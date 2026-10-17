@@ -30,12 +30,7 @@ public static class ContentDispositionParser
         fileName = string.Empty;
         isExtended = false;
 
-        if (string.IsNullOrWhiteSpace(headerValue) || headerValue.Length > MaxHeaderLength)
-        {
-            return false;
-        }
-
-        if (!TryScanHeader(headerValue.AsSpan(), out var extended, out var plain))
+        if (!TryGetCandidates(headerValue, out var extended, out var plain))
         {
             return false;
         }
@@ -62,33 +57,9 @@ public static class ContentDispositionParser
         fileName = string.Empty;
         isExtended = false;
 
-        if (headerValues is null)
+        if (!TryGetCandidates(headerValues, out var firstExtended, out var firstPlain))
         {
             return false;
-        }
-
-        string? firstExtended = null;
-        string? firstPlain = null;
-        var totalLength = 0;
-
-        foreach (var header in headerValues)
-        {
-            if (string.IsNullOrWhiteSpace(header))
-            {
-                continue;
-            }
-
-            totalLength += header.Length;
-            if (totalLength > MaxHeaderLength)
-            {
-                return false;
-            }
-
-            if (TryScanHeader(header.AsSpan(), out var extended, out var plain))
-            {
-                firstExtended ??= extended;
-                firstPlain ??= plain;
-            }
         }
 
         if (!string.IsNullOrEmpty(firstExtended))
@@ -106,6 +77,55 @@ public static class ContentDispositionParser
         }
 
         return false;
+    }
+
+    internal static bool TryGetCandidates(string? headerValue, out string? extendedFileName, out string? plainFileName)
+    {
+        extendedFileName = null;
+        plainFileName = null;
+
+        if (string.IsNullOrWhiteSpace(headerValue) || headerValue.Length > MaxHeaderLength)
+        {
+            return false;
+        }
+
+        return TryScanHeader(headerValue.AsSpan(), out extendedFileName, out plainFileName);
+    }
+
+    internal static bool TryGetCandidates(IEnumerable<string>? headerValues, out string? extendedFileName, out string? plainFileName)
+    {
+        extendedFileName = null;
+        plainFileName = null;
+
+        if (headerValues is null)
+        {
+            return false;
+        }
+
+        var totalLength = 0;
+        foreach (var header in headerValues)
+        {
+            if (string.IsNullOrWhiteSpace(header))
+            {
+                continue;
+            }
+
+            totalLength += header.Length;
+            if (totalLength > MaxHeaderLength)
+            {
+                extendedFileName = null;
+                plainFileName = null;
+                return false;
+            }
+
+            if (TryScanHeader(header.AsSpan(), out var extended, out var plain))
+            {
+                extendedFileName ??= extended;
+                plainFileName ??= plain;
+            }
+        }
+
+        return extendedFileName is not null || plainFileName is not null;
     }
 
     private static bool TryScanHeader(ReadOnlySpan<char> header, out string? extendedFileName, out string? plainFileName)
