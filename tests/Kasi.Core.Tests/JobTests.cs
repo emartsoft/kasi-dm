@@ -1,6 +1,7 @@
 namespace Kasi.Core.Tests;
 
-[Trait("Requirement", "TRD-6.9")]
+[Trait("Requirement", "KASI-RES-004")]
+[Trait("Requirement", "KASI-MED-004")]
 public class JobTests
 {
     private static readonly DateTimeOffset _start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);

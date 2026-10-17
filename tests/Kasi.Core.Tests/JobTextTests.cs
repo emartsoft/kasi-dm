@@ -1,7 +1,7 @@
 namespace Kasi.Core.Tests;
 
 /// <summary>The state and kind strings are what is stored in SQLite, so they are pinned here.</summary>
-[Trait("Requirement", "TRD-6.9")]
+[Trait("Requirement", "KASI-RES-006")]
 public class JobTextTests
 {
     private static readonly string[] _stateNames =

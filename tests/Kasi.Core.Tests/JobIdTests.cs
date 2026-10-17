@@ -1,6 +1,6 @@
 namespace Kasi.Core.Tests;
 
-[Trait("Requirement", "TRD-11.2")]
+[Trait("Requirement", "KASI-RES-006")]
 public class JobIdTests
 {
     private static readonly DateTimeOffset _start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);

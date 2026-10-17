@@ -1,6 +1,7 @@
 namespace Kasi.Core.Tests;
 
-[Trait("Requirement", "TRD-6.9")]
+[Trait("Requirement", "KASI-RES-004")]
+[Trait("Requirement", "KASI-MED-004")]
 public class JobStateMachineTests
 {
     // Written out independently of the implementation: this table is the specification.
