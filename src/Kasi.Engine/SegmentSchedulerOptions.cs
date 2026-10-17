@@ -10,6 +10,9 @@ public sealed record SegmentSchedulerOptions
     /// <summary>Most connections the download may use (the caller maps the job's or queue's setting here).</summary>
     public int MaxConnections { get; init; } = DefaultMaxConnections;
 
+    /// <summary>How many connections may transfer before the ramp-up adds more; TRD 6.3 starts with one.</summary>
+    public int InitialConnections { get; init; } = 1;
+
     /// <summary>A segment is only split when each half keeps at least this many unleased bytes.</summary>
     public long MinSplitSize { get; init; } = 1L * 1024 * 1024;
 
@@ -38,7 +41,10 @@ public sealed record SegmentSchedulerOptions
 
     public TimeSpan RampUpInterval { get; init; } = TimeSpan.FromMilliseconds(250);
 
-    /// <summary>Aggregate throughput must rise by this fraction over the previous window for another connection to be added.</summary>
+    /// <summary>
+    /// Another connection is added only if the one added last raised aggregate throughput by at least this fraction of the throughput
+    /// of an average existing connection (so a link that scales linearly keeps ramping to 32, and a saturated one stops at once).
+    /// </summary>
     public double RampUpThroughputGainThreshold { get; init; } = 0.05;
 
     /// <summary>Near the end of the file cap a lease at <c>remaining / connections</c> so one big lease does not leave the others idle. Off until measured (M1.15).</summary>
@@ -64,6 +70,8 @@ public sealed record SegmentSchedulerOptions
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxConnections, MinConnectionLimit);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(MaxConnections, MaxConnectionLimit);
+        ArgumentOutOfRangeException.ThrowIfLessThan(InitialConnections, MinConnectionLimit);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(InitialConnections, MaxConnections);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MinSplitSize);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(PageAlignment);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MinLeaseBytes);

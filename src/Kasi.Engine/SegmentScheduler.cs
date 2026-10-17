@@ -24,7 +24,13 @@ public sealed class SegmentScheduler
     private int _incompleteSegments;
     private long _totalWritten;
     private int _structureVersion;
-    private readonly int _allowedConnections; // becomes mutable with the ramp-up (next commit)
+    private int _allowedConnections;
+    private int _connectionCap;
+    private bool _rampStopped;
+    private bool _newestSeen;
+    private DateTimeOffset _rampWindowStart;
+    private long _rampWindowBytes;
+    private double? _previousRate;
     private bool _firstLeaseIssued;
 
     /// <summary>Starts a fresh download: one segment covering the whole file (none for an empty file).</summary>
@@ -90,7 +96,8 @@ public sealed class SegmentScheduler
         _nextSegmentIndex = _segments.Count == 0 ? 0 : _segments.Max(s => s.Index) + 1;
         _incompleteSegments = _segments.Count(s => !s.IsComplete);
         _totalWritten = _segments.Sum(s => s.Written);
-        _allowedConnections = rangesSupported ? _options.MaxConnections : 1;
+        _connectionCap = _options.MaxConnections;
+        _allowedConnections = rangesSupported ? _options.InitialConnections : 1;
     }
 
     public long TotalBytes { get; }
@@ -164,12 +171,12 @@ public sealed class SegmentScheduler
 
         lock (_gate)
         {
+            var now = _time.GetUtcNow();
+            EvaluateRampUpCore(now);
             if (_incompleteSegments == 0 || workerId >= _allowedConnections || _workerLease[workerId] is not null)
             {
                 return null;
             }
-
-            var now = _time.GetUtcNow();
 
             // 1. keep going on the segment this worker already owns
             var own = _workerSegment[workerId];
@@ -225,6 +232,7 @@ public sealed class SegmentScheduler
 
             var now = _time.GetUtcNow();
             _speeds[lease.Worker].Add(bytesWritten, now);
+            CountForRampUp(lease.Worker, bytesWritten, now);
 
             var before = segment.Cursor;
             lease.Cursor += bytesWritten;
@@ -240,7 +248,44 @@ public sealed class SegmentScheduler
                 }
             }
 
+            EvaluateRampUpCore(now);
             return new LeaseAdvanceResult(before, gain, lease.Cursor == lease.End, IsSuperseded: false);
+        }
+    }
+
+    /// <summary>
+    /// Adds a connection when it is time (TRD 6.3): after the first 250 ms of transfer one is added; after that one more each 250 ms
+    /// window while the connection added last raised aggregate throughput by at least 5% of what an average existing connection
+    /// moves (ADR 0004: a flat 5% of the total cannot be met beyond 20 connections even on a link that scales perfectly, which would
+    /// make TC-ENG-006 unreachable at 32). The first window that falls short ends the ramp-up for this download. Also runs from
+    /// <see cref="TryAcquireNextLease"/> and <see cref="AdvanceLease"/>.
+    /// </summary>
+    /// <returns>How many connections are allowed now.</returns>
+    public int EvaluateRampUp()
+    {
+        lock (_gate)
+        {
+            EvaluateRampUpCore(_time.GetUtcNow());
+            return _allowedConnections;
+        }
+    }
+
+    /// <summary>
+    /// The host is throttling (429, 503 with Retry-After): lower the connection limit and stop ramping up. Workers above the new
+    /// limit finish their current lease and get no more; their segments are released for the others.
+    /// </summary>
+    public void ReduceAllowedConnections(int count = 1)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+        lock (_gate)
+        {
+            _connectionCap = Math.Max(1, _connectionCap - count);
+            _allowedConnections = Math.Max(1, Math.Min(_allowedConnections, _connectionCap));
+            _rampStopped = true;
+            for (var worker = _allowedConnections; worker < _workerSegment.Length; worker++)
+            {
+                ReleaseIfOverLimit(worker);
+            }
         }
     }
 
@@ -263,6 +308,8 @@ public sealed class SegmentScheduler
             {
                 ReleaseOwnership(lease.Segment);
             }
+
+            ReleaseIfOverLimit(lease.Worker);
         }
     }
 
@@ -288,6 +335,82 @@ public sealed class SegmentScheduler
                 ReleaseOwnership(segment);
                 PromoteShadow(segment);
             }
+        }
+    }
+
+    private bool RampUpActive => _rangesSupported && !_rampStopped && _allowedConnections < _connectionCap;
+
+    private void CountForRampUp(int worker, int bytes, DateTimeOffset now)
+    {
+        if (!RampUpActive)
+        {
+            return;
+        }
+
+        if (!_newestSeen && worker == _allowedConnections - 1)
+        {
+            // the connection added last has just started: measure from here so its start-up time is not held against it
+            _newestSeen = true;
+            _rampWindowStart = now;
+            _rampWindowBytes = 0;
+        }
+
+        if (_newestSeen)
+        {
+            _rampWindowBytes += bytes;
+        }
+    }
+
+    private void EvaluateRampUpCore(DateTimeOffset now)
+    {
+        if (!RampUpActive || !_newestSeen || now - _rampWindowStart < _options.RampUpInterval)
+        {
+            return;
+        }
+
+        var rate = _rampWindowBytes / (now - _rampWindowStart).TotalSeconds;
+        if (_previousRate is { } previous && rate - previous < _options.RampUpThroughputGainThreshold * previous / (_allowedConnections - 1))
+        {
+            _rampStopped = true; // the last connection added did not raise throughput enough: this is as many as this server gives
+            return;
+        }
+
+        if (!HasSplittableWork())
+        {
+            _rampWindowStart = now;
+            _rampWindowBytes = 0;
+            return; // nothing for another connection to do; look again next window
+        }
+
+        _previousRate = rate;
+        _allowedConnections++;
+        _newestSeen = false;
+    }
+
+    /// <summary>True when another connection would have something to fetch: an unowned segment or one with enough unleased bytes to split.</summary>
+    private bool HasSplittableWork()
+    {
+        foreach (var segment in _segments)
+        {
+            if (segment.IsComplete)
+            {
+                continue;
+            }
+
+            if (segment.Owner < 0 || segment.End - segment.LeaseEnd >= 2 * _options.MinSplitSize)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ReleaseIfOverLimit(int worker)
+    {
+        if (worker >= _allowedConnections && _workerLease[worker] is null && _workerSegment[worker] is { } segment)
+        {
+            ReleaseOwnership(segment);
         }
     }
 

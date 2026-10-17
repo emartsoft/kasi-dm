@@ -22,7 +22,12 @@ internal sealed class SchedulerSimulator
         TimeSpan? tick = null,
         IEnumerable<Kasi.Core.Segment>? existingSegments = null)
     {
-        Options = options ?? new SegmentSchedulerOptions { MaxConnections = bytesPerSecondPerWorker.Length };
+        // without explicit options every worker may start at once, so tests of splitting and completion are not also tests of the ramp-up
+        Options = options ?? new SegmentSchedulerOptions
+        {
+            MaxConnections = bytesPerSecondPerWorker.Length,
+            InitialConnections = bytesPerSecondPerWorker.Length,
+        };
         Time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.Zero));
         Scheduler = existingSegments is null
             ? new SegmentScheduler(totalBytes, rangesSupported, Options, Time)

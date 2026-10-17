@@ -18,7 +18,7 @@ public class SegmentSchedulerTests
         bool rangesSupported = true,
         bool probe = false,
         FakeTimeProvider? time = null) =>
-        new(total, rangesSupported, new SegmentSchedulerOptions { MaxConnections = workers }, time ?? new FakeTimeProvider(), probe);
+        new(total, rangesSupported, new SegmentSchedulerOptions { MaxConnections = workers, InitialConnections = workers }, time ?? new FakeTimeProvider(), probe);
 
     private static long AlignUp(long value, long alignment) => (value + alignment - 1) / alignment * alignment;
 
@@ -179,7 +179,7 @@ public class SegmentSchedulerTests
         var scheduler = new SegmentScheduler(
             total,
             rangesSupported: true,
-            new SegmentSchedulerOptions { MaxConnections = 2, PageAlignment = 1 * GiB },
+            new SegmentSchedulerOptions { MaxConnections = 2, InitialConnections = 2, PageAlignment = 1 * GiB },
             new FakeTimeProvider());
         var first = scheduler.TryAcquireNextLease(0)!.Value;
 
@@ -384,7 +384,7 @@ public class SegmentSchedulerTests
         var scheduler = new SegmentScheduler(
             3000 * KiB,
             [new Segment(0, 0, 1000 * KiB, 1000 * KiB), new Segment(1, 1000 * KiB, 3000 * KiB, 500 * KiB)],
-            options: new SegmentSchedulerOptions { MaxConnections = 4 });
+            options: new SegmentSchedulerOptions { MaxConnections = 4, InitialConnections = 4 });
 
         var lease = scheduler.TryAcquireNextLease(0)!.Value;
 
@@ -409,7 +409,7 @@ public class SegmentSchedulerTests
         var scheduler = new SegmentScheduler(
             100 * MiB,
             [new Segment(5, 0, 50 * MiB), new Segment(2, 50 * MiB, 100 * MiB)],
-            options: new SegmentSchedulerOptions { MaxConnections = 4 });
+            options: new SegmentSchedulerOptions { MaxConnections = 4, InitialConnections = 4 });
         _ = scheduler.TryAcquireNextLease(0);
         _ = scheduler.TryAcquireNextLease(1);
 

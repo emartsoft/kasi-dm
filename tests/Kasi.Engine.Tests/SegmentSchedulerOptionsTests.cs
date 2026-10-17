@@ -11,6 +11,7 @@ public class SegmentSchedulerOptionsTests
         var options = new SegmentSchedulerOptions();
 
         options.MaxConnections.Should().Be(8);
+        options.InitialConnections.Should().Be(1);
         options.MinSplitSize.Should().Be(1024 * 1024);
         options.PageAlignment.Should().Be(64 * 1024);
         options.MinLeaseBytes.Should().Be(512 * 1024);
@@ -41,6 +42,8 @@ public class SegmentSchedulerOptionsTests
     {
         { "0 connections", new SegmentSchedulerOptions { MaxConnections = 0 } },
         { "33 connections", new SegmentSchedulerOptions { MaxConnections = 33 } },
+        { "0 initial connections", new SegmentSchedulerOptions { InitialConnections = 0 } },
+        { "more initial than maximum connections", new SegmentSchedulerOptions { MaxConnections = 4, InitialConnections = 5 } },
         { "zero min split", new SegmentSchedulerOptions { MinSplitSize = 0 } },
         { "zero alignment", new SegmentSchedulerOptions { PageAlignment = 0 } },
         { "zero min lease", new SegmentSchedulerOptions { MinLeaseBytes = 0 } },

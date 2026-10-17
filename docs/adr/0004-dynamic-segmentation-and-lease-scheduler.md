@@ -35,8 +35,16 @@ unfinished segment; whichever lease finishes first wins and the other is told it
 2 MiB per download.
 
 **Ramp-up.** Start with one connection. After the first 250 ms with positive throughput add a second; afterwards add one per
-250 ms window while aggregate throughput rose by at least 5% over the previous window, stopping for good at the first window
-that did not. The thresholds are options so the M1.15 benchmark can tune them.
+250 ms window while the connection added last raised aggregate throughput by at least 5% of what an average existing connection
+moves (`R_k - R_(k-1) >= 0.05 * R_(k-1) / (k-1)`), stopping for good at the first window that fell short. Each window is
+measured from the moment the newest connection starts transferring, so its start-up time is not held against it, and no
+connection is added when there is nothing left for it to fetch.
+
+*Why not a flat 5% of the total, as TRD 6.3 reads.* On a link that scales perfectly the gain from connection k to k+1 is 1/k, which
+drops below 5% at k = 20, so a flat threshold stops at 20 or 21 connections and TC-ENG-006 (count 32 reached) could never pass.
+The marginal rule keeps ramping while each new connection still contributes like an average one, and stops at once on a
+saturated link. The simulation tests show both, and show the flat rule failing the 32-connection case. `InitialConnections` and
+the threshold are options so M1.15's benchmark can tune them.
 
 **First lease.** For any download the engine intends to segment it probes with a bounded first range
 (`firstRangeLength = 512 KiB`). The probe response is exactly worker 0's first lease and ends by itself, returning the
