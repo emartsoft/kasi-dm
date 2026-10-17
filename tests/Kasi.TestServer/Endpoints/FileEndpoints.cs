@@ -5,7 +5,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace Kasi.TestServer.Endpoints;
 
-/// <summary><c>/files</c>, <c>/norange</c>, <c>/chunked</c> and <c>/mutable</c> (TPL 3.1).</summary>
+/// <summary><c>/files</c>, <c>/novalidators</c>, <c>/norange</c>, <c>/chunked</c> and <c>/mutable</c> (TPL 3.1).</summary>
 internal static class FileEndpoints
 {
     private const string ContentType = "application/octet-stream";
@@ -26,6 +26,19 @@ internal static class FileEndpoints
                 && session.RequestIndex >= after;
             var effective = changed ? seed + "~changed" : seed;
             return Ranged(effective, size, $"\"{effective}-{size}\"", changed ? _baseModified.AddDays(1) : _baseModified);
+        });
+
+        // Range-capable, without ETag or Last-Modified (TC-RES-010).
+        app.MapMethods("/novalidators/{seed}/{size:long}", _getAndHead, (string seed, long size) =>
+        {
+            if (!IsValid(seed, size))
+            {
+                return Results.BadRequest();
+            }
+
+#pragma warning disable CA2000 // the stream result owns the stream and disposes it after the response
+            return Results.Stream(new GeneratedStream(seed, size), ContentType, enableRangeProcessing: true);
+#pragma warning restore CA2000
         });
 
         // Ignores Range and always answers 200 with the whole body.

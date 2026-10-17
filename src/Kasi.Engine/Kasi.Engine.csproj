@@ -9,4 +9,8 @@
     <ProjectReference Include="../Kasi.Core/Kasi.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kasi.Engine.Tests" />
+  </ItemGroup>
+
 </Project>
