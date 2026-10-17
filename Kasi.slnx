@@ -10,6 +10,9 @@
     <Project Path="src/Kasi.Scheduling/Kasi.Scheduling.csproj" />
     <Project Path="src/Kasi.Torrent/Kasi.Torrent.csproj" />
   </Folder>
+  <Folder Name="/bench/">
+    <Project Path="bench/Kasi.Bench/Kasi.Bench.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Kasi.App.Tests/Kasi.App.Tests.csproj" />
     <Project Path="tests/Kasi.ArchitectureTests/Kasi.ArchitectureTests.csproj" />
