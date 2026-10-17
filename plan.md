@@ -64,10 +64,10 @@ M0 is **closed for engineering** (2026-10-17): PRs #1 to #5 are squash-merged in
 | [x] Defect tracker: `bug`, `needs-triage`, `security` and four `severity:` labels created; bug template has severity and linked-test-case fields | dev | done |
 | [x] Set `CLAUDE.md` "Current phase" to M1 | dev | done |
 | [ ] Protect `main`: squash merge only, required check **Build, test, coverage**, approvals per CONTRIBUTING 5.2. GitHub refuses branch protection on a private repo without the Pro plan | you | upgrade the plan or make the repo public, then apply |
-| [ ] Approve test plan v0.1 | CTO | recorded in the TPL document control |
-| [ ] Code-signing certificate: EV certificate or Azure Trusted Signing (Appendix B #4); not needed before the first public build in M4 | you | procured; secrets in CI secret storage only |
+| [x] Approve test plan v0.1 and the TRD | CTO | done: signed MM, 17 Oct 2026 in both document-control tables |
+| [ ] Code-signing certificate: EV certificate or Azure Trusted Signing (Appendix B #4). Deadline set to the end of M4, but M4.6 signs the beta builds, so it is needed when M4.6 starts or the beta ships unsigned and triggers SmartScreen warnings | you | procured; secrets in CI secret storage only |
 | [ ] Choose the ARM64 runner (hosted or self-hosted) | lead dev | decision recorded; ARM64 build job added in M4 |
-| [ ] Product name check: keep "Kasi" or choose a final brand, trademark check in Kenya and key markets (Appendix B #1) | you | decision recorded |
+| [x] Product name: **Kasi Download Manager** (Appendix B #1) | you | done; a trademark search in Kenya and key markets is still advisable before the first public build |
 | [ ] Confirm the 24-week estimate and sub-task weeks in this file | CTO | sign-off |
 | [ ] Verify Native AOT publish of `Kasi.NativeHost` (link step failed on the author's machine: `vswhere.exe` not found); moves to M2 when the host has code | dev | `dotnet publish -r win-x64` succeeds locally or in CI |
 
@@ -192,7 +192,7 @@ Suggested order by week: 3 (M1.1 to M1.3, CI Ubuntu leg), 4 (M1.4, M1.5 logic), 
 | [ ] M5.1 | **Grid polish:** configurable and persisted columns and sort, search and filter within 100 ms for 10,000 jobs | UI-007, UI-008, NFR-006, TC-UI-006 | frames under 16 ms with 20 jobs updating |
 | [ ] M5.2 | **Themes:** manual light, dark and system override | UI-006, TC-UI-005 | override persists |
 | [ ] M5.3 | **Accessibility audit:** Narrator reads name, status and progress; full keyboard operation; WCAG 2.2 AA contrast; Accessibility Insights scan clean | UI-010, NFR-017, TC-UI-007 | audit report |
-| [ ] M5.4 | **Kiswahili localisation** (in-house or contracted, Appendix B #7, decision due at the start of M5) and language switch without restart | UI-009, TC-UI-008 | all UI text switches; no hard-coded strings |
+| [ ] M5.4 | **English only (Appendix B #7):** Kiswahili is not shipped. Keep every user-visible string in `.resx` so a language can be added later, and audit that nothing is hard-coded | UI-009 dropped, TC-UI-008 not run | no hard-coded strings; the requirement change is recorded in the TRD and TPL |
 | [ ] M5.5 | **Performance sign-off:** cold start under 1.5 s, idle memory under 80 MB, under 250 MB with 20 jobs, CPU under 5% of one core at 100 MB/s, installer under 60 MB, final IDM comparison within 5% | NFR-001 to 006, NFR-020 | benchmark report with PerfView, ETW and Windows Performance Recorder evidence |
 | [ ] M5.6 | **Full regression and compatibility matrix**; final fault-injection run | NFR-007, NFR-014, NFR-015 | all suites green on the release candidate |
 | [ ] M5.7 | **Usability sessions:** first download from install in under 2 minutes for a new user (5 moderated users) | NFR-016 | session report |
@@ -213,13 +213,13 @@ Suggested order by week: 3 (M1.1 to M1.3, CI Ubuntu leg), 4 (M1.4, M1.5 logic), 
 
 | # | Item | Owner | Needed by |
 | --- | --- | --- | --- |
-| 1 | Product name and trademark check | Martin Maiyo | end of M0 |
-| 2 | Licensing and business model (recorded as Free and Open Source, Appendix B #2) | MartSoft Solutions | end of M1 |
+| 1 | Product name: Kasi Download Manager | Martin Maiyo | done |
+| 2 | Licensing and business model: Free and Open Source | MartSoft Solutions | done; the specific licence and a `LICENSE` file are still to choose (see 5) |
 | 3 | UI library: decided 17 Oct 2026 (Avalonia + FluentAvalonia, MIT only) | lead developer | done |
-| 4 | Code-signing certificate | Martin Maiyo | end of M0 |
-| 5 | Source availability: closed or open the engine | MartSoft Solutions | end of M1 |
+| 4 | Code-signing certificate | Martin Maiyo | end of M4 |
+| 5 | Source availability and licence: Free and Open Source implies open source, so confirm the engine is open, pick the licence (it must be compatible with FFmpeg LGPL and the MIT and Apache-2.0 dependencies), and add `LICENSE`. A public repo also enables branch protection on the free plan | MartSoft Solutions | end of M1 |
 | 6 | Crash-reporting backend (Sentry, hosted or self-hosted) | lead developer | start of M4 |
-| 7 | Kiswahili localisation route | Martin Maiyo | start of M5 |
+| 7 | Kiswahili localisation: keep English only | Martin Maiyo | done |
 | 8 | Appoint QA lead | Martin Maiyo | start of M1 |
 | 9 | Benchmark machine and IDM test licence | Martin Maiyo | week 4 |
 | 10 | ARM64 runner | lead developer | end of M0 |
@@ -244,7 +244,7 @@ From TRD Appendix C and TPL 10, with the action each needs in this plan.
 
 ## 11. Not in v1.0
 
-Recorded so scope stays honest: macOS and Linux builds, mobile, cloud sync, site-specific extractors, any handling of DRM content, a local REST API (KASI-SYS-008, P4), and a command-line interface (KASI-SYS-007, P4). P3 items (BRW-007, MED-007, MED-008, QUE-006, UI-009) ship only if capacity allows; the rest of the P2 list can slip to v1.1 with approval.
+Recorded so scope stays honest: macOS and Linux builds, mobile, cloud sync, site-specific extractors, any handling of DRM content, a local REST API (KASI-SYS-008, P4), and a command-line interface (KASI-SYS-007, P4). P3 items (BRW-007, MED-007, MED-008, QUE-006) ship only if capacity allows; UI-009 (Kiswahili) is dropped, v1.0 is English only; the rest of the P2 list can slip to v1.1 with approval.
 
 ## 12. Requirement coverage
 
@@ -356,7 +356,7 @@ Every requirement from TRD sections 3 and 4 and the phase that delivers it. Prio
 | UI-006 Light and dark | P2 | M2 follows Windows, M5 override | M2.9, M5.2 |
 | UI-007 Columns and sort | P2 | M5 | M5.1 |
 | UI-008 Search and filter | P2 | M5 | M5.1 |
-| UI-009 Localisation | P3 | M5 | M5.4 |
+| UI-009 Localisation (Kiswahili) | P3 | dropped from v1.0: English only | M5.4 keeps strings in resources |
 | UI-010 Keyboard and screen reader | P2 | M2 names, M5 audit | M2.9, M5.3 |
 
 ### 12.10 System (SYS)
