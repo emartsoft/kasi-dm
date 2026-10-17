@@ -478,7 +478,7 @@ public sealed class PartFileWriter : IAsyncDisposable, IDisposable
             Kernel32.FsctlSetSparse,
             &input,
             (uint)sizeof(Kernel32.FileSetSparseBuffer),
-             null,
+            null,
             0,
             out _,
             0);

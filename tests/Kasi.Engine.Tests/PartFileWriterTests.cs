@@ -132,6 +132,7 @@ public sealed class PartFileWriterTests : IDisposable
     [Fact]
     public async Task SealAsync_rejects_file_with_unwritten_sparse_hole_even_when_caller_passes_matching_bytesWritten()
     {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Hole detection relies on sparse files (FSCTL_QUERY_ALLOCATED_RANGES), which are Windows-only here.");
         var ct = TestContext.Current.CancellationToken;
         const int size = 3 * 256 * 1024;
         using var opened = PartFileWriter.TryOpen(_tempDir, "hole.bin", size).Should().BeOfType<PartFileOpened>().Subject;
