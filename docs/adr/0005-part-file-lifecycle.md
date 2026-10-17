@@ -64,6 +64,7 @@ idle workers hold no buffer against the 250 MB memory budget (`KASI-NFR-004`). I
 
 - `SegmentScheduler.AdvanceLease` is called only after `PartFileWriter.WriteAsync` succeeds, and `ICheckpointWriter.Record` is
   called only after `PartFileWriter.FlushAsync` returns on a cursor snapshot taken before the flush (ADR 0003, ADR 0004).
-- Concurrent `WriteAsync` calls on one asynchronous `SafeFileHandle` do not allocate per 16 KiB network chunk; each 256 KiB OS
-  write uses `PoolingAsyncValueTaskMethodBuilder` and allocates only the small Win32 overlapped structure when completing
-  asynchronously.
+- Concurrent `WriteAsync` calls on one asynchronous `SafeFileHandle` do not allocate per 16 KiB network chunk (`0 B` on the
+  15/16 buffered chunks; `38 B` amortised per 16 KiB call including the 16th-call flush in `PartFileWriteBenchmarks`, and
+  `389 B` / `93.3 us` per direct 256 KiB `PartFileWriter.WriteAsync` on `.NET 10.0.12` X64 RyuJIT). Each 256 KiB OS write uses
+  `PoolingAsyncValueTaskMethodBuilder` and allocates only the small Win32 overlapped structure when completing asynchronously.
