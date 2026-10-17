@@ -135,6 +135,7 @@ public sealed class FileEndpointTests : IAsyncLifetime
 
     [Theory]
     [InlineData("/files/a/-1")]
+    [InlineData("/novalidators/a/-1")]
     [InlineData("/norange/a/-1")]
     [InlineData("/chunked/a/-1")]
     public async Task Negative_size_is_a_bad_request(string url)
@@ -142,6 +143,20 @@ public sealed class FileEndpointTests : IAsyncLifetime
         using var response = await _client.GetAsync(url, TestClient.Ct);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Novalidators_supports_Range_without_ETag_or_Last_Modified()
+    {
+        using var request = Get("/novalidators/nv/5000", new RangeHeaderValue(0, null));
+        using var response = await _client.SendAsync(request, TestClient.Ct);
+        var body = await response.Content.ReadAsByteArrayAsync(TestClient.Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.PartialContent);
+        response.Content.Headers.ContentRange!.ToString().Should().Be("bytes 0-4999/5000");
+        response.Headers.ETag.Should().BeNull();
+        response.Content.Headers.LastModified.Should().BeNull();
+        body.Should().Equal(GeneratedContent.Bytes("nv", 5000));
     }
 
     [Fact]
