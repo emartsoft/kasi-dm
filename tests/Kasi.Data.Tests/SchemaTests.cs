@@ -7,14 +7,11 @@ namespace Kasi.Data.Tests;
 [Trait("Category", "Integration")]
 public sealed class SchemaTests : IAsyncLifetime, IDisposable
 {
-    private const string InsertQueue = "INSERT INTO queue (id, name, sort_order) VALUES (1, 'Main', 0);";
-
     private readonly TempDatabase _db = new();
 
     public async ValueTask InitializeAsync()
     {
-        await new MigrationRunner(_db.Factory).MigrateAsync(TempDatabase.Ct);
-        await _db.ExecAsync(InsertQueue);
+        await new MigrationRunner(_db.Factory).MigrateAsync(TempDatabase.Ct); // queue 1 and the default categories come from migration 0002
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -54,7 +51,7 @@ public sealed class SchemaTests : IAsyncLifetime, IDisposable
     [Theory]
     [InlineData("INSERT INTO queue (id, name, sort_order, quota_reset) VALUES (2, 'Q2', 1, 'hourly');", "quota_reset outside daily/weekly/never")]
     [InlineData("INSERT INTO queue (id, name, sort_order) VALUES (2, 'Main', 1);", "duplicate queue name")]
-    [InlineData("INSERT INTO category (name, folder) VALUES ('Video', 'v'), ('Video', 'w');", "duplicate category name")]
+    [InlineData("INSERT INTO category (name, folder) VALUES ('Video', 'v');", "duplicate category name")]
     public async Task Rejects_invalid_queue_and_category_rows(string sql, string reason)
     {
         Func<Task> act = () => _db.ExecAsync(sql);
