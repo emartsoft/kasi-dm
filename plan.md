@@ -63,12 +63,12 @@ M0 is **closed for engineering** (2026-10-17): PRs #1 to #5 are squash-merged in
 | [x] CI green on GitHub (Windows runner), workflow runs on PRs to any base branch | dev | done |
 | [x] Defect tracker: `bug`, `needs-triage`, `security` and four `severity:` labels created; bug template has severity and linked-test-case fields | dev | done |
 | [x] Set `CLAUDE.md` "Current phase" to M1 | dev | done |
-| [ ] Protect `main`: squash merge only, required check **Build, test, coverage**, approvals per CONTRIBUTING 5.2. GitHub refuses branch protection on a private repo without the Pro plan | you | upgrade the plan or make the repo public, then apply |
+| [ ] Protect `main`: squash merge only, required check **Build, test, coverage**, approvals per CONTRIBUTING 5.2. Unblocked: the repo became public on 17 Oct 2026, so GitHub now allows it | you | settings applied (not yet applied) |
 | [x] Approve test plan v0.1 and the TRD | CTO | done: signed MM, 17 Oct 2026 in both document-control tables |
-| [ ] Code-signing certificate: EV certificate or Azure Trusted Signing (Appendix B #4). Deadline set to the end of M4, but M4.6 signs the beta builds, so it is needed when M4.6 starts or the beta ships unsigned and triggers SmartScreen warnings | you | procured; secrets in CI secret storage only |
-| [ ] Choose the ARM64 runner (hosted or self-hosted) | lead dev | decision recorded; ARM64 build job added in M4 |
+| [ ] Code-signing certificate (Appendix B #4). Deadline set to the end of M4, but M4.6 signs the beta builds, so it is needed when M4.6 starts or the beta ships unsigned and triggers SmartScreen warnings. Eligibility checks and applications take weeks: start them by M3. Options: SignPath Foundation (free for open source), Azure Trusted Signing (check Kenya eligibility), or an EV certificate on cloud signing | you | route chosen, applied for, secrets in CI secret storage only |
+| [ ] Choose the ARM64 runner. Recommended: GitHub-hosted `windows-11-arm`, free for public repos, for build and unit tests on ARM64; an x64 runner cross-publishes `win-arm64` artifacts; a Windows 11 ARM64 VM covers release-candidate smoke runs | lead dev | decision recorded; ARM64 job added in M4 |
 | [x] Product name: **Kasi Download Manager** (Appendix B #1) | you | done; a trademark search in Kenya and key markets is still advisable before the first public build |
-| [ ] Confirm the 24-week estimate and sub-task weeks in this file | CTO | sign-off |
+| [x] Confirm the 24-week estimate and sub-task weeks in this file | CTO | done: approved 17 Oct 2026 |
 | [ ] Verify Native AOT publish of `Kasi.NativeHost` (link step failed on the author's machine: `vswhere.exe` not found); moves to M2 when the host has code | dev | `dotnet publish -r win-x64` succeeds locally or in CI |
 
 ## 4. M1: Download engine, resume, bandwidth (weeks 3 to 8)
