@@ -20,6 +20,7 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
     private readonly Channel<Message> _channel = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions { SingleReader = true });
     private readonly Dictionary<(JobId Job, int Segment), long> _pending = [];
     private readonly CancellationTokenSource _stop = new();
+    private PeriodicTimer? _timer;
     private Task? _ticker;
     private Task? _reader;
     private int _commits;
@@ -51,6 +52,9 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
             return;
         }
 
+        // Created here, not inside the ticker task: the first tick is due one interval after Start returns, however
+        // long the thread pool takes to start the task. (A timer made later would measure from the wrong moment.)
+        _timer = new PeriodicTimer(_interval, _time);
         _reader = Task.Run(ReadAsync);
         _ticker = Task.Run(TickAsync);
     }
@@ -94,15 +98,15 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
         }
 #pragma warning restore VSTHRD003
 
+        _timer?.Dispose();
         _stop.Dispose();
     }
 
     private async Task TickAsync()
     {
-        using var timer = new PeriodicTimer(_interval, _time);
         try
         {
-            while (await timer.WaitForNextTickAsync(_stop.Token).ConfigureAwait(false))
+            while (await _timer!.WaitForNextTickAsync(_stop.Token).ConfigureAwait(false))
             {
                 _channel.Writer.TryWrite(Tick.Instance);
             }
