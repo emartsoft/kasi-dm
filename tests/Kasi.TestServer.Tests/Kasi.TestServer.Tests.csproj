@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
+  </ItemGroup>
+
+</Project>

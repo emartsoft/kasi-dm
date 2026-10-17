@@ -4,11 +4,15 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Kasi.TestServer is a runnable server, not a test assembly: it gets none of the test packages. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer'">
     <IsTestProject>true</IsTestProject>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer'">
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
@@ -16,7 +20,7 @@
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer'">
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
   </ItemGroup>
