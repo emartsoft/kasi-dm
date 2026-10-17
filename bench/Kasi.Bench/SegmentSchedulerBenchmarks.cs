@@ -39,15 +39,19 @@ public class SegmentSchedulerBenchmarks
         return _scheduler.AdvanceLease(_leaseId, ChunkBytes);
     }
 
-    /// <summary>Acquire, advance and complete one lease, which also exercises the split path while the file is large.</summary>
+    /// <summary>
+    /// Worker 0 takes, advances and completes a lease, and worker 1 then takes a lease by splitting the large segment. Both workers
+    /// are allowed from the start (<c>InitialConnections = 2</c>); with the default of one, worker 1 would be refused and no split would happen.
+    /// </summary>
     [Benchmark]
     public bool AcquireAdvanceComplete()
     {
-        var scheduler = new SegmentScheduler(FileBytes);
+        var scheduler = new SegmentScheduler(FileBytes, options: new SegmentSchedulerOptions { InitialConnections = 2 });
         var lease = scheduler.TryAcquireNextLease(0)!.Value;
         scheduler.AdvanceLease(lease.LeaseId, (int)lease.Length);
         scheduler.CompleteLease(lease.LeaseId);
-        return scheduler.TryAcquireNextLease(1) is not null;
+        var split = scheduler.TryAcquireNextLease(1);
+        return split is not null && scheduler.StructureVersion == 1;
     }
 
     private void StartLease()
