@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Kasi.TestServer": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
