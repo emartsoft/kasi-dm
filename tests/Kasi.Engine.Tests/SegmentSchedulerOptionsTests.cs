@@ -65,6 +65,21 @@ public class SegmentSchedulerOptionsTests
         act.Should().Throw<ArgumentOutOfRangeException>(reason);
     }
 
+    [Theory]
+    [InlineData(0.0, 512 * 1024L)]                      // cold worker
+    [InlineData(-5.0, 512 * 1024L)]
+    [InlineData(double.NaN, 512 * 1024L)]
+    [InlineData(double.PositiveInfinity, 512 * 1024L)]
+    [InlineData(100_000.0, 512 * 1024L)]                // 0.2 MB: below the minimum
+    [InlineData(1024.0 * 1024, 2 * 1024 * 1024L)]       // 1 MiB/s: two seconds
+    [InlineData(5.0 * 1024 * 1024, 10 * 1024 * 1024L)]
+    [InlineData(8.0 * 1024 * 1024, 16 * 1024 * 1024L)]  // exactly the cap
+    [InlineData(20.0 * 1024 * 1024, 16 * 1024 * 1024L)] // clamped
+    public void Lease_size_is_two_seconds_of_speed_clamped_to_the_limits(double bytesPerSecond, long expected)
+    {
+        new SegmentSchedulerOptions().LeaseSizeFor(bytesPerSecond).Should().Be(expected);
+    }
+
     [Fact]
     public void A_lease_knows_its_length()
     {

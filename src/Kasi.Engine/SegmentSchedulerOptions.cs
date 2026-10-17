@@ -44,6 +44,21 @@ public sealed record SegmentSchedulerOptions
     /// <summary>Near the end of the file cap a lease at <c>remaining / connections</c> so one big lease does not leave the others idle. Off until measured (M1.15).</summary>
     public bool ShrinkTailLeases { get; init; }
 
+    /// <summary>
+    /// The size of the next lease for a worker moving <paramref name="bytesPerSecond"/>: <see cref="LeaseTargetDuration"/> of transfer,
+    /// clamped to <see cref="MinLeaseBytes"/> .. <see cref="MaxLeaseBytes"/>. An unknown, zero or invalid speed gives the minimum.
+    /// </summary>
+    public long LeaseSizeFor(double bytesPerSecond)
+    {
+        if (!double.IsFinite(bytesPerSecond) || bytesPerSecond <= 0)
+        {
+            return MinLeaseBytes;
+        }
+
+        var wanted = bytesPerSecond * LeaseTargetDuration.TotalSeconds;
+        return wanted >= MaxLeaseBytes ? MaxLeaseBytes : Math.Max(MinLeaseBytes, (long)wanted);
+    }
+
     /// <summary>Throws <see cref="ArgumentOutOfRangeException"/> for a value the scheduler cannot work with.</summary>
     public void Validate()
     {
