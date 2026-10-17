@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kasi.App/Kasi.App.csproj" />
+    <Project Path="src/Kasi.Core/Kasi.Core.csproj" />
+    <Project Path="src/Kasi.Data/Kasi.Data.csproj" />
+    <Project Path="src/Kasi.Engine/Kasi.Engine.csproj" />
+    <Project Path="src/Kasi.Ipc/Kasi.Ipc.csproj" />
+    <Project Path="src/Kasi.Media/Kasi.Media.csproj" />
+    <Project Path="src/Kasi.NativeHost/Kasi.NativeHost.csproj" />
+    <Project Path="src/Kasi.Scheduling/Kasi.Scheduling.csproj" />
+    <Project Path="src/Kasi.Torrent/Kasi.Torrent.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kasi.Engine.Tests/Kasi.Engine.Tests.csproj" />
+  </Folder>
+</Solution>
