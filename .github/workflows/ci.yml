@@ -76,3 +76,27 @@ jobs:
             TestResults/**/*.trx
             coverage/
           if-no-files-found: warn
+
+  # TPL 3.4: ARM64 build verification and smoke tests on the hosted Windows 11 ARM64 runner (free for public repos).
+  # Linux-container integration tests and coverage stay on the x64 job above.
+  build-test-arm64:
+    name: Build and unit tests (ARM64)
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Kasi.slnx
+
+      - name: Build
+        run: dotnet build Kasi.slnx -c Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test Kasi.slnx -c Release --no-build --filter "Category!=Integration"
