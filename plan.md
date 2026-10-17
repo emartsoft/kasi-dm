@@ -49,24 +49,27 @@ All on branch `chore/m0-foundations`, nothing pushed yet. 159 tests pass; a fres
 | [x] 5 | `bf83b46` | `Kasi.App` Avalonia 12 shell: FluentAvalonia theme, Hosting composition root, empty main window with automation name, strings in `.resx` | 3 headless tests (Light and Dark); real exe shows a window titled "Kasi" and exits 0 |
 | [x] 6 | `c094532` | `.github/workflows/ci.yml`: restore, format check, Release build, unit and integration tests with Coverlet, ReportGenerator summary and artifact (tool pinned in `dotnet-tools.json`) | all commands run in a fresh clone; coverage 91.1% lines over `Kasi.App` and `Kasi.Data`; YAML parses |
 
-Dependencies added in M0 (all MIT unless noted): Avalonia 12.1.4 (+ Desktop, Themes.Fluent, Headless.XUnit), FluentAvaloniaUI 3.1.0, CommunityToolkit.Mvvm, Microsoft.Extensions.Hosting, Microsoft.Data.Sqlite, MinVer, coverlet.collector, Microsoft.VisualStudio.Threading.Analyzers, xunit.v3 (Apache-2.0), AwesomeAssertions (Apache-2.0; replaces FluentAssertions, whose v8+ is commercially licensed), ReportGenerator (Apache-2.0, tool only).
+Dependencies added in M0 (all MIT unless noted): Avalonia 12.1.4 (+ Desktop, Headless.XUnit), FluentAvaloniaUI 3.1.0, CommunityToolkit.Mvvm, Microsoft.Extensions.Hosting, Microsoft.Data.Sqlite, MinVer, coverlet.collector, Microsoft.VisualStudio.Threading.Analyzers, xunit.v3 (Apache-2.0), AwesomeAssertions (Apache-2.0; replaces FluentAssertions, whose v8+ is commercially licensed), ReportGenerator (Apache-2.0, tool only).
 
-### 3.2 To close M0
+### 3.2 Closing M0
 
 End-of-M0 exit criteria (TPL 4): repository, CI and signing set up; TestServer and chaos merged; CI green on an empty engine; defect tracker configured; test plan approved.
 
-| Task | Owner | Done when |
+M0 is **closed for engineering** (2026-10-17): PRs #1 to #5 are squash-merged into `main` and CI is green there. The rows below that are still open are owner decisions; they gate the end-of-M0 review, not M1 coding.
+
+| Task | Owner | Status |
 | --- | --- | --- |
-| [ ] Add a GitHub remote, push, open PRs (one per step, see 3.1) | you | PRs exist and CI is green on GitHub, not only locally |
-| [ ] Protect `main`: squash merge only, required check **Build, test, coverage**, approvals per CONTRIBUTING 5.2 | you | settings applied |
-| [ ] Verify Native AOT publish of `Kasi.NativeHost` (link step failed on this machine: `vswhere.exe` not found) | dev | `dotnet publish -r win-x64` succeeds locally or in CI; add it as a CI step in M2 when the host has code |
-| [ ] Configure the defect tracker: `bug` label, severity labels (Critical, High, Medium, Low), TC-ID field in the issue template | QA lead | template updated in `.github/ISSUE_TEMPLATE/bug_report.yml` |
+| [x] Remote created, work pushed, PRs opened and merged (#1 to #5), default branch `main`, step branches deleted | you, dev | done |
+| [x] CI green on GitHub (Windows runner), workflow runs on PRs to any base branch | dev | done |
+| [x] Defect tracker: `bug`, `needs-triage`, `security` and four `severity:` labels created; bug template has severity and linked-test-case fields | dev | done |
+| [x] Set `CLAUDE.md` "Current phase" to M1 | dev | done |
+| [ ] Protect `main`: squash merge only, required check **Build, test, coverage**, approvals per CONTRIBUTING 5.2. GitHub refuses branch protection on a private repo without the Pro plan | you | upgrade the plan or make the repo public, then apply |
 | [ ] Approve test plan v0.1 | CTO | recorded in the TPL document control |
+| [ ] Code-signing certificate: EV certificate or Azure Trusted Signing (Appendix B #4); not needed before the first public build in M4 | you | procured; secrets in CI secret storage only |
 | [ ] Choose the ARM64 runner (hosted or self-hosted) | lead dev | decision recorded; ARM64 build job added in M4 |
-| [ ] Code-signing certificate: EV certificate or Azure Trusted Signing (Appendix B #4) | you | procured; secrets in CI secret storage only |
 | [ ] Product name check: keep "Kasi" or choose a final brand, trademark check in Kenya and key markets (Appendix B #1) | you | decision recorded |
 | [ ] Confirm the 24-week estimate and sub-task weeks in this file | CTO | sign-off |
-| [ ] Set `CLAUDE.md` "Current phase" to M1 | dev | line updated |
+| [ ] Verify Native AOT publish of `Kasi.NativeHost` (link step failed on the author's machine: `vswhere.exe` not found); moves to M2 when the host has code | dev | `dotnet publish -r win-x64` succeeds locally or in CI |
 
 ## 4. M1: Download engine, resume, bandwidth (weeks 3 to 8)
 
