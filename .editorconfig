@@ -117,3 +117,4 @@ dotnet_naming_rule.types_pascal.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.VSTHRD200.severity = none
+dotnet_naming_rule.async_methods_suffix.severity = none

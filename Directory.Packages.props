@@ -6,8 +6,9 @@
   </PropertyGroup>
 
   <!-- Licences: MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; xunit.runner.visualstudio Apache-2.0; AwesomeAssertions Apache-2.0;
-       Microsoft.NET.Test.Sdk MIT; coverlet.collector MIT. -->
+       Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); coverlet.collector MIT. -->
   <ItemGroup>
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
     <PackageVersion Include="MinVer" Version="8.0.0" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="18.12.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
