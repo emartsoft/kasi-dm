@@ -30,6 +30,7 @@ internal static class TestServerApp
 
         FileEndpoints.Map(app);
         DispositionEndpoints.Map(app);
+        StreamingEndpoints.Map(app);
 
         app.MapPost("/_chaos", (ChaosProfile profile, ChaosRegistry registry) => Results.Ok(new { id = registry.Register(profile) }));
         app.MapDelete("/_chaos", (ChaosRegistry registry) =>
