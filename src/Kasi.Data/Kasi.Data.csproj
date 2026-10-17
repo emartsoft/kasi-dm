@@ -4,4 +4,16 @@
     <ProjectReference Include="../Kasi.Core/Kasi.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Migrations/*.sql" LogicalName="Migrations/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kasi.Data.Tests" />
+  </ItemGroup>
+
 </Project>
