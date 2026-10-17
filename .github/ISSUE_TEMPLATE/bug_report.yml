@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a defect in Kasi (see KASI-TPL-2026-001, section 8)
+labels: ["bug", "needs-triage"]
+body:
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: Version and commit from Help → About, or the CI artefact name
+      placeholder: 1.0.0-beta.3+a1b2c3d
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version and architecture; browser and version if relevant
+      placeholder: Windows 11 24H2 x64, Chrome 141
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Suggested severity
+      description: Triage sets the final value
+      options:
+        - Critical (data loss, corrupt file, security, crash on start)
+        - High (core feature broken, no workaround)
+        - Medium (workaround exists)
+        - Low (cosmetic)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps. For fault-injection failures, include the chaos seed.
+      placeholder: |
+        1. Add a 4 GiB download with 16 connections
+        2. Kill Kasi at ~40%
+        3. Restart and resume
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: input
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Attach logs exported with "Export logs for support" (redacted automatically), screenshots, checksum details. Do not paste raw cookies or private URLs.
+  - type: input
+    id: links
+    attributes:
+      label: Linked test case / requirement
+      placeholder: TC-RES-001, KASI-RES-002, or "exploratory"
