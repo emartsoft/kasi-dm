@@ -1,0 +1,44 @@
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Headless.XUnit;
+using Avalonia.Styling;
+using Kasi.App.ViewModels;
+using Kasi.App.Views;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Kasi.App.Tests;
+
+public class MainWindowTests
+{
+    private static MainWindow Open()
+    {
+        using var host = CompositionRoot.Build([]);
+        var window = new MainWindow { DataContext = host.Services.GetRequiredService<MainWindowViewModel>() };
+        window.Show();
+        return window;
+    }
+
+    [AvaloniaFact]
+    public void Main_window_opens_empty_with_a_title_and_an_automation_name()
+    {
+        var window = Open();
+
+        window.IsVisible.Should().BeTrue();
+        window.Title.Should().Be("Kasi");
+        AutomationProperties.GetName(window).Should().Be("Kasi main window");
+        window.Content.Should().BeNull();
+    }
+
+    [AvaloniaTheory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    public void Main_window_renders_in_both_theme_variants(string variant)
+    {
+        var theme = variant == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
+        Application.Current!.RequestedThemeVariant = theme;
+
+        var window = Open();
+
+        window.ActualThemeVariant.Should().Be(theme);
+    }
+}
