@@ -2,6 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
+    <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
   </ItemGroup>
-
 </Project>

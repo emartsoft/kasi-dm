@@ -1,0 +1,34 @@
+attachment; filename="example.html"
+attachment; filename*=UTF-8''%e2%82%ac%20rates
+attachment; filename="EURO rates"; filename*=utf-8''%e2%82%ac%20rates
+attachment; filename="omáčka.jpg"
+attachment; filename*=iso-8859-1'en'%A3%20rates.txt
+attachment; filename="../../evil.txt"
+attachment; filename="..\..\evil.txt"
+attachment; filename*=UTF-8''..%2F..%2Fevil.txt
+attachment; filename="C:\Windows\System32\drivers\etc\hosts"
+attachment; filename="CON.txt"
+attachment; filename="NUL"
+attachment; filename="NUL .txt"
+attachment; filename="CON. .txt"
+attachment; filename="COM¹.txt"
+attachment; filename="LPT².doc"
+attachment; filename="CONIN$"
+attachment; filename="a \"quoted\" name.txt"
+attachment; filename="a;b.txt"
+attachment; filename="report.txt. . "
+attachment; filename="a<b>c:d|e?f*.txt"
+attachment; filename="invoice‮fdp.exe"
+attachment; filename=""
+attachment
+inline; filename="inline.pdf"
+attachment; filename*=UTF-8''%ZZbad
+attachment; filename*=UTF-8''%FF%FE
+attachment; filename*=SHIFT_JIS''%82%A0.txt; filename="fallback.txt"
+attachment; filename="unclosed
+https://example.com/files/%E2%82%AC%20rates.txt?token=1#part
+https://example.com/files/..%2F..%2FCON.txt
+https://example.com/files/100%coverage.pdf
+ftp://ftp.example.com/pub/linux.iso?mirror=ke
+magnet:?xt=urn:btih:0123456789abcdef
+data:text/plain;base64,SGVsbG8=
