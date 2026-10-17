@@ -3,6 +3,7 @@ using Kasi.TestServer;
 
 namespace Kasi.Engine.Tests;
 
+[Collection(NonParallelAllocationGroup.Name)]
 [Trait("Requirement", "KASI-ENG-008")]
 [Trait("Requirement", "KASI-RES-001")]
 public sealed class PartFileWriterTests : IDisposable
