@@ -1,0 +1,3 @@
+# Libraries must use ConfigureAwait(false) (CONTRIBUTING 3.1). Kasi.App opts out in its own .editorconfig.
+[*.cs]
+dotnet_diagnostic.CA2007.severity = error

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Kasi.Core/Kasi.Core.csproj" />
+    <ProjectReference Include="../Kasi.Engine/Kasi.Engine.csproj" />
+    <ProjectReference Include="../Kasi.Media/Kasi.Media.csproj" />
+    <ProjectReference Include="../Kasi.Torrent/Kasi.Torrent.csproj" />
+    <ProjectReference Include="../Kasi.Scheduling/Kasi.Scheduling.csproj" />
+    <ProjectReference Include="../Kasi.Data/Kasi.Data.csproj" />
+    <ProjectReference Include="../Kasi.Ipc/Kasi.Ipc.csproj" />
+  </ItemGroup>
+
+</Project>
