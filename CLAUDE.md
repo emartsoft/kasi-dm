@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M0 — Foundations (TRD section 16).** Scope: solution and project structure, central package management, `Directory.Build.props`, SQLite data layer and migrations, `Kasi.TestServer` with chaos middleware, architecture tests, CI pipeline. No engine features yet. Update this line when the phase changes.
+**M1 — Download engine, resume, bandwidth (TRD section 16; plan.md section 4).** Scope: domain model and job lifecycle, repositories and the checkpoint writer, probe, segment scheduler (leases, dynamic segmentation), disk writer, HTTP transfer, retry, checkpoint and resume, auth and refresh link, bandwidth limiter, proxies, checksums, FTP, fault-injection harness, benchmarks. No UI, browser or media work yet. M0 is closed except the owner items in plan.md section 3.2. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 
