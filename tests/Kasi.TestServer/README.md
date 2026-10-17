@@ -13,6 +13,7 @@ As a process: `dotnet run --project tests/Kasi.TestServer -- 5080` (`KASI_TESTSE
 | Endpoint | Behaviour |
 | --- | --- |
 | `/files/{seed}/{size}` | Range, If-Range, ETag, Last-Modified, HEAD |
+| `/novalidators/{seed}/{size}` | Range and 206, without ETag or Last-Modified |
 | `/norange/{seed}/{size}` | Ignores Range, always 200 |
 | `/chunked/{seed}/{size}` | No Content-Length |
 | `/redirect/{hops}/…` | `hops` 302s, then the wrapped path |

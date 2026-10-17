@@ -47,6 +47,13 @@ internal sealed class ChaosMiddleware(RequestDelegate next, ChaosRegistry regist
             return;
         }
 
+        if (profile.ResetAfterBytes <= 0)
+        {
+            session.Aborted = true;
+            context.Abort();
+            return;
+        }
+
         var original = context.Response.Body;
         context.Response.Body = new ChaosStream(original, context, session, connection);
         try
