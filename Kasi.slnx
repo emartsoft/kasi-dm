@@ -11,6 +11,7 @@
     <Project Path="src/Kasi.Torrent/Kasi.Torrent.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Kasi.ArchitectureTests/Kasi.ArchitectureTests.csproj" />
     <Project Path="tests/Kasi.Engine.Tests/Kasi.Engine.Tests.csproj" />
   </Folder>
 </Solution>

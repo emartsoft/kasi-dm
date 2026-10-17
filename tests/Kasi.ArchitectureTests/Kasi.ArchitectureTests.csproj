@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kasi.Core/Kasi.Core.csproj" />
+    <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
+    <ProjectReference Include="../../src/Kasi.Media/Kasi.Media.csproj" />
+    <ProjectReference Include="../../src/Kasi.Torrent/Kasi.Torrent.csproj" />
+    <ProjectReference Include="../../src/Kasi.Scheduling/Kasi.Scheduling.csproj" />
+    <ProjectReference Include="../../src/Kasi.Data/Kasi.Data.csproj" />
+    <ProjectReference Include="../../src/Kasi.Ipc/Kasi.Ipc.csproj" />
+  </ItemGroup>
+
+</Project>
