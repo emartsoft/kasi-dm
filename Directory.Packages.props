@@ -8,10 +8,11 @@
   <!-- Licences: Avalonia (+Desktop, Headless.XUnit) MIT; FluentAvaloniaUI MIT; CommunityToolkit.Mvvm MIT;
        Microsoft.Extensions.Hosting MIT; MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; xunit.runner.visualstudio Apache-2.0;
        AwesomeAssertions Apache-2.0;
-       Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); Dapper Apache-2.0; coverlet.collector MIT. -->
+       Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); Dapper Apache-2.0; Microsoft.Extensions.TimeProvider.Testing MIT; coverlet.collector MIT. -->
   <ItemGroup>
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <PackageVersion Include="Avalonia" Version="12.1.4" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.4" />
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.4" />
