@@ -19,6 +19,7 @@ public sealed class SegmentScheduler
     private readonly Lease?[] _workerLease;
     private readonly SegmentState?[] _workerSegment;
     private readonly SpeedTracker[] _speeds;
+    private readonly DateTimeOffset?[] _slowSince;
     private long _nextLeaseId = 1;
     private int _nextSegmentIndex;
     private int _incompleteSegments;
@@ -29,6 +30,7 @@ public sealed class SegmentScheduler
     private bool _rampStopped;
     private bool _newestSeen;
     private DateTimeOffset _rampWindowStart;
+    private DateTimeOffset _lastSlowCheck;
     private long _rampWindowBytes;
     private double? _previousRate;
     private bool _firstLeaseIssued;
@@ -77,6 +79,7 @@ public sealed class SegmentScheduler
         _workerLease = new Lease?[_options.MaxConnections];
         _workerSegment = new SegmentState?[_options.MaxConnections];
         _speeds = Enumerable.Range(0, _options.MaxConnections).Select(_ => new SpeedTracker()).ToArray();
+        _slowSince = new DateTimeOffset?[_options.MaxConnections];
 
         if (existingSegments is null)
         {
@@ -172,7 +175,7 @@ public sealed class SegmentScheduler
         lock (_gate)
         {
             var now = _time.GetUtcNow();
-            EvaluateRampUpCore(now);
+            Tick(now);
             if (_incompleteSegments == 0 || workerId >= _allowedConnections || _workerLease[workerId] is not null)
             {
                 return null;
@@ -248,7 +251,7 @@ public sealed class SegmentScheduler
                 }
             }
 
-            EvaluateRampUpCore(now);
+            Tick(now);
             return new LeaseAdvanceResult(before, gain, lease.Cursor == lease.End, IsSuperseded: false);
         }
     }
@@ -265,7 +268,7 @@ public sealed class SegmentScheduler
     {
         lock (_gate)
         {
-            EvaluateRampUpCore(_time.GetUtcNow());
+            Tick(_time.GetUtcNow());
             return _allowedConnections;
         }
     }
@@ -336,6 +339,88 @@ public sealed class SegmentScheduler
                 PromoteShadow(segment);
             }
         }
+    }
+
+    private void Tick(DateTimeOffset now)
+    {
+        EvaluateRampUpCore(now);
+        UpdateSlowLanes(now);
+    }
+
+    /// <summary>
+    /// Slow-lane takeover (TRD 6.3): a worker below 30% of the median speed of the active workers for 10 s, whose segment still has more than
+    /// 4 MiB to fetch and at least 1 MiB not yet leased, has that rest cut off as a new unowned segment, so whichever worker is free next
+    /// takes the larger share. The slow worker keeps only the lease it is reading. Checked at most every ramp-up interval.
+    /// The median counts every allowed worker that has a speed sample, including one between two leases (its last speed holds), so a
+    /// moment when the fast workers all happen to finish a lease together does not reset the slow worker's 10 s.
+    /// </summary>
+    private void UpdateSlowLanes(DateTimeOffset now)
+    {
+        if (!_rangesSupported || now - _lastSlowCheck < _options.RampUpInterval)
+        {
+            return;
+        }
+
+        _lastSlowCheck = now;
+        Span<double> speeds = stackalloc double[_workerLease.Length];
+        var active = 0;
+        for (var worker = 0; worker < _workerLease.Length; worker++)
+        {
+            if (worker < _allowedConnections && _speeds[worker].HasSample)
+            {
+                speeds[active++] = _speeds[worker].Speed(now);
+            }
+        }
+
+        if (active < _options.SlowLaneMinActiveWorkers)
+        {
+            Array.Clear(_slowSince);
+            return;
+        }
+
+        var sorted = speeds[..active];
+        sorted.Sort();
+        var median = active % 2 == 1 ? sorted[active / 2] : (sorted[(active / 2) - 1] + sorted[active / 2]) / 2;
+        var threshold = _options.SlowLaneSpeedRatio * median;
+
+        for (var worker = 0; worker < _workerLease.Length; worker++)
+        {
+            if (!_speeds[worker].HasSample || _speeds[worker].Speed(now) >= threshold)
+            {
+                _slowSince[worker] = null;
+                continue;
+            }
+
+            // slowness is a property of the worker, not of one lease: the 10 s run on across the moment between two leases
+            _slowSince[worker] ??= now;
+            if (_workerLease[worker] is { IsShadow: false } lease
+                && now - _slowSince[worker] >= _options.SlowLaneSustainedDuration
+                && TryCarveSlowTail(lease.Segment))
+            {
+                _slowSince[worker] = null;
+            }
+        }
+    }
+
+    private bool TryCarveSlowTail(SegmentState victim)
+    {
+        var leaseEnd = victim.LeaseEnd;
+        var minSplit = _options.MinSplitSize;
+        if (victim.IsComplete
+            || victim.Length - victim.Written <= _options.SlowLaneMinRemainingMultiplier * minSplit
+            || victim.End - leaseEnd < minSplit)
+        {
+            return false;
+        }
+
+        var mid = AlignUp(leaseEnd, _options.PageAlignment);
+        if (victim.End - mid < minSplit)
+        {
+            mid = leaseEnd; // alignment would leave too little for the taker: cut right after the lease in flight
+        }
+
+        SplitAt(victim, mid);
+        return true;
     }
 
     private bool RampUpActive => _rangesSupported && !_rampStopped && _allowedConnections < _connectionCap;
@@ -528,10 +613,21 @@ public sealed class SegmentScheduler
             mid = leaseEnd + (free / 2); // alignment would leave nothing: split unaligned
         }
 
+        return SplitAt(victim, mid);
+    }
+
+    /// <summary>Cuts <paramref name="victim"/> at <paramref name="mid"/> and returns the unowned new segment <c>[mid, oldEnd)</c>.</summary>
+    private SegmentState SplitAt(SegmentState victim, long mid)
+    {
         var fresh = new SegmentState(_nextSegmentIndex++, mid, victim.End, 0);
         victim.End = mid;
         _segments.Insert(_segments.IndexOf(victim) + 1, fresh);
         _incompleteSegments++;
+        if (victim.IsComplete)
+        {
+            _incompleteSegments--;
+        }
+
         _structureVersion++;
         return fresh;
     }
