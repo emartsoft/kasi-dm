@@ -1,3 +1,4 @@
+using Kasi.Core;
 using Microsoft.Data.Sqlite;
 
 namespace Kasi.Data.Tests;
@@ -59,6 +60,18 @@ public sealed class SchemaTests : IAsyncLifetime, IDisposable
         Func<Task> act = () => _db.ExecAsync(sql);
 
         await act.Should().ThrowAsync<SqliteException>(reason);
+    }
+
+    [Theory]
+    [InlineData(JobKind.Http)]
+    [InlineData(JobKind.Ftp)]
+    [InlineData(JobKind.Media)]
+    [InlineData(JobKind.Torrent)]
+    public async Task Accepts_every_job_kind_the_domain_model_can_write(JobKind kind)
+    {
+        await _db.ExecAsync(InsertJob(kind: JobKindText.ToText(kind)));
+
+        (await _db.ScalarAsync("SELECT COUNT(*) FROM job;")).Should().Be(1L);
     }
 
     [Fact]
