@@ -5,8 +5,13 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
+<<<<<<< HEAD
   <!-- Licences: MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; AwesomeAssertions Apache-2.0;
        Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); coverlet.collector MIT. -->
+=======
+  <!-- Licences: MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; xunit.runner.visualstudio Apache-2.0; AwesomeAssertions Apache-2.0;
+       Microsoft.NET.Test.Sdk MIT; coverlet.collector MIT. -->
+>>>>>>> chore/m0-2-architecture-tests
   <ItemGroup>
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
     <PackageVersion Include="MinVer" Version="8.0.0" />
