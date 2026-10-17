@@ -5,7 +5,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
-  <!-- Licences: MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; AwesomeAssertions Apache-2.0;
+  <!-- Licences: MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; xunit.runner.visualstudio Apache-2.0; AwesomeAssertions Apache-2.0;
        Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); coverlet.collector MIT. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
