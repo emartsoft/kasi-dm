@@ -92,7 +92,7 @@ public class ProbeOutcomeTests
     }
 
     [Fact]
-    public void Non_identity_content_encoding_forces_single_connection_and_non_resumable_while_identity_is_normalized_to_null()
+    public void Non_identity_content_encoding_forces_single_connection_and_non_resumable_while_identity_is_normalised_to_null()
     {
         var url = new Uri("https://example.com/file.bin");
 

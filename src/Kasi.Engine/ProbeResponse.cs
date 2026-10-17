@@ -50,21 +50,21 @@ public sealed class ProbeResponse : ProbeOutcome, IAsyncDisposable, IDisposable
             throw new ArgumentOutOfRangeException(nameof(bodyLength), bodyLength, "BodyLength cannot be negative.");
         }
 
-        var normalizedEncoding = NormalizeContentEncoding(contentEncoding);
-        var normalizedETag = NormalizeStrongETag(eTag);
-        var normalizedLastModified = string.IsNullOrWhiteSpace(lastModified) ? null : lastModified;
-        var effectiveRangesSupported = rangesSupported && normalizedEncoding is null;
+        var normalisedEncoding = NormaliseContentEncoding(contentEncoding);
+        var normalisedETag = NormaliseStrongETag(eTag);
+        var normalisedLastModified = string.IsNullOrWhiteSpace(lastModified) ? null : lastModified;
+        var effectiveRangesSupported = rangesSupported && normalisedEncoding is null;
 
         FinalUrl = finalUrl;
         FileName = fileName;
         Body = body;
         TotalBytes = totalBytes;
         BodyLength = bodyLength;
-        ContentEncoding = normalizedEncoding;
+        ContentEncoding = normalisedEncoding;
         RangesSupported = effectiveRangesSupported;
-        ETag = normalizedETag;
-        LastModified = normalizedLastModified;
-        Resumable = effectiveRangesSupported && (normalizedETag is not null || normalizedLastModified is not null);
+        ETag = normalisedETag;
+        LastModified = normalisedLastModified;
+        Resumable = effectiveRangesSupported && (normalisedETag is not null || normalisedLastModified is not null);
         AcceptRanges = string.IsNullOrWhiteSpace(acceptRanges) ? null : acceptRanges;
         ContentType = string.IsNullOrWhiteSpace(contentType) ? null : contentType;
         _responseOwner = responseOwner;
@@ -135,7 +135,7 @@ public sealed class ProbeResponse : ProbeOutcome, IAsyncDisposable, IDisposable
         _responseOwner?.Dispose();
     }
 
-    private static string? NormalizeStrongETag(string? eTag)
+    private static string? NormaliseStrongETag(string? eTag)
     {
         if (string.IsNullOrWhiteSpace(eTag))
         {
@@ -146,7 +146,7 @@ public sealed class ProbeResponse : ProbeOutcome, IAsyncDisposable, IDisposable
         return trimmed.StartsWith("W/", StringComparison.OrdinalIgnoreCase) ? null : trimmed;
     }
 
-    private static string? NormalizeContentEncoding(string? contentEncoding)
+    private static string? NormaliseContentEncoding(string? contentEncoding)
     {
         if (string.IsNullOrWhiteSpace(contentEncoding))
         {
