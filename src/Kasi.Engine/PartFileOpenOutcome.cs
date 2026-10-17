@@ -11,6 +11,24 @@ public abstract record PartFileOpenOutcome
 }
 
 /// <summary>
+/// Successful open outcome holding the active <see cref="PartFileWriter"/>.
+/// </summary>
+public sealed record PartFileOpened : PartFileOpenOutcome, IAsyncDisposable, IDisposable
+{
+    public PartFileOpened(PartFileWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        Writer = writer;
+    }
+
+    public PartFileWriter Writer { get; }
+
+    public void Dispose() => Writer.Dispose();
+
+    public ValueTask DisposeAsync() => Writer.DisposeAsync();
+}
+
+/// <summary>
 /// Indicates that opening or pre-allocating the <c>.kasipart</c> file failed with a classified <see cref="DiskStatus"/>.
 /// </summary>
 public sealed record PartFileOpenFailure : PartFileOpenOutcome
