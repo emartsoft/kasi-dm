@@ -5,8 +5,7 @@ name: CI
 # The engine coverage gate (80%, KASI-NFR-018) is switched on in M1, once Kasi.Engine contains code.
 
 on:
-  pull_request:
-    branches: [main]
+  pull_request: # any base branch, so stacked PRs are checked too
   push:
     branches: [main]
 
@@ -57,7 +56,7 @@ jobs:
           --collect:"XPlat Code Coverage" --results-directory TestResults/integration --logger trx
 
       - name: Coverage report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && hashFiles('TestResults/**/coverage.cobertura.xml') != '' }}
         shell: pwsh
         run: |
           dotnet tool restore
