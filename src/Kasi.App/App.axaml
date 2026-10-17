@@ -4,7 +4,6 @@
              x:Class="Kasi.App.App"
              RequestedThemeVariant="Default">
   <Application.Styles>
-    <FluentTheme />
     <sty:FluentAvaloniaTheme />
   </Application.Styles>
 </Application>

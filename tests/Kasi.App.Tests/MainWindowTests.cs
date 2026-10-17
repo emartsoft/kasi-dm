@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Kasi.App.Tests;
 
+[Trait("Requirement", "KASI-UI-010")]
 public class MainWindowTests
 {
     private static MainWindow Open()
@@ -40,5 +41,7 @@ public class MainWindowTests
         var window = Open();
 
         window.ActualThemeVariant.Should().Be(theme);
+        Application.Current.TryGetResource("ButtonBackground", theme, out var resource).Should().BeTrue("the Fluent control resources must be loaded exactly once");
+        resource.Should().NotBeNull();
     }
 }
