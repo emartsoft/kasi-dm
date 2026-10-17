@@ -442,14 +442,14 @@ public class SegmentSchedulerTests
     // ---- whole downloads through the simulator ---------------------------------------------------------------------
 
     [Fact]
-    public void Eight_equal_workers_download_one_GiB_receiving_every_byte_exactly_once()
+    public void Eight_equal_workers_download_one_GiB_and_fetch_nothing_twice_but_the_endgame_duplicates()
     {
         var sim = new SchedulerSimulator(1 * GiB, Enumerable.Repeat(8.0 * MiB, 8).ToArray());
 
         sim.RunUntilComplete(TimeSpan.FromMinutes(10));
 
         sim.Scheduler.TotalWritten.Should().Be(1 * GiB);
-        sim.BytesReceived.Should().Be(1 * GiB, "without endgame duplication nothing is fetched twice");
+        sim.BytesReceived.Should().BeInRange(1 * GiB, (1 * GiB) + (2 * MiB), "only the endgame duplicates (at most 2 MiB) are fetched twice");
         sim.Scheduler.StructureVersion.Should().BeGreaterThan(0);
         sim.Scheduler.GetSegmentsSnapshot().Should().OnlyContain(s => s.IsComplete);
     }

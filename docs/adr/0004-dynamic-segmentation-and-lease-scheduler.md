@@ -30,9 +30,13 @@ split of the segment with the most unleased bytes; an endgame duplicate. A split
 4 MiB left and an unleased tail of at least 1 MiB, is split at the end of its current lease: it finishes that lease and the idle
 worker takes the whole remainder. At least three active workers are required for the median to mean anything.
 
-**Endgame.** When no split is possible and every remaining segment has under 1 MiB left, an idle worker duplicates the slowest
-unfinished segment; whichever lease finishes first wins and the other is told it is superseded. Duplicated bytes are capped at
-2 MiB per download.
+**Endgame.** When nothing can be split or taken, an idle worker duplicates the rest of the slowest unfinished segment (the one whose
+owner has the lowest speed); whichever lease finishes first wins and the other is told it is superseded. A segment qualifies when
+its remaining bytes fit in what is left of the per-download duplicate budget of 2 MiB, so duplicated traffic can never exceed
+2 MiB. TRD 6.3 words the trigger as "every remaining segment is smaller than minSplit"; with the default numbers the budget is
+the tighter limit, and the TRD wording would leave a segment of 1 to 2 MiB behind a very slow worker unduplicated, keeping every
+other connection idle for as long as that worker takes (40 s at 40 KB/s). A segment with more than the budget left is never
+duplicated; a large lease in flight near the end of the file is the case the tail-shrink option addresses.
 
 **Ramp-up.** Start with one connection. After the first 250 ms with positive throughput add a second; afterwards add one per
 250 ms window while the connection added last raised aggregate throughput by at least 5% of what an average existing connection

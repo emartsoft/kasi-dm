@@ -24,6 +24,7 @@ public sealed class SegmentScheduler
     private int _nextSegmentIndex;
     private int _incompleteSegments;
     private long _totalWritten;
+    private long _endgameBytes;
     private int _structureVersion;
     private int _allowedConnections;
     private int _connectionCap;
@@ -142,6 +143,18 @@ public sealed class SegmentScheduler
         }
     }
 
+    /// <summary>Bytes handed to endgame duplicates so far; never more than <see cref="SegmentSchedulerOptions.MaxEndgameDuplicateBytes"/>.</summary>
+    public long EndgameDuplicateBytesAllocated
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _endgameBytes;
+            }
+        }
+    }
+
     /// <summary>Raised by one whenever a segment is split. The engine persists the snapshot when it changes (ADR 0004).</summary>
     public int StructureVersion
     {
@@ -208,7 +221,8 @@ public sealed class SegmentScheduler
                 return IssuePrimary(workerId, Split(victim, leaseEnd), now);
             }
 
-            return null;
+            // 4. nothing left to split: duplicate the tail of the slowest unfinished segment (TRD 6.3 endgame)
+            return _rangesSupported ? TryIssueEndgameDuplicate(workerId, now) : null;
         }
     }
 
@@ -511,8 +525,14 @@ public sealed class SegmentScheduler
         }
         else
         {
-            var speed = _speeds[workerId].Speed(now);
-            end = Math.Min(segment.End, start + _options.LeaseSizeFor(speed));
+            var size = _options.LeaseSizeFor(_speeds[workerId].Speed(now));
+            if (_options.ShrinkTailLeases)
+            {
+                // near the end of the file one big lease would keep the others idle: share what is left between the connections
+                size = Math.Min(size, Math.Max(_options.MinLeaseBytes, (TotalBytes - _totalWritten) / _allowedConnections));
+            }
+
+            end = Math.Min(segment.End, start + size);
             if (segment.End - end < _options.MinLeaseBytes)
             {
                 end = segment.End; // no tiny trailing request
@@ -525,6 +545,53 @@ public sealed class SegmentScheduler
         _workerSegment[workerId] = segment;
         _firstLeaseIssued = true;
         return new LeaseAssignment(lease.Id, workerId, segment.Index, start, end, IsEndgameDuplicate: false, IsInitialProbeStream: isProbe);
+    }
+
+    /// <summary>
+    /// Endgame duplication (TRD 6.3): when no segment can be split or taken, an idle worker fetches the rest of the segment that is
+    /// moving slowest, in parallel with its owner; whichever lease finishes first completes the segment and the other is told it
+    /// is superseded. Only a segment whose remaining bytes fit in what is left of the per-download duplicate budget (2 MiB) qualifies,
+    /// so the traffic wasted on duplicates is bounded by that budget however slow the owner is. ADR 0004: TRD 6.3 says "smaller than
+    /// MinSplit"; with the default numbers the budget is the tighter limit, and a segment of 1 to 2 MiB behind a very slow worker
+    /// would otherwise keep every other connection idle for as long as that worker takes.
+    /// </summary>
+    private LeaseAssignment? TryIssueEndgameDuplicate(int workerId, DateTimeOffset now)
+    {
+        var budget = _options.MaxEndgameDuplicateBytes - _endgameBytes;
+        SegmentState? best = null;
+        var bestSpeed = double.MaxValue;
+        var bestRemaining = 0L;
+        foreach (var segment in _segments)
+        {
+            if (segment.IsComplete || segment.Shadow is not null || segment.Primary is null)
+            {
+                continue;
+            }
+
+            var remaining = segment.End - segment.Cursor;
+            if (remaining > budget)
+            {
+                continue;
+            }
+
+            var speed = _speeds[segment.Owner].Speed(now);
+            if (speed < bestSpeed || (speed == bestSpeed && remaining > bestRemaining))
+            {
+                best = segment;
+                bestSpeed = speed;
+                bestRemaining = remaining;
+            }
+        }
+
+        if (best is null)
+        {
+            return null;
+        }
+
+        var lease = new Lease(_nextLeaseId++, workerId, best, best.Cursor, best.End, isShadow: true);
+        Attach(lease, now);
+        _endgameBytes += bestRemaining;
+        return new LeaseAssignment(lease.Id, workerId, best.Index, lease.Start, lease.End, IsEndgameDuplicate: true, IsInitialProbeStream: false);
     }
 
     private void Attach(Lease lease, DateTimeOffset now)
@@ -696,7 +763,7 @@ public sealed class SegmentScheduler
                 {
                     Check(primary.Segment == segment && !primary.IsShadow, $"segment {segment.Index} primary lease is inconsistent");
                     Check(primary.Start >= segment.Start && primary.End <= segment.End, $"lease {primary.Id} [{primary.Start},{primary.End}) leaves segment {segment.Index} [{segment.Start},{segment.End})");
-                    Check(segment.Owner == primary.Worker, $"segment {segment.Index} is owned by {segment.Owner} but leased to {primary.Worker}");
+                    Check(segment.IsComplete || segment.Owner == primary.Worker, $"segment {segment.Index} is owned by {segment.Owner} but leased to {primary.Worker}"); // a finished segment is released while a superseded lease is still winding down
                 }
 
                 if (segment.Shadow is { } shadow)
