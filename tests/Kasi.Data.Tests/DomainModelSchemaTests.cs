@@ -46,17 +46,16 @@ public sealed class DomainModelSchemaTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Queue_defaults_match_the_column_defaults()
     {
-        await _db.ExecAsync("INSERT INTO queue (id, name, sort_order) VALUES (1, 'Main', 0);");
-        var model = new Queue { Id = 1, Name = "Main", SortOrder = 0 };
+        await _db.ExecAsync("INSERT INTO queue (id, name, sort_order) VALUES (2, 'Other', 1);");
+        var model = new Queue { Id = 2, Name = "Other", SortOrder = 1 };
 
-        (await _db.ScalarAsync("SELECT max_parallel FROM queue WHERE id = 1;")).Should().Be((long)model.MaxParallel);
-        (await _db.ScalarAsync("SELECT post_action FROM queue WHERE id = 1;")).Should().Be(model.PostAction);
+        (await _db.ScalarAsync("SELECT max_parallel FROM queue WHERE id = 2;")).Should().Be((long)model.MaxParallel);
+        (await _db.ScalarAsync("SELECT post_action FROM queue WHERE id = 2;")).Should().Be(model.PostAction);
     }
 
     [Fact]
     public async Task Job_resumable_default_matches_the_column_default()
     {
-        await _db.ExecAsync("INSERT INTO queue (id, name, sort_order) VALUES (1, 'Main', 0);");
         await _db.ExecAsync("INSERT INTO job (id, kind, url, file_name, folder, state, queue_id, queue_pos, created_utc) VALUES ('j', 'http', 'u', 'f', 'd', 'Queued', 1, 1.0, 't');");
 
         (await _db.ScalarAsync("SELECT resumable FROM job;")).Should().Be(1L);
@@ -69,9 +68,9 @@ public sealed class DomainModelSchemaTests : IAsyncLifetime, IDisposable
     [InlineData(QuotaReset.Never)]
     public async Task Every_quota_reset_the_domain_model_can_write_passes_the_CHECK_constraint(QuotaReset reset)
     {
-        await _db.ExecAsync($"INSERT INTO queue (id, name, sort_order, quota_reset) VALUES (1, 'Q', 0, '{QuotaResetText.ToText(reset)}');");
+        await _db.ExecAsync($"INSERT INTO queue (id, name, sort_order, quota_reset) VALUES (2, 'Q', 5, '{QuotaResetText.ToText(reset)}');");
 
-        (await _db.ScalarAsync("SELECT COUNT(*) FROM queue;")).Should().Be(1L);
+        (await _db.ScalarAsync("SELECT COUNT(*) FROM queue WHERE id = 2;")).Should().Be(1L);
     }
 
     private static string Normalise(string name) => name.Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
