@@ -1,0 +1,79 @@
+name: CI
+
+# TRD 14.5 step 1: build, unit tests, integration tests against local test servers, coverage.
+# Extension lint/tests are added in M2 together with the extension itself.
+# The engine coverage gate (80%, KASI-NFR-018) is switched on in M1, once Kasi.Engine contains code.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: Build, test, coverage
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Kasi.slnx
+
+      - name: Format check
+        run: dotnet format Kasi.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build Kasi.slnx -c Release --no-restore
+
+      - name: Unit tests
+        run: >
+          dotnet test Kasi.slnx -c Release --no-build
+          --filter "Category!=Integration"
+          --collect:"XPlat Code Coverage" --results-directory TestResults/unit --logger trx
+
+      - name: Integration tests
+        run: >
+          dotnet test Kasi.slnx -c Release --no-build
+          --filter "Category=Integration"
+          --collect:"XPlat Code Coverage" --results-directory TestResults/integration --logger trx
+
+      - name: Coverage report
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          dotnet tool restore
+          dotnet tool run reportgenerator `
+            "-reports:TestResults/**/coverage.cobertura.xml" `
+            "-targetdir:coverage" `
+            "-reporttypes:HtmlInline_AzurePipelines;MarkdownSummaryGithub;Cobertura" `
+            "-assemblyfilters:+Kasi.*;-Kasi.TestServer;-*.Tests;-Kasi.ArchitectureTests"
+          if (Test-Path coverage/SummaryGithub.md) { Get-Content coverage/SummaryGithub.md >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Upload test results and coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-and-coverage
+          path: |
+            TestResults/**/*.trx
+            coverage/
+          if-no-files-found: warn
