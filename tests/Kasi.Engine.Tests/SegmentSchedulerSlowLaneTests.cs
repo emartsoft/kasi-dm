@@ -75,7 +75,7 @@ public class SegmentSchedulerSlowLaneTests
         RunFor(sim, TimeSpan.FromSeconds(8));
         sim.SetSpeed(0, 400_000);
 
-        RunFor(sim, TimeSpan.FromSeconds(12));
+        RunFor(sim, TimeSpan.FromSeconds(10));   // to 18 s: at about 20 s the fast workers finish their segments and a normal split follows
 
         sim.Scheduler.StructureVersion.Should().Be(3);
     }

@@ -74,5 +74,9 @@ file. A known size without ranges is one segment and one worker.
   simulation; the live-server versions arrive with the real workers in M1.7.
 - A large lease in flight near the end of the file can leave other workers idle, because a split cannot cut into it and endgame
   needs under 1 MiB left. An option shrinks tail leases to `remaining / connections`; it is off by default until M1.15 measures it.
+- The scheduler cannot rescue a worker that stalls. A lease in flight is never cut, the slow-lane takeover only helps segments with
+  more than 4 MiB left, and endgame duplication only covers segments that fit in the 2 MiB budget. A connection that moves
+  nothing for minutes must be abandoned by the engine's stall timeout (TRD 6.6, M1.8) with `AbandonLease`; the property test
+  therefore generates no worker slower than 16 KB/s, and a generator that did (a 512 KiB lease at 15 B/s) found exactly this.
 - Ramp-up decided on 250 ms windows is noisy; a premature plateau costs throughput, not correctness.
 - The probe's first range is part of the engine's protocol with `HttpProber`; changing it needs a new ADR.

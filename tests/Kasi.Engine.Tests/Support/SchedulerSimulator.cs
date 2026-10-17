@@ -13,6 +13,8 @@ internal sealed class SchedulerSimulator
     private readonly double[] _carry;
     private readonly LeaseAssignment?[] _lease;
     private readonly long[] _cursor;
+    private readonly Random? _random;
+    private readonly double _failurePerTick;
 
     public SchedulerSimulator(
         long totalBytes,
@@ -20,8 +22,12 @@ internal sealed class SchedulerSimulator
         SegmentSchedulerOptions? options = null,
         bool rangesSupported = true,
         TimeSpan? tick = null,
-        IEnumerable<Kasi.Core.Segment>? existingSegments = null)
+        IEnumerable<Kasi.Core.Segment>? existingSegments = null,
+        Random? random = null,
+        double failurePerTick = 0)
     {
+        _random = random;
+        _failurePerTick = failurePerTick;
         // without explicit options every worker may start at once, so tests of splitting and completion are not also tests of the ramp-up
         Options = options ?? new SegmentSchedulerOptions
         {
@@ -59,34 +65,85 @@ internal sealed class SchedulerSimulator
 
     public long BytesReceived { get; private set; }
 
+    /// <summary>Leases dropped by the random failure injection.</summary>
+    public int Failures { get; private set; }
+
     public void SetSpeed(int worker, double bytesPerSecond) => _speed[worker] = bytesPerSecond;
 
     public LeaseAssignment? CurrentLease(int worker) => _lease[worker];
 
-    /// <summary>One tick: every worker acquires if idle and receives bytes, then the clock moves on.</summary>
+    /// <summary>
+    /// One tick: each worker spends its byte budget for the tick, finishing leases and starting the next ones within the same tick
+    /// (a fast connection is never idle between leases), then the clock moves on.
+    /// </summary>
     public void Step()
     {
         for (var worker = 0; worker < _speed.Length; worker++)
         {
-            if (_lease[worker] is null)
+            var budget = _carry[worker] + (_speed[worker] * Tick.TotalSeconds);
+            var failureChecked = false;
+            while (true)
             {
-                var acquired = Scheduler.TryAcquireNextLease(worker);
-                if (acquired is { } lease)
+                if (_lease[worker] is null)
                 {
+                    var acquired = Scheduler.TryAcquireNextLease(worker);
+                    if (acquired is not { } lease)
+                    {
+                        if (!Scheduler.IsComplete)
+                        {
+                            IdleTicks[worker]++;
+                        }
+
+                        budget = 0;
+                        break;
+                    }
+
                     _lease[worker] = lease;
                     _cursor[worker] = lease.Start;
                     Issued.Add(lease);
                 }
-                else if (!Scheduler.IsComplete)
+
+                var current = _lease[worker]!.Value;
+                if (!failureChecked && _random is not null && _random.NextDouble() < _failurePerTick)
                 {
-                    IdleTicks[worker]++;
+                    // the connection drops: the bytes received so far stay counted and the lease is given up
+                    Scheduler.AbandonLease(current.LeaseId);
+                    _lease[worker] = null;
+                    Failures++;
+                    budget = 0;
+                    break;
                 }
+
+                failureChecked = true;
+                var take = (long)Math.Min(budget, current.End - _cursor[worker]);
+                var superseded = false;
+                if (take > 0)
+                {
+                    superseded = Scheduler.AdvanceLease(current.LeaseId, (int)take).IsSuperseded;
+                    _cursor[worker] += take;
+                    BytesReceived += take;
+                    budget -= take;
+                }
+
+                if (superseded)
+                {
+                    SupersededLeases++;
+                }
+
+                if (superseded || _cursor[worker] == current.End)
+                {
+                    Scheduler.CompleteLease(current.LeaseId);
+                    _lease[worker] = null;
+                    if (budget >= 1)
+                    {
+                        continue; // still has bytes to spend this tick: start the next lease at once
+                    }
+                }
+
+                break;
             }
 
-            if (_lease[worker] is { } current)
-            {
-                Receive(worker, current);
-            }
+            _carry[worker] = _lease[worker] is null ? 0 : budget;
         }
 
         Scheduler.AssertInvariants();
@@ -106,36 +163,5 @@ internal sealed class SchedulerSimulator
 
             Step();
         }
-    }
-
-    private void Receive(int worker, LeaseAssignment lease)
-    {
-        var budget = _carry[worker] + (_speed[worker] * Tick.TotalSeconds);
-        var bytes = (long)Math.Min(budget, lease.End - _cursor[worker]);
-        _carry[worker] = bytes < (lease.End - _cursor[worker]) ? budget - bytes : 0;
-        if (bytes > 0)
-        {
-            var result = Scheduler.AdvanceLease(lease.LeaseId, (int)bytes);
-            _cursor[worker] += bytes;
-            BytesReceived += bytes;
-            if (result.IsSuperseded)
-            {
-                SupersededLeases++;
-                Finish(worker, lease);
-                return;
-            }
-        }
-
-        if (_cursor[worker] == lease.End)
-        {
-            Finish(worker, lease);
-        }
-    }
-
-    private void Finish(int worker, LeaseAssignment lease)
-    {
-        Scheduler.CompleteLease(lease.LeaseId);
-        _lease[worker] = null;
-        _carry[worker] = 0;
     }
 }
