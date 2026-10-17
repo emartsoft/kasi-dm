@@ -123,4 +123,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. It covers
 
 ## Licence
 
-[To be decided: see TRD Appendix B, open issue 2.] Third-party notices are in `THIRD-PARTY-NOTICES.txt`.
+Kasi is free and open source under the [MIT licence](LICENSE). Third-party notices are in `THIRD-PARTY-NOTICES.txt`.
