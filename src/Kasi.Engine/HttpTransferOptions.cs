@@ -39,8 +39,12 @@ public sealed record HttpTransferOptions
     /// <summary>Persists the probe's URL, filename, size and validators so a restart can resume (M1.9).</summary>
     public IJobRepository? JobRepository { get; init; }
 
-    /// <summary>How often the active transfer flushes the part file and records its cursors (TRD 6.5).</summary>
-    public TimeSpan CheckpointInterval { get; init; } = TimeSpan.FromSeconds(2);
+    /// <summary>
+    /// How often the active transfer flushes the part file and records its cursors (TRD 6.5). Data lost on a kill is at most this
+    /// interval plus <see cref="WriteBufferMaxAge"/> (unwritten bytes are not in the snapshot), so 1.5 s plus 0.5 s keeps
+    /// KASI-NFR-007's two seconds.
+    /// </summary>
+    public TimeSpan CheckpointInterval { get; init; } = TimeSpan.FromSeconds(1.5);
 
     /// <summary>Test-only mid-transfer write fault; the runner forwards it to the part writer.</summary>
     internal Func<long, int, Exception?>? WriteFaultInjector { get; init; }

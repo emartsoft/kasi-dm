@@ -91,8 +91,7 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("TC", "TC-RES-001")]
-    public async Task A_split_persists_the_new_segment_structure_before_progress_is_recorded()
+    public async Task A_live_download_persists_its_split_structure_to_SQLite()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var db = await CheckpointDb.CreateAsync(_folder, ct);
@@ -116,8 +115,7 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
     }
 
     [Fact]
-    [Trait("TC", "TC-RES-002")]
-    public async Task A_failed_part_flush_never_records_a_cursor()
+    public async Task A_failed_final_flush_never_records_a_cursor()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var db = await CheckpointDb.CreateAsync(_folder, ct);
@@ -228,6 +226,72 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
         File.Exists(Path.Combine(_folder, failed.ResolvedFileName!)).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task A_database_hiccup_on_two_ticks_does_not_fail_the_download()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await CheckpointDb.CreateAsync(_folder, ct);
+        const string seed = "checkpoint-hiccup";
+        const int size = 6 * 1024 * 1024;
+        var chaosId = _host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 1024 * 1024 });
+        var options = Options(4, db) with
+        {
+            CheckpointWriter = new FlakyCheckpointWriter(db.Writer, failFirst: 2),
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = chaosId },
+        };
+
+        var outcome = await new HttpTransferRunner().DownloadAsync(Url($"/files/{seed}/{size}"), _folder, options, ct);
+
+        var completed = outcome.Should().BeOfType<TransferCompleted>().Subject;
+        (await Sha256FileAsync(completed.FinalPath, ct)).Should().Be(GeneratedContent.Sha256Hex(seed, size));
+    }
+
+    [Fact]
+    public async Task A_persistent_checkpoint_failure_stops_the_transfer_promptly_and_keeps_the_part_file()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await CheckpointDb.CreateAsync(_folder, ct);
+        const string seed = "checkpoint-persistent";
+        const int size = 32 * 1024 * 1024; // about eight seconds at 1 MiB/s on four connections if nothing stopped it
+        var chaosId = _host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 1024 * 1024 });
+        var options = Options(4, db) with
+        {
+            CheckpointWriter = new FlakyCheckpointWriter(db.Writer, failFirst: int.MaxValue),
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = chaosId },
+        };
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+
+        var outcome = await new HttpTransferRunner().DownloadAsync(Url($"/files/{seed}/{size}"), _folder, options, ct);
+        timer.Stop();
+
+        var failed = outcome.Should().BeOfType<TransferFailed>().Subject;
+        failed.ErrorKind.Should().Be(TransferErrorKind.CheckpointError);
+        timer.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5), "the transfer must stop instead of downloading on without a durable record");
+        File.Exists(Path.Combine(_folder, failed.ResolvedFileName! + PartFileWriter.PartExtension)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_part_file_flush_failure_on_a_tick_keeps_its_disk_full_classification()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await CheckpointDb.CreateAsync(_folder, ct);
+        const string seed = "checkpoint-tick-disk-full";
+        const int size = 16 * 1024 * 1024;
+        var chaosId = _host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 1024 * 1024 });
+        var flushes = 0;
+        var options = Options(4, db) with
+        {
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = chaosId },
+            FlushFaultInjector = () => Interlocked.Increment(ref flushes) == 2
+                ? new IOException("simulated disk full", unchecked((int)0x80070070))
+                : null, // only the second flush, a periodic tick, fails; the final flush then succeeds
+        };
+
+        var outcome = await new HttpTransferRunner().DownloadAsync(Url($"/files/{seed}/{size}"), _folder, options, ct);
+
+        outcome.Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.DiskNotEnoughSpace);
+    }
+
     private Uri Url(string path) => new(_host.BaseAddress, path);
 
     private static HttpTransferOptions Options(int connections, CheckpointDb db) => new()
@@ -266,6 +330,19 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
         }
 
         return Convert.ToHexStringLower(hasher.GetHashAndReset());
+    }
+
+    /// <summary>Fails the first commits to simulate a database that is briefly unavailable, then delegates.</summary>
+    private sealed class FlakyCheckpointWriter(ICheckpointWriter inner, int failFirst) : ICheckpointWriter
+    {
+        private int _commits;
+
+        public void Record(JobId jobId, int segmentIndex, long written) => inner.Record(jobId, segmentIndex, written);
+
+        public Task FlushAsync(CancellationToken cancellationToken = default) =>
+            Interlocked.Increment(ref _commits) <= failFirst
+                ? Task.FromException(new InvalidOperationException("simulated database failure"))
+                : inner.FlushAsync(cancellationToken);
     }
 
     private sealed class CheckpointDb : IAsyncDisposable

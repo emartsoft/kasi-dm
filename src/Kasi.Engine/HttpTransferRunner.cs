@@ -303,23 +303,14 @@ public sealed class HttpTransferRunner
         string fileName,
         CancellationToken cancellationToken)
     {
-        var job = await jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
-        if (job is null)
-        {
-            return;
-        }
-
-        await jobs.UpdateAsync(
-            job with
-            {
-                FinalUrl = probe.FinalUrl.AbsoluteUri,
-                FileName = fileName,
-                TotalBytes = probe.TotalBytes,
-                ETag = probe.ETag,
-                LastModified = probe.LastModified,
-                Resumable = probe.Resumable,
-            },
+        var stored = await jobs.UpdateTransferMetadataAsync(
+            jobId,
+            new JobTransferMetadata(probe.FinalUrl.AbsoluteUri, fileName, probe.TotalBytes, probe.ETag, probe.LastModified, probe.Resumable),
             cancellationToken).ConfigureAwait(false);
+        if (!stored)
+        {
+            throw new InvalidOperationException("The job to checkpoint does not exist.");
+        }
     }
 
     private async Task<TransferOutcome> SingleStreamAsync(
@@ -542,6 +533,7 @@ public sealed class HttpTransferRunner
             }
         }
 
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         SegmentCheckpointCoordinator? checkpoint = null;
         if (options.CheckpointJobId is { } checkpointJob && options.CheckpointWriter is { } checkpointWriter && options.SegmentRepository is { } segmentRepository)
         {
@@ -552,7 +544,8 @@ public sealed class HttpTransferRunner
                 writer,
                 scheduler,
                 time,
-                options.CheckpointInterval);
+                options.CheckpointInterval,
+                onPersistentFailure: _ => linked.Cancel());
             try
             {
                 await checkpoint.SaveStructureAsync(cancellationToken).ConfigureAwait(false);
@@ -567,7 +560,6 @@ public sealed class HttpTransferRunner
             }
         }
 
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var state = new FailureState();
         using var signal = new WorkerWakeSignal(options.SchedulerOptions.MaxConnections);
         var throttleGate = new ThrottleGate(time);
@@ -603,9 +595,10 @@ public sealed class HttpTransferRunner
         }
 
         var failure = state.Failure;
-        if (failure is null && checkpoint?.Failure is { } checkpointFailure)
+        if (failure is null && !scheduler.IsComplete && checkpoint?.Failure is { } checkpointFailure)
         {
-            failure = CheckpointFailure(checkpointFailure);
+            // a failed flush keeps its disk classification (disk full pauses, other I/O errors fail); a database failure is a checkpoint error
+            failure = checkpointFailure is SegmentCheckpointException disk ? DiskFailure(disk.Status) : CheckpointFailure(checkpointFailure);
         }
 
         if (failure is { } transferFailure)

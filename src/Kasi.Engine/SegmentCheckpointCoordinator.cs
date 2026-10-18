@@ -16,6 +16,8 @@ internal sealed class SegmentCheckpointCoordinator
     private readonly SegmentScheduler _scheduler;
     private readonly TimeProvider _time;
     private readonly TimeSpan _interval;
+    private readonly int _maxConsecutiveFailures;
+    private readonly Action<Exception>? _onPersistentFailure;
     private int _persistedStructure = -1;
 
     public SegmentCheckpointCoordinator(
@@ -25,7 +27,9 @@ internal sealed class SegmentCheckpointCoordinator
         PartFileWriter writer,
         SegmentScheduler scheduler,
         TimeProvider time,
-        TimeSpan interval)
+        TimeSpan interval,
+        int maxConsecutiveFailures = DefaultMaxConsecutiveFailures,
+        Action<Exception>? onPersistentFailure = null)
     {
         _jobId = jobId;
         _checkpoints = checkpoints;
@@ -34,8 +38,14 @@ internal sealed class SegmentCheckpointCoordinator
         _scheduler = scheduler;
         _time = time;
         _interval = interval;
+        _maxConsecutiveFailures = maxConsecutiveFailures;
+        _onPersistentFailure = onPersistentFailure;
     }
 
+    /// <summary>Consecutive failing ticks before the transfer is stopped (ADR 0003, ADR 0008): about three intervals of no durable record.</summary>
+    public const int DefaultMaxConsecutiveFailures = 3;
+
+    /// <summary>The failure that stopped the periodic checkpoint, or null; a <see cref="SegmentCheckpointException"/> carries a disk status.</summary>
     public Exception? Failure { get; private set; }
 
     public async Task SaveStructureAsync(CancellationToken cancellationToken)
@@ -48,20 +58,38 @@ internal sealed class SegmentCheckpointCoordinator
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(_interval, _time);
+        var failures = 0;
         try
         {
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
-                await SaveAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await SaveAsync(cancellationToken).ConfigureAwait(false);
+                    failures = 0;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // A part file that cannot be flushed (disk full, I/O error) means durability cannot be established at all, so
+                    // it stops the transfer at once. A database hiccup (SQLite busy because of an indexer or antivirus) is
+                    // tolerated until it has failed on several ticks in a row, and a good tick starts the count again.
+                    failures++;
+                    if (ex is SegmentCheckpointException || failures >= _maxConsecutiveFailures)
+                    {
+                        Failure = ex;
+                        _onPersistentFailure?.Invoke(ex);
+                        return;
+                    }
+                }
             }
         }
         catch (OperationCanceledException)
         {
             // The transfer ended; the caller runs the final checkpoint.
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            Failure = ex;
         }
     }
 

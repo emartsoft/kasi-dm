@@ -171,6 +171,29 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task UpdateTransferMetadata_writes_only_the_probe_columns_and_never_a_stale_state()
+    {
+        var job = NewJob() with { State = JobState.Paused, Error = "User", DoneBytes = 5000, Connections = 3 };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+        var metadata = new JobTransferMetadata("https://cdn.example.com/f.bin", "f.bin", 12345, "\"abc\"", "Sun, 18 Oct 2026 10:00:00 GMT", Resumable: false);
+
+        (await _jobs.UpdateTransferMetadataAsync(job.Id, metadata, TempDatabase.Ct)).Should().BeTrue();
+
+        var stored = (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!;
+        stored.FinalUrl.Should().Be("https://cdn.example.com/f.bin");
+        stored.FileName.Should().Be("f.bin");
+        stored.TotalBytes.Should().Be(12345);
+        stored.ETag.Should().Be("\"abc\"");
+        stored.LastModified.Should().Be("Sun, 18 Oct 2026 10:00:00 GMT");
+        stored.Resumable.Should().BeFalse();
+        stored.State.Should().Be(JobState.Paused, "a probe result must not undo a state change made in the meantime");
+        stored.Error.Should().Be("User");
+        stored.DoneBytes.Should().Be(5000);
+        stored.Connections.Should().Be(3);
+        (await _jobs.UpdateTransferMetadataAsync(NewJob().Id, metadata, TempDatabase.Ct)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Updating_resetting_or_deleting_a_missing_job_reports_false()
     {
         var ghost = NewJob();

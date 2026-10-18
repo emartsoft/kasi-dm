@@ -17,6 +17,13 @@ public interface IJobRepository
     /// </summary>
     Task<bool> UpdateAsync(Job job, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Writes only what a probe learned (final URL, file name, size, validators, resumability) and leaves the state, error, progress
+    /// and queue columns alone, so a caller that changed the state in the meantime (a user pause) is never overwritten with a stale
+    /// copy. Returns false if there is no such job.
+    /// </summary>
+    Task<bool> UpdateTransferMetadataAsync(JobId id, JobTransferMetadata metadata, CancellationToken cancellationToken = default);
+
     /// <summary>Sets the saved byte count back to zero, for a job that restarts from the beginning (TRD 6.5). Returns false if there is no such job.</summary>
     Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default);
 

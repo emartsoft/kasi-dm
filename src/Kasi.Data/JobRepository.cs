@@ -54,6 +54,27 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
         return changed > 0;
     }
 
+    public async Task<bool> UpdateTransferMetadataAsync(JobId id, JobTransferMetadata metadata, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE job SET final_url = @FinalUrl, file_name = @FileName, total_bytes = @TotalBytes, etag = @ETag, last_modified = @LastModified, " +
+            "resumable = @Resumable WHERE id = @id;",
+            new
+            {
+                id = id.ToString(),
+                metadata.FinalUrl,
+                metadata.FileName,
+                metadata.TotalBytes,
+                metadata.ETag,
+                metadata.LastModified,
+                Resumable = metadata.Resumable ? 1 : 0,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return changed > 0;
+    }
+
     public async Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default)
     {
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);

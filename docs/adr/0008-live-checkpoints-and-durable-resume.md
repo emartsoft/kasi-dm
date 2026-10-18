@@ -19,21 +19,28 @@ with `ISegmentRepository.ReplaceAsync` when the version changed, records every s
 commits that batch. The snapshot is taken before the flush and the records are written after it. If the flush fails, nothing
 is recorded.
 
-**Live cadence.** The coordinator runs on a `PeriodicTimer` owned by the runner (`CheckpointInterval`, 2 s by default). It
-stops before the runner's final snapshot/flush so the shutdown/pause checkpoint cannot race the periodic one. The final
-checkpoint runs on success (before seal/commit) and on failure/cancellation, with the same snapshot-before-flush order.
+**Live cadence and the loss budget.** The coordinator runs on a `PeriodicTimer` owned by the runner (`CheckpointInterval`,
+**1.5 s** by default) and commits on every tick. Data lost on a kill is the interval plus `WriteBufferMaxAge` (0.5 s: bytes
+still in a worker's write buffer are not in the snapshot), so 1.5 s plus 0.5 s keeps KASI-NFR-007's two seconds. It stops
+before the runner's final snapshot/flush so the shutdown/pause checkpoint cannot race the periodic one. The final checkpoint
+runs on success (before seal/commit) and on failure/cancellation, with the same snapshot-before-flush order.
 
 **Structure.** `SegmentScheduler.GetCheckpointSnapshot()` returns the list and version atomically. A snapshot/version pair
 cannot straddle a split, so a new segment is persisted before its progress is recorded. The initial structure is persisted
 before any worker starts.
 
-**Probe metadata.** After a successful probe the runner updates the job row with the final URL, resolved filename, total
-bytes, ETag, Last-Modified and `Resumable`. `done_bytes` remains owned by the checkpoint writer and `SegmentRepository`; the
-runner never lowers it.
+**Probe metadata.** After a successful probe the runner writes the final URL, resolved filename, total bytes, ETag,
+Last-Modified and `Resumable` with `IJobRepository.UpdateTransferMetadataAsync`, which updates **only** those columns, so a
+state change made by the caller in the meantime (a user pause) is never overwritten with a stale copy, and `done_bytes` stays
+owned by the checkpoint writer. A job id that has no row is a `CheckpointError`, not a silent skip.
 
-**Failure semantics.** A part-file flush failure keeps the existing `DiskError`/`DiskNotEnoughSpace` classification and the
-part file. A database/structure failure is `TransferErrorKind.CheckpointError`; the transfer stops rather than continuing
-without a durable record. `Cancelled`, `DiskNotEnoughSpace` and `CheckpointError` all return the last durable snapshot.
+**Failure semantics.** A part file that cannot be flushed on a tick (disk full, I/O error) stops the transfer at once with its
+disk classification (`DiskNotEnoughSpace` pauses, others fail), keeping the part file. A database failure is tolerated until
+it has failed on `3` ticks in a row (a good tick starts the count again, so SQLite being briefly busy because of an indexer
+or antivirus does not end a download); then the periodic checkpoint cancels the transfer, which returns
+`TransferErrorKind.CheckpointError` with the last durable snapshot and the part file, instead of downloading on without a
+durable record. A tick that failed earlier never fails a transfer that went on to complete: the final checkpoint before the
+seal decides. `Cancelled`, `DiskNotEnoughSpace` and `CheckpointError` all return the last durable snapshot.
 
 **Ownership.** The caller starts `CheckpointWriter` (its existing contract), creates the job row and supplies the repository
 implementations; the runner uses only the Core interfaces. Job-state transitions and the engine facade remain M1.13.
@@ -41,7 +48,7 @@ implementations; the runner uses only the Core interfaces. Job-state transitions
 ## Consequences
 
 - A pause/reboot can reload segment rows, send `If-Range` and continue without re-downloading flushed data.
-- The 2 s interval bounds replay to at most roughly 2 s per connection, as required by KASI-RES-001.
+- A kill loses at most `CheckpointInterval + WriteBufferMaxAge` (1.5 s + 0.5 s) per connection, as KASI-NFR-007 requires.
 - A `/mutable` change between or during sessions returns `FileChanged`; the caller restarts, and a fresh download overwrites
   the part and replaces the old structure.
 - Single-stream downloads have no resumable cursors and are restarted by the caller.
