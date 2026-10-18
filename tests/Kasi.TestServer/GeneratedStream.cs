@@ -1,7 +1,7 @@
 namespace Kasi.TestServer;
 
 /// <summary>A read-only, seekable stream over <see cref="GeneratedContent"/>; lets ASP.NET Core do range processing.</summary>
-internal sealed class GeneratedStream(string seed, long length) : Stream
+internal sealed class GeneratedStream(string seed, long length, TestServerMetrics? metrics = null) : Stream
 {
     private long _position;
 
@@ -26,6 +26,7 @@ internal sealed class GeneratedStream(string seed, long length) : Stream
         var count = (int)Math.Min(buffer.Length, Math.Max(0, length - _position));
         GeneratedContent.Fill(seed, _position, buffer[..count]);
         _position += count;
+        metrics?.FileBytesServed(count);
         return count;
     }
 

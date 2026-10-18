@@ -11,5 +11,8 @@ public sealed record JobSecret
 
     public HttpCredentials? Credentials { get; init; }
 
+    /// <summary>Origin that owns captured headers and credentials; retained when a refreshed URL changes origin.</summary>
+    public Uri? SensitiveOrigin { get; init; }
+
     public override string ToString() => Redact.Placeholder;
 }

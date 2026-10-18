@@ -5,19 +5,17 @@ namespace Kasi.Engine;
 /// <summary>Decides which headers and browser cookies may leave the machine for each probe hop and lease.</summary>
 internal sealed class RequestScope
 {
-    private readonly Uri? _initialUrl;
-    private readonly IReadOnlyDictionary<string, (string Value, bool OriginOnly)> _headers;
+    private readonly IReadOnlyDictionary<string, (string Value, Uri? Origin, bool OriginOnly)> _headers;
     private readonly IReadOnlyList<JobCookie> _cookies;
 
     public RequestScope(Uri? initialUrl, IReadOnlyDictionary<string, string>? requestHeaders, JobSecret? secret)
     {
-        _initialUrl = initialUrl;
-        var headers = new Dictionary<string, (string Value, bool OriginOnly)>(StringComparer.OrdinalIgnoreCase);
+        var headers = new Dictionary<string, (string Value, Uri? Origin, bool OriginOnly)>(StringComparer.OrdinalIgnoreCase);
         if (requestHeaders is not null)
         {
             foreach (var header in requestHeaders)
             {
-                headers[header.Key] = (header.Value, Sensitive(header.Key));
+                headers[header.Key] = (header.Value, initialUrl, IsSensitiveHeader(header.Key));
             }
         }
 
@@ -26,7 +24,7 @@ internal sealed class RequestScope
             foreach (var header in secret.Headers)
             {
                 // a captured header is a secret whatever its name (X-Api-Key, X-Amz-Security-Token), so it never leaves its origin
-                headers[header.Key] = (header.Value, true);
+                headers[header.Key] = (header.Value, secret.SensitiveOrigin ?? initialUrl, true);
             }
         }
 
@@ -38,11 +36,11 @@ internal sealed class RequestScope
     {
         ArgumentNullException.ThrowIfNull(request);
         var url = request.RequestUri ?? throw new ArgumentException("The HTTP request needs an absolute URI.", nameof(request));
-        var sameOrigin = _initialUrl is not null && IsSameOrigin(_initialUrl, url);
         string? rawCookieHeader = null;
         foreach (var header in _headers)
         {
-            if (header.Value.OriginOnly && !sameOrigin)
+            if (header.Value.OriginOnly
+                && (header.Value.Origin is null || !IsSameOrigin(header.Value.Origin, url)))
             {
                 continue;
             }
@@ -72,9 +70,10 @@ internal sealed class RequestScope
     }
 
     public static bool IsSameOrigin(Uri first, Uri second) =>
-        Uri.Compare(first, second, UriComponents.SchemeAndServer, UriFormat.SafeUnescaped, StringComparison.OrdinalIgnoreCase) == 0;
+        first.IsAbsoluteUri && second.IsAbsoluteUri
+        && Uri.Compare(first, second, UriComponents.SchemeAndServer, UriFormat.SafeUnescaped, StringComparison.OrdinalIgnoreCase) == 0;
 
-    private static bool Sensitive(string name) =>
+    public static bool IsSensitiveHeader(string name) =>
         name.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
         || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase)
         || name.Equals("Proxy-Authorization", StringComparison.OrdinalIgnoreCase);

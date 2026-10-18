@@ -1,6 +1,6 @@
 # 0009. Authentication scope, protected job secrets and link refresh
 
-- Status: accepted for M1.10a/b; the refresh workflow is implemented in M1.10c
+- Status: implemented in M1.10a/b/c, pending merge
 - Date: 2026-10-18
 - Requirements: KASI-ENG-009, KASI-ENG-010, KASI-NFR-013; TC-ENG-016 to 018
 
@@ -38,9 +38,12 @@ On resume, the saved job URL supplies that initial origin (or the caller explici
 the runner suppresses credentials and sensitive raw headers. A saved final URL on another origin cannot inherit the
 source origin's credentials.
 
-**Link refresh (M1.10c).** The engine will probe a proposed new URL and compare total size and the stored ETag (or
-Last-Modified) before changing the saved URL or writing bytes. A successful validation updates only `url` and
-`final_url`, then resumes the existing segment cursors with `If-Range`.
+**Link refresh (M1.10c).** The engine probes a proposed new URL with a one-byte range and compares total size and the
+stored ETag (or Last-Modified) before changing the saved URL or writing bytes. A successful validation updates only
+`url` and `final_url`, then resumes the existing segment cursors with `If-Range`. The saved checkpoint identity must
+still match the caller's paused job. A secret's sensitive headers and credentials are bound to their original origin
+before a URL change is persisted; a newly supplied secret can bind to the refreshed origin. Browser cookies retain
+their individual domain and path scope.
 
 ## Consequences
 

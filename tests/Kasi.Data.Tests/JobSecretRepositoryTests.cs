@@ -84,6 +84,7 @@ public sealed class JobSecretRepositoryTests : IAsyncLifetime, IDisposable
             cookie.GetProperty("httpOnly").GetBoolean().Should().BeTrue();
             json.RootElement.GetProperty("headers").GetProperty("Authorization").GetString().Should().Be("header-value");
             json.RootElement.GetProperty("credentials").GetProperty("userName").GetString().Should().Be("alice");
+            json.RootElement.GetProperty("sensitiveOrigin").GetString().Should().Be("https://example.com/");
         }
         finally
         {
@@ -162,5 +163,6 @@ public sealed class JobSecretRepositoryTests : IAsyncLifetime, IDisposable
         }],
         Headers = new Dictionary<string, string> { ["Authorization"] = "header-value" },
         Credentials = new HttpCredentials { UserName = "alice", Password = "password-value" },
+        SensitiveOrigin = new Uri("https://example.com/"),
     };
 }
