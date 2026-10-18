@@ -292,6 +292,38 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
         outcome.Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.DiskNotEnoughSpace);
     }
 
+    [Fact]
+    public async Task Cancelling_during_the_initial_structure_save_is_reported_as_cancelled_not_as_a_checkpoint_error()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await CheckpointDb.CreateAsync(_folder, ct);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var options = Options(4, db) with { SegmentRepository = new BlockingSegments(db.Segments, entered) };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        var download = new HttpTransferRunner().DownloadAsync(Url("/files/checkpoint-cancel-structure/4194304"), _folder, options, cts.Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        await cts.CancelAsync();
+
+        (await download).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
+    }
+
+    [Fact]
+    public async Task Cancelling_while_the_probe_metadata_is_saved_is_reported_as_cancelled_not_as_a_checkpoint_error()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var db = await CheckpointDb.CreateAsync(_folder, ct);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var options = Options(4, db) with { JobRepository = new BlockingJobs(db.Jobs, entered) };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        var download = new HttpTransferRunner().DownloadAsync(Url("/files/checkpoint-cancel-metadata/4194304"), _folder, options, cts.Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        await cts.CancelAsync();
+
+        (await download).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
+    }
+
     private Uri Url(string path) => new(_host.BaseAddress, path);
 
     private static HttpTransferOptions Options(int connections, CheckpointDb db) => new()
@@ -330,6 +362,42 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
         }
 
         return Convert.ToHexStringLower(hasher.GetHashAndReset());
+    }
+
+    /// <summary>Blocks the structure write until the caller cancels, to cancel exactly while it is in flight.</summary>
+    private sealed class BlockingSegments(ISegmentRepository inner, TaskCompletionSource entered) : ISegmentRepository
+    {
+        public Task<IReadOnlyList<Segment>> LoadAsync(JobId jobId, CancellationToken cancellationToken = default) => inner.LoadAsync(jobId, cancellationToken);
+
+        public async Task ReplaceAsync(JobId jobId, IReadOnlyList<Segment> segments, CancellationToken cancellationToken = default)
+        {
+            entered.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+    }
+
+    /// <summary>Blocks the probe-metadata write until the caller cancels, to cancel exactly while it is in flight.</summary>
+    private sealed class BlockingJobs(IJobRepository inner, TaskCompletionSource entered) : IJobRepository
+    {
+        public Task AddAsync(Job job, CancellationToken cancellationToken = default) => inner.AddAsync(job, cancellationToken);
+
+        public Task<Job?> GetAsync(JobId id, CancellationToken cancellationToken = default) => inner.GetAsync(id, cancellationToken);
+
+        public Task<IReadOnlyList<Job>> ListAsync(int? queueId = null, JobState? state = null, CancellationToken cancellationToken = default) =>
+            inner.ListAsync(queueId, state, cancellationToken);
+
+        public Task<bool> UpdateAsync(Job job, CancellationToken cancellationToken = default) => inner.UpdateAsync(job, cancellationToken);
+
+        public async Task<bool> UpdateTransferMetadataAsync(JobId id, JobTransferMetadata metadata, CancellationToken cancellationToken = default)
+        {
+            entered.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return true;
+        }
+
+        public Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default) => inner.ResetProgressAsync(id, cancellationToken);
+
+        public Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default) => inner.DeleteAsync(id, cancellationToken);
     }
 
     /// <summary>Fails the first commits to simulate a database that is briefly unavailable, then delegates.</summary>

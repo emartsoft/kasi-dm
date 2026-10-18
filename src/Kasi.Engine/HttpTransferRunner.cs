@@ -105,6 +105,10 @@ public sealed class HttpTransferRunner
                 {
                     await PersistProbeMetadataAsync(jobs, checkpointJob, probe, fileName, cancellationToken).ConfigureAwait(false);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return Cancelled("The download was cancelled while the probe result was saved.", fileName, probe.TotalBytes, probe.ETag, probe.LastModified);
+                }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     return Failed(CheckpointFailure(ex), fileName, probe.TotalBytes, probe.ETag, probe.LastModified);
@@ -549,6 +553,10 @@ public sealed class HttpTransferRunner
             try
             {
                 await checkpoint.SaveStructureAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return Cancelled("The download was cancelled while the segment structure was saved.", fileName, totalBytes, eTag, lastModified);
             }
             catch (SegmentCheckpointException ex)
             {
