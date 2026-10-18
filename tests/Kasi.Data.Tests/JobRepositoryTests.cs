@@ -194,6 +194,30 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    [Trait("TC", "TC-ENG-018")]
+    public async Task UpdateUrl_changes_only_urls_and_preserves_resume_state()
+    {
+        var job = NewJob() with
+        {
+            FinalUrl = "https://old.example.com/file.bin?token=old",
+            DoneBytes = 5000,
+            State = JobState.Paused,
+            ETag = "\"version-1\"",
+            LastModified = "Sun, 18 Oct 2026 10:00:00 GMT",
+        };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+        await _db.ExecAsync($"INSERT INTO segment (job_id, idx, start, \"end\", written) VALUES ('{job.Id}', 0, 0, 10000, 5000);");
+
+        var newUrl = "https://example.com/file.bin?token=new";
+        var newFinalUrl = "https://cdn.example.com/file.bin?token=new";
+        (await _jobs.UpdateUrlAsync(job.Id, newUrl, newFinalUrl, TempDatabase.Ct)).Should().BeTrue();
+
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct)).Should().BeEquivalentTo(job with { Url = newUrl, FinalUrl = newFinalUrl });
+        (await _db.ScalarAsync($"SELECT written FROM segment WHERE job_id = '{job.Id}';")).Should().Be(5000L);
+        (await _jobs.UpdateUrlAsync(NewJob().Id, newUrl, newFinalUrl, TempDatabase.Ct)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Updating_resetting_or_deleting_a_missing_job_reports_false()
     {
         var ghost = NewJob();

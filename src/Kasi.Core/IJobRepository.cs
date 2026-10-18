@@ -24,6 +24,9 @@ public interface IJobRepository
     /// </summary>
     Task<bool> UpdateTransferMetadataAsync(JobId id, JobTransferMetadata metadata, CancellationToken cancellationToken = default);
 
+    /// <summary>Changes only the source and final URLs after a refreshed link is validated; preserves progress, validators and state.</summary>
+    Task<bool> UpdateUrlAsync(JobId id, string url, string? finalUrl, CancellationToken cancellationToken = default);
+
     /// <summary>Sets the saved byte count back to zero, for a job that restarts from the beginning (TRD 6.5). Returns false if there is no such job.</summary>
     Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default);
 
