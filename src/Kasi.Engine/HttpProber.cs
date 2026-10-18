@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using Kasi.Core.Logging;
 
@@ -146,7 +147,7 @@ public sealed class HttpProber
                     : ProbeErrorKind.TransientError;
                 return new ProbeFailure(
                     kind,
-                    $"HTTP request failed while probing '{Redact.Url(currentUrl.AbsoluteUri)}': {ex.Message}",
+                    $"HTTP request failed while probing '{Redact.Url(currentUrl.AbsoluteUri)}': {DescribeFailure(ex)}",
                     ex.StatusCode);
             }
         }
@@ -366,6 +367,24 @@ public sealed class HttpProber
         uri.IsAbsoluteUri
         && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
             || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Error kinds only, never the exception text: it can echo the full URL (with its query), header values or local paths
+    /// (CLAUDE.md rule 3). The kinds stay useful for diagnosis.
+    /// </summary>
+    private static string DescribeFailure(HttpRequestException exception)
+    {
+        var description = exception.HttpRequestError.ToString();
+        for (var inner = exception.InnerException; inner is not null; inner = inner.InnerException)
+        {
+            if (inner is SocketException socket)
+            {
+                return $"{description} (SocketError {socket.SocketErrorCode})";
+            }
+        }
+
+        return exception.InnerException is { } first ? $"{description} ({first.GetType().Name})" : description;
+    }
 
     private static bool IsCertificateFailure(HttpRequestException exception)
     {

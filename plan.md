@@ -37,7 +37,7 @@ Taken from `CLAUDE.md` and `CONTRIBUTING.md`; repeated here because every task b
 
 ### 3.1 Delivered
 
-All on branch `chore/m0-foundations`, nothing pushed yet. 159 tests pass; a fresh clone passes the CI commands.
+Delivered in M0 (PRs #1 to #5, all merged into `main`); the step commits below were squash-merged. 159 tests passed at the time, and a fresh clone passed the CI commands.
 
 | Step | Commit | Delivered | Verified by |
 | --- | --- | --- | --- |
@@ -400,6 +400,7 @@ Every requirement from TRD sections 3 and 4 and the phase that delivers it. Prio
 ## 13. How to keep this file useful
 
 - Tick a task only when its "verified by" evidence exists, and link the PR or gate report next to it.
+- Update `README.md` (status, layout, commands) in the same PR as the change that makes it stale, as `plan.md` is. A task is not done while either still describes the old state.
 - When a phase starts, split its tasks into PR-sized steps and put the TC IDs in each commit body.
 - At each gate, copy the exit criteria into the gate report and attach the last three nightly fault-injection reports.
 - Record each architecture decision as an ADR (`docs/adr/NNNN-title.md`). ADRs already planned: media tables DDL (M3.3), HTTP/2 and TLS in the test server (M1.7), IPC pipe and message versioning (M2.1), update channels (M4.7).
