@@ -1,6 +1,6 @@
 # 0006. HTTP connection pooling, TLS validation and the transfer loop
 
-- Status: Draft — the pool and TLS sections are implemented and accepted for M1.7a; the worker-loop sections are completed in M1.7b/c.
+- Status: Accepted for M1.7a/b — the pool, TLS, transfer loop, resume and failure paths are implemented; the live scheduler scenarios and their validation remain M1.7c.
 - Date: 2026-10-18
 - Requirements: KASI-ENG-001, KASI-ENG-006, KASI-ENG-008, KASI-NFR-011, KASI-RES-002, TRD 5.3, 6.2, 6.4, 6.5, ADR 0004, ADR 0005
 

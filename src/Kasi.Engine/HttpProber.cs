@@ -21,12 +21,17 @@ public sealed class HttpProber
 
     private readonly HttpMessageInvoker _httpClient;
     private readonly TimeProvider _time;
+    private readonly IReadOnlyDictionary<string, string>? _defaultHeaders;
 
-    public HttpProber(HttpMessageInvoker httpClient, TimeProvider? timeProvider = null)
+    public HttpProber(
+        HttpMessageInvoker httpClient,
+        TimeProvider? timeProvider = null,
+        IReadOnlyDictionary<string, string>? defaultHeaders = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         _httpClient = httpClient;
         _time = timeProvider ?? TimeProvider.System;
+        _defaultHeaders = defaultHeaders;
     }
 
     public async Task<ProbeOutcome> ProbeAsync(
@@ -153,7 +158,7 @@ public sealed class HttpProber
         }
     }
 
-    private static HttpRequestMessage CreateRequest(Uri url, bool includeRange, long? firstRangeLength)
+    private HttpRequestMessage CreateRequest(Uri url, bool includeRange, long? firstRangeLength)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url)
         {
@@ -162,6 +167,14 @@ public sealed class HttpProber
             VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
         };
         request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
+        if (_defaultHeaders is not null)
+        {
+            foreach (var header in _defaultHeaders)
+            {
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
         if (includeRange)
         {
             request.Headers.Range = firstRangeLength is { } length
