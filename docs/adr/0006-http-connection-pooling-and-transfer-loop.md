@@ -43,13 +43,22 @@ recorded a strong `ETag` or `Last-Modified`. A split never cuts into a lease in 
 endgame peer, the worker drops its buffered bytes, completes the scheduler lease and drains the bounded response so the
 connection returns quietly (`TC-ENG-011`); normal leases read to EOF before disposal.
 
-**Failure and cancellation order (M1.7b/c).** One code path cancels the sibling workers, has each worker flush its
-pending buffer and advance its lease (or abandon it on failure), takes the segment snapshot, calls
+**Failure and cancellation order (M1.7b/c).** One code path cancels the sibling workers, abandons each in-flight lease
+(a worker's pending write buffer, at most 256 KiB or 500 ms of data, is dropped rather than written: only written bytes ever
+count, so this is safe, and those bytes are downloaded again on resume), takes the segment snapshot, calls
 `PartFileWriter.FlushAsync`, disposes the writer **without** `Abandon()` so `.kasipart` survives, and returns a typed
-`TransferFailed` carrying the pre-flush snapshot and the flushed byte count. Pause and shutdown use the same path, so a
-recorded cursor can never be ahead of the data on disk.
+`TransferFailed`. **The snapshot and flushed byte count are returned only if that flush succeeded**; if it failed, nothing
+since the caller's last durable checkpoint is known to be on disk, so the flush failure is returned with no snapshot. Pause
+and shutdown use the same path, so a recorded cursor can never be ahead of the data on disk.
 
 ## Consequences
+
+- A superseded endgame lease is drained to its end (up to `SupersededLeaseDrainTimeout`, 15 s) so its connection returns
+  without an aborted request (`TC-ENG-011`). The transfer cannot finish before that drain, so a very slow superseded lease
+  can delay completion by its remaining bytes (worst case the timeout, after which the response is disposed and counts as
+  an aborted request). Moving drains off the completion path is possible later; the live endgame test bounds the delay.
+- Idle workers are woken through `WorkerWakeSignal`, which keeps at most one stored wake per worker, so a long busy stretch
+  cannot leave a backlog that makes idle workers spin.
 
 - A 1 GiB, 8-connection HTTPS download performs one handshake per worker lane (`TC-ENG-010`), not one per segment.
 - The pool holds one handler and one idle connection per worker for the life of a transfer; that is the cost of
