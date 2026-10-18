@@ -102,3 +102,8 @@ jobs:
 
       - name: Unit tests
         run: dotnet test Kasi.slnx -c Release --no-build --filter "Category!=Integration"
+
+      # The SQLite persistence tests are tagged Integration (TRD 12), so the filter above skips them; run them here too so
+      # the ARM64 build exercises the native SQLite and the checkpoint writer.
+      - name: Persistence tests (SQLite)
+        run: dotnet test tests/Kasi.Data.Tests -c Release --no-build

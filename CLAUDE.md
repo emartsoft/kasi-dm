@@ -27,7 +27,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 - HTTP: `SocketsHttpHandler`; FTP: FluentFTP; torrents: MonoTorrent; storage: SQLite (WAL) via Microsoft.Data.Sqlite + Dapper
 - Muxing: FFmpeg LGPL build as an external process; installer/updates: Velopack; logging: Serilog
 - Extension: TypeScript, Manifest V3, Vite, webextension-polyfill; native host ID `com.martsoft.kasi`
-- Tests: xUnit, FluentAssertions, FsCheck, Testcontainers, Avalonia.Headless, FlaUI, Vitest, Playwright
+- Tests: xUnit, AwesomeAssertions (the maintained FluentAssertions fork, Apache-2.0), FsCheck, Testcontainers, Avalonia.Headless, FlaUI, Vitest, Playwright
 
 ## Solution layout
 
@@ -58,6 +58,7 @@ bench/ build/ docs/
 - Tag tests: `[Trait("TC", "TC-ENG-008")]`; integration tests also `[Trait("Category", "Integration")]`.
 - Follow Conventional Commits with scopes from CONTRIBUTING.md (`engine`, `media`, `data`, `app`, …). Do not push or open PRs unless asked.
 - Record significant design decisions as ADRs in `docs/adr/`.
+- Keep `README.md` (status, layout, commands) and `plan.md` (task status, "Last updated") current: update them in the same PR as the work that changes them, and say so in the PR description.
 
 ## Commands
 

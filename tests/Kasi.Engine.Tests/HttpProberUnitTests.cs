@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.Extensions.Time.Testing;
 
@@ -293,6 +294,24 @@ public class HttpProberUnitTests
 
         f401.Kind.Should().Be(ProbeErrorKind.AuthRequired);
         f401.AuthChallenges.Should().Equal("Basic", "Digest");
+    }
+
+    [Fact]
+    public async Task Failure_messages_never_repeat_the_text_of_the_underlying_exception()
+    {
+        using var handler = new StubHandler((_, _) => throw new HttpRequestException(
+            HttpRequestError.ConnectionError,
+            "connect to https://example.com/a.bin?token=abc failed for C:/Users/someone/secret.txt",
+            new SocketException((int)SocketError.ConnectionRefused)));
+        using var invoker = new HttpMessageInvoker(handler);
+        var prober = new HttpProber(invoker);
+
+        var failure = (await prober.ProbeAsync(new Uri("https://example.com/a.bin?token=abc"), cancellationToken: TestContext.Current.CancellationToken))
+            .Should().BeOfType<ProbeFailure>().Subject;
+
+        failure.Kind.Should().Be(ProbeErrorKind.TransientError);
+        failure.Message.Should().NotContain("token=abc").And.NotContain("someone").And.NotContain("secret.txt");
+        failure.Message.Should().Contain("ConnectionError").And.Contain("ConnectionRefused", "the error kinds are safe and still diagnostic");
     }
 
     [Fact]

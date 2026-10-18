@@ -11,34 +11,38 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 | Platforms | Windows 10 22H2+, Windows 11 (x64, ARM64) |
 | Browsers | Chrome, Edge, Firefox (latest 3) and Firefox ESR |
 
+## Status
+
+Under construction, in milestone **M1 (download engine)**; see [plan.md](plan.md) for the task list and what is done. Today the repository has the domain model and job lifecycle, the SQLite data layer with the checkpoint writer, filename handling, the HTTP probe, the segment scheduler and the part-file disk writer, plus `Kasi.TestServer` and the CI pipeline. **There is no end-to-end download yet** (the HTTP transfer loop is M1.7), and the desktop app is an empty shell. `Kasi.Media`, `Kasi.Torrent`, `Kasi.Scheduling` and `Kasi.Ipc` are placeholders, and the browser extension, native host, FFmpeg fetch, packaging scripts and fault-injection harness arrive in later milestones. Items in the layout below marked *(planned)* do not exist yet.
+
 ## Repository layout
 
 ```
-kasi/
+kasi-dm/
 ├── src/
 │   ├── Kasi.Core/            Domain model (Job, Segment, Queue, Category), interfaces, events
 │   ├── Kasi.Engine/          Probe, HTTP/FTP transfer, dynamic segmentation, file writer, throttling, retry
-│   ├── Kasi.Media/           HLS/DASH parsing, DRM detection, segment download, FFmpeg wrapper
-│   ├── Kasi.Torrent/         MonoTorrent adapter
-│   ├── Kasi.Scheduling/      Queue runner, schedules, post-actions, wake timers
+│   ├── Kasi.Media/           HLS/DASH parsing, DRM detection, segment download, FFmpeg wrapper (placeholder, M3)
+│   ├── Kasi.Torrent/         MonoTorrent adapter (placeholder, M4)
+│   ├── Kasi.Scheduling/      Queue runner, schedules, post-actions, wake timers (placeholder, M2)
 │   ├── Kasi.Data/            SQLite repositories, migrations, checkpoint writer
-│   ├── Kasi.Ipc/             Message contracts, JSON schema validation, named-pipe client/server
-│   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray
-│   └── Kasi.NativeHost/      Native AOT browser native-messaging host
-├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox builds)
+│   ├── Kasi.Ipc/             Message contracts, JSON schema validation, named-pipe client/server (placeholder, M2)
+│   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray (empty shell)
+│   └── Kasi.NativeHost/      Native AOT browser native-messaging host (stub, M2)
+├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox builds) (planned, M2)
 ├── tests/
 │   ├── Kasi.Engine.Tests/    Unit + property tests (FsCheck)
 │   ├── Kasi.*.Tests/         One test project per src project
 │   ├── Kasi.TestServer/      Controllable HTTP test server with chaos middleware
-│   ├── Kasi.FaultInjection/  Kill-loop, power-cut and soak harnesses
-│   └── fixtures/             HLS/DASH manifests, torrent files, Content-Disposition cases
-├── bench/                    Kasi.Bench harness, sources.json, weekly results
-├── build/                    Packaging (Velopack), signing, FFmpeg fetch script
-├── docs/                     Architecture decision records (ADRs), protocol schema, runbooks
+│   ├── Kasi.FaultInjection/  Kill-loop, power-cut and soak harnesses (planned, M1.14)
+│   └── fixtures/             Content-Disposition corpus (HLS/DASH manifests and torrent files planned, M3/M4)
+├── bench/                    Kasi.Bench BenchmarkDotNet micro-benchmarks (sources.json and weekly results planned, M1.15)
+├── build/                    Packaging (Velopack), signing, FFmpeg fetch script (planned, M3/M4)
+├── docs/                     Architecture decision records (ADRs), specs, per-milestone plans, runbooks
 ├── Directory.Build.props     Shared MSBuild settings (nullable, warnings as errors, analyzers)
 ├── Directory.Packages.props  Central package versions
 ├── .editorconfig             Code style, enforced in build
-└── Kasi.sln
+└── Kasi.slnx
 ```
 
 **Architecture rule:** nothing under `Kasi.Core`, `Kasi.Engine`, `Kasi.Media`, `Kasi.Torrent`, `Kasi.Scheduling`, `Kasi.Data` or `Kasi.Ipc` may reference Avalonia (KASI-NFR-019). The engine must run headless. An architecture test in `Kasi.ArchitectureTests` fails the build if this is broken.
@@ -57,21 +61,23 @@ kasi/
 ## Getting started
 
 ```powershell
-git clone https://github.com/martsoft/kasi.git
-cd kasi
+git clone https://github.com/emartsoft/kasi-dm.git
+cd kasi-dm
 
-# Restore .NET packages and fetch the pinned LGPL FFmpeg build into build/ffmpeg
 dotnet restore
-pwsh ./build/fetch-ffmpeg.ps1
 
 # Build everything
 dotnet build -c Debug
 
-# Run the desktop app
+# Run the desktop app (an empty shell until M2)
 dotnet run --project src/Kasi.App
 ```
 
-### Browser extension (development)
+`build/fetch-ffmpeg.ps1` (pinned LGPL FFmpeg build) arrives with media capture in M3.
+
+### Browser extension (development, from M2)
+
+The extension, the dev host registration script and the commands below do not exist yet.
 
 ```powershell
 cd extension
@@ -94,7 +100,7 @@ This writes `com.martsoft.kasi` host manifests under `HKCU` pointing at your Deb
 # Unit and integration tests (needs Docker for Testcontainers)
 dotnet test
 
-# Only fast unit tests
+# Only fast unit tests (the SQLite persistence tests are tagged Integration, so they are not in this set)
 dotnet test --filter "Category!=Integration"
 
 # One test case from the test plan
@@ -107,9 +113,19 @@ cd extension; npm test; npm run test:e2e
 dotnet test --collect:"XPlat Code Coverage"
 ```
 
+The disk-full test (`TC-ENG-015`, `PartFileVhdIntegrationTests`) mounts a small VHDX with `diskpart` and skips itself unless you run elevated; CI sets `KASI_REQUIRE_VHD=1`, which turns a skip into a failure.
+
+Micro-benchmarks (BenchmarkDotNet) live in `bench/Kasi.Bench`:
+
+```powershell
+dotnet run -c Release --project bench/Kasi.Bench -- --filter "*SegmentScheduler*"
+```
+
 Tests never reach the public internet; they run against `Kasi.TestServer`. Fault-injection and benchmark suites run on dedicated machines; see `KASI-TPL-2026-001`, sections 6 and 7.
 
-## Packaging
+## Packaging (from M4)
+
+`build/pack.ps1` does not exist yet; the command below is the intended interface.
 
 ```powershell
 pwsh ./build/pack.ps1 -Version 1.0.0 -Channel beta
