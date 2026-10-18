@@ -388,6 +388,9 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
 
         public Task<bool> UpdateAsync(Job job, CancellationToken cancellationToken = default) => inner.UpdateAsync(job, cancellationToken);
 
+        public Task<bool> UpdateUrlAsync(JobId id, string url, string? finalUrl, CancellationToken cancellationToken = default) =>
+            inner.UpdateUrlAsync(id, url, finalUrl, cancellationToken);
+
         public async Task<bool> UpdateTransferMetadataAsync(JobId id, JobTransferMetadata metadata, CancellationToken cancellationToken = default)
         {
             entered.TrySetResult();

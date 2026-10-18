@@ -75,6 +75,17 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
         return changed > 0;
     }
 
+    public async Task<bool> UpdateUrlAsync(JobId id, string url, string? finalUrl, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE job SET url = @url, final_url = @finalUrl WHERE id = @id;",
+            new { id = id.ToString(), url, finalUrl },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return changed > 0;
+    }
+
     public async Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default)
     {
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
