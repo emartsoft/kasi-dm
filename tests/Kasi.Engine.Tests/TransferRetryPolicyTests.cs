@@ -26,6 +26,17 @@ public sealed class TransferRetryPolicyTests
     }
 
     [Fact]
+    public void A_rogue_Retry_After_is_capped()
+    {
+        var policy = Policy() with { MaxRetryAfter = TimeSpan.FromMinutes(15) };
+
+        var decision = policy.Decide(TransferErrorKind.HttpStatusError, System.Net.HttpStatusCode.TooManyRequests, TimeSpan.FromHours(6), failedAttempts: 1);
+
+        decision.Retry.Should().BeTrue();
+        decision.Delay.Should().Be(TimeSpan.FromMinutes(15), "a multi-hour Retry-After must not block the transfer");
+    }
+
+    [Fact]
     public void Retry_after_raises_the_delay_and_a_throttled_decision_reduces_connections()
     {
         var decision = Policy().Decide(

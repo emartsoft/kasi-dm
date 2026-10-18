@@ -34,4 +34,10 @@ public sealed class TransferCompleted : TransferOutcome
     public int StructureVersion { get; init; }
 
     public long EndgameDuplicateBytes { get; init; }
+
+    /// <summary>Lease retries made during the transfer (failed leases that were retried; probe retries are not counted).</summary>
+    public int RetryCount { get; init; }
+
+    /// <summary>The allowed connection count at the end; below the configured count after a throttling server reduced it.</summary>
+    public int FinalAllowedConnections { get; init; }
 }

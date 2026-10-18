@@ -23,13 +23,22 @@ transient. `429`, and `503` with `Retry-After`, are throttled. `401`/`403` are a
 permanent, `FileChanged` is restart-only (M1.9), certificate failures are never retried, `DiskNotEnoughSpace` is a pause, and
 `Cancelled`/offline stop the retry loop.
 
-**Backoff.** Attempts are counted per probe and per worker; a successful lease resets the worker's counter. The cap is
-`min(60 s, 1 s * 2^(attempt-1))`; the wait is full jitter in `[0, cap]`. A server `Retry-After` raises the wait to at least
-the stated value. Ten failed attempts end the transfer with the original classified outcome.
+**Backoff.** Attempts are counted per probe and per worker. A completed lease resets the worker's counter, and so does a failed
+attempt that flushed at least `MinProgressBytes` (16 KiB) of new bytes: a connection that dies every few hundred KiB keeps
+moving the file forward, and only ten failures *without* progress end the transfer (which ends with the original classified
+outcome; ten failures means nine retries). Before a lease is given up, the bytes already received are written and counted
+(`SalvageAsync`), so the retry starts at the last byte that arrived. The cap is `min(60 s, 1 s * 2^(attempt-1))`; the wait is
+full jitter in `[0, cap]`. A server `Retry-After` raises the wait to at least the stated value, capped at `MaxRetryAfter`
+(15 minutes) so a rogue multi-hour value cannot block the transfer.
 
-**Throttling.** The first throttled decision in a transfer lowers the scheduler's allowed connection count by one; later 429s
-from sibling workers do not reduce it repeatedly. The reduced `SegmentSchedulerOptions` also applies when the throttle
-happens during the probe, before the scheduler exists.
+**Stalls.** A lease whose connection delivers nothing for `ReadStallTimeout` (30 s) is abandoned and retried; ADR 0004 said the
+scheduler cannot rescue a stalled worker, so the engine does. One `StallGuard` per lease restarts its countdown before every
+read; single-stream downloads use the same guard and fail instead of hanging.
+
+**Throttling.** A throttling server opens a transfer-wide window (`ThrottleGate`): every worker waits it out before its next
+request, and only the first throttle of a window lowers the scheduler's allowed connection count by one, so eight workers
+receiving `429` together reduce the pool by one. The reduction is not restored later in the transfer. The reduced
+`SegmentSchedulerOptions` also applies when the throttle happens during the probe, before the scheduler exists.
 
 **Lease retry.** A failed lease has already been abandoned, so its flushed cursor remains in the scheduler. The worker waits
 and acquires a fresh lease; it never reuses a dead lease ID and never rewinds a cursor. Non-retryable failures still cancel

@@ -334,6 +334,7 @@ public sealed class HttpTransferRunner
         }
 
         using var buffer = new PooledPartWriteBuffer(writer, options.WriteBufferMaxAge, time);
+        using var stallGuard = new StallGuard(time, options.RetryPolicy.ReadStallTimeout, cancellationToken);
         long readTotal = 0;
         long flushed = 0;
         try
@@ -347,7 +348,7 @@ public sealed class HttpTransferRunner
                     break;
                 }
 
-                var read = await ReadBodyAsync(probe.Body, window, cancellationToken).ConfigureAwait(false);
+                var read = await ReadBodyAsync(probe.Body, window, stallGuard, cancellationToken).ConfigureAwait(false);
                 if (read == 0)
                 {
                     break;
@@ -506,7 +507,7 @@ public sealed class HttpTransferRunner
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var state = new FailureState();
         using var signal = new WorkerWakeSignal(options.SchedulerOptions.MaxConnections);
-        var throttleGate = new ThrottleGate();
+        var throttleGate = new ThrottleGate(time);
         var workers = new Task[options.SchedulerOptions.MaxConnections];
         for (var worker = 0; worker < workers.Length; worker++)
         {
@@ -584,6 +585,8 @@ public sealed class HttpTransferRunner
             FinalSegments = snapshot,
             StructureVersion = scheduler.StructureVersion,
             EndgameDuplicateBytes = scheduler.EndgameDuplicateBytesAllocated,
+            RetryCount = state.Retries,
+            FinalAllowedConnections = scheduler.AllowedConnections,
         };
     }
 
@@ -616,6 +619,22 @@ public sealed class HttpTransferRunner
                 return;
             }
 
+            var throttled = throttleGate.Remaining();
+            if (throttled > TimeSpan.Zero)
+            {
+                // a throttling server asked every worker to wait, not only the one that received the 429
+                try
+                {
+                    await Task.Delay(throttled, time, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                continue;
+            }
+
             lease ??= scheduler.TryAcquireNextLease(workerId);
             if (lease is null)
             {
@@ -638,13 +657,20 @@ public sealed class HttpTransferRunner
 
             var current = lease.Value;
             lease = null;
+            var progress = new LeaseProgress();
             try
             {
-                await TransferLeaseAsync(workerId, current, probe, pool, finalUrl, writer, scheduler, totalBytes, eTag, lastModified, options, time, cancellationToken).ConfigureAwait(false);
+                await TransferLeaseAsync(workerId, current, probe, pool, finalUrl, writer, scheduler, totalBytes, eTag, lastModified, options, time, progress, cancellationToken).ConfigureAwait(false);
                 failedAttempts = 0;
             }
             catch (TransferException failure)
             {
+                if (progress.Flushed >= options.RetryPolicy.MinProgressBytes)
+                {
+                    // the attempt moved the file forward, so this failure starts the count again instead of using up the budget
+                    failedAttempts = 0;
+                }
+
                 var decision = options.RetryPolicy.Decide(
                     failure.Failure.Kind,
                     failure.Failure.HttpStatusCode,
@@ -653,7 +679,8 @@ public sealed class HttpTransferRunner
                     ++failedAttempts);
                 if (decision.Retry)
                 {
-                    if (decision.ReduceConnections && throttleGate.TryReduce())
+                    state.CountRetry();
+                    if (decision.ReduceConnections && throttleGate.Enter(decision.Delay))
                     {
                         scheduler.ReduceAllowedConnections();
                     }
@@ -712,6 +739,7 @@ public sealed class HttpTransferRunner
         string? lastModified,
         HttpTransferOptions options,
         TimeProvider time,
+        LeaseProgress progress,
         CancellationToken cancellationToken)
     {
         HttpResponseMessage? response = null;
@@ -751,7 +779,8 @@ public sealed class HttpTransferRunner
 
             using var buffer = new PooledPartWriteBuffer(writer, options.WriteBufferMaxAge, time);
             buffer.BeginLease(lease.Start, lease.End);
-            await ReadLeaseAsync(lease, body, buffer, scheduler, options.SupersededLeaseDrainTimeout, cancellationToken).ConfigureAwait(false);
+            using var stallGuard = new StallGuard(time, options.RetryPolicy.ReadStallTimeout, cancellationToken);
+            await ReadLeaseAsync(lease, body, buffer, scheduler, options.SupersededLeaseDrainTimeout, progress, stallGuard, cancellationToken).ConfigureAwait(false);
             completed = true;
         }
         catch
@@ -782,6 +811,8 @@ public sealed class HttpTransferRunner
         PooledPartWriteBuffer buffer,
         SegmentScheduler scheduler,
         TimeSpan drainTimeout,
+        LeaseProgress progress,
+        StallGuard stallGuard,
         CancellationToken cancellationToken)
     {
         long received = 0;
@@ -794,12 +825,19 @@ public sealed class HttpTransferRunner
             }
 
             int read;
+            stallGuard.Reset();
             try
             {
-                read = await body.ReadAsync(window, cancellationToken).ConfigureAwait(false);
+                read = await body.ReadAsync(window, stallGuard.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stallGuard.Stalled)
+            {
+                await SalvageAsync(lease, buffer, scheduler, progress).ConfigureAwait(false);
+                throw new TransferException(StallFailure());
             }
             catch (Exception ex) when (ex is IOException or HttpRequestException)
             {
+                await SalvageAsync(lease, buffer, scheduler, progress).ConfigureAwait(false);
                 throw new TransferException(NetworkFailure(ex));
             }
 
@@ -817,6 +855,7 @@ public sealed class HttpTransferRunner
 
             if (result.FlushedBytes > 0)
             {
+                progress.Flushed += result.FlushedBytes;
                 var advance = scheduler.AdvanceLease(lease.LeaseId, result.FlushedBytes);
                 if (advance.IsSuperseded)
                 {
@@ -836,10 +875,37 @@ public sealed class HttpTransferRunner
 
         if (received != lease.Length)
         {
+            if (completed.FlushedBytes > 0)
+            {
+                progress.Flushed += completed.FlushedBytes;
+                scheduler.AdvanceLease(lease.LeaseId, completed.FlushedBytes);
+            }
+
             throw new TransferException(Protocol($"Lease {lease.LeaseId} ended after {received} of {lease.Length} bytes."));
         }
 
         scheduler.CompleteLease(lease.LeaseId);
+    }
+
+    /// <summary>
+    /// Writes what the worker has already received before its lease is given up, so the retry starts at the last byte that
+    /// arrived and a connection that dies every few hundred KiB still moves forward (only written bytes ever count).
+    /// </summary>
+    private static async Task SalvageAsync(LeaseAssignment lease, PooledPartWriteBuffer buffer, SegmentScheduler scheduler, LeaseProgress progress)
+    {
+        try
+        {
+            var flushed = await buffer.FlushPendingAsync(CancellationToken.None).ConfigureAwait(false);
+            if (flushed.IsSuccess && flushed.FlushedBytes > 0)
+            {
+                progress.Flushed += flushed.FlushedBytes;
+                scheduler.AdvanceLease(lease.LeaseId, flushed.FlushedBytes);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ObjectDisposedException)
+        {
+            // best effort: the retry simply fetches these bytes again
+        }
     }
 
     private static HttpRequestMessage CreateLeaseRequest(
@@ -1006,17 +1072,25 @@ public sealed class HttpTransferRunner
         }
     }
 
-    private static async ValueTask<int> ReadBodyAsync(Stream body, Memory<byte> buffer, CancellationToken cancellationToken)
+    private static async ValueTask<int> ReadBodyAsync(Stream body, Memory<byte> buffer, StallGuard guard, CancellationToken cancellationToken)
     {
+        guard.Reset();
         try
         {
-            return await body.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return await body.ReadAsync(buffer, guard.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (guard.Stalled && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TransferException(StallFailure());
         }
         catch (Exception ex) when (ex is IOException or HttpRequestException)
         {
             throw new TransferException(NetworkFailure(ex));
         }
     }
+
+    private static TransferFailure StallFailure() =>
+        new(TransferErrorKind.TransientNetworkError, "The connection delivered no data for the read-stall timeout.");
 
     private static string ResolveFileName(string probedFileName, string? overrideFileName) =>
         FileNameSanitiser.Sanitise(
@@ -1216,16 +1290,20 @@ public sealed class HttpTransferRunner
         public TransferFailure Failure { get; } = failure;
     }
 
-    private sealed class ThrottleGate
+    private sealed class LeaseProgress
     {
-        private int _reduced;
-
-        public bool TryReduce() => Interlocked.Exchange(ref _reduced, 1) == 0;
+        /// <summary>Bytes of this lease attempt that reached the part file and were counted by the scheduler.</summary>
+        public long Flushed { get; set; }
     }
 
     private sealed class FailureState
     {
         private TransferFailure? _failure;
+        private int _retries;
+
+        public int Retries => Volatile.Read(ref _retries);
+
+        public void CountRetry() => Interlocked.Increment(ref _retries);
 
         public TransferFailure? Failure => Volatile.Read(ref _failure);
 

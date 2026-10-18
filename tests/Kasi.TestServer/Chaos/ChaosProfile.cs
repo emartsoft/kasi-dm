@@ -23,6 +23,9 @@ public sealed record ChaosProfile
 
     public long StallAfterBytes { get; init; }
 
+    /// <summary>Apply the stall only on this zero-based request index; null stalls every request.</summary>
+    public int? StallOnRequest { get; init; }
+
     /// <summary>Limit body throughput; applies to the connection with <see cref="ThrottleConnectionIndex"/>, or to all when null.</summary>
     public long? ThrottleBytesPerSecond { get; init; }
 

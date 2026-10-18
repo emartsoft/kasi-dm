@@ -12,6 +12,8 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
     private long _sent;
     private bool _stalled;
 
+    private bool StallActive => _profile.StallOnRequest is null || _profile.StallOnRequest == session.RequestIndex;
+
     private bool ResetActive => _profile.ResetOnRequest is null || _profile.ResetOnRequest == session.RequestIndex;
 
     private long? ResetAt => ResetActive ? _profile.ResetAfterBytes : null;
@@ -64,7 +66,7 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
                 return; // swallow the rest: the declared length is never reached
             }
 
-            if (_profile.StallSeconds is { } stall && !_stalled && _sent >= _profile.StallAfterBytes)
+            if (StallActive && _profile.StallSeconds is { } stall && !_stalled && _sent >= _profile.StallAfterBytes)
             {
                 _stalled = true;
                 await inner.FlushAsync(cancellationToken);
@@ -132,7 +134,7 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
             take = Math.Min(take, cut - _sent);
         }
 
-        if (_profile.StallSeconds is not null && !_stalled && _profile.StallAfterBytes > _sent)
+        if (StallActive && _profile.StallSeconds is not null && !_stalled && _profile.StallAfterBytes > _sent)
         {
             take = Math.Min(take, _profile.StallAfterBytes - _sent);
         }

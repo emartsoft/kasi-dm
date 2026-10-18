@@ -15,6 +15,15 @@ public sealed record TransferRetryPolicy
 
     public TimeSpan MaxDelay { get; init; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>The longest wait a server <c>Retry-After</c> can impose (a rogue multi-hour value must not block the transfer).</summary>
+    public TimeSpan MaxRetryAfter { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>A failed attempt that flushed at least this many new bytes made progress, so it starts the attempt count again.</summary>
+    public int MinProgressBytes { get; init; } = 16 * 1024;
+
+    /// <summary>A lease whose connection delivers nothing for this long is abandoned and retried (ADR 0004).</summary>
+    public TimeSpan ReadStallTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
     /// <summary>Test-only deterministic jitter; production uses <see cref="Random.Shared"/> full jitter.</summary>
     internal Func<TimeSpan, TimeSpan>? Jitter { get; init; }
 
@@ -62,7 +71,7 @@ public sealed record TransferRetryPolicy
         var delay = DelayFor(failedAttempts);
         if (retryAfter is { } serverDelay)
         {
-            var stated = serverDelay < TimeSpan.Zero ? TimeSpan.Zero : serverDelay;
+            var stated = serverDelay < TimeSpan.Zero ? TimeSpan.Zero : serverDelay > MaxRetryAfter ? MaxRetryAfter : serverDelay;
             if (stated > delay)
             {
                 delay = stated;
@@ -90,6 +99,9 @@ public sealed record TransferRetryPolicy
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxAttempts);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(BaseDelay, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(MaxDelay, BaseDelay);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(MaxRetryAfter, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MinProgressBytes);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ReadStallTimeout, TimeSpan.Zero);
     }
 
     private static TransferRetryClass ClassifyStatus(HttpStatusCode? statusCode, TimeSpan? retryAfter)
