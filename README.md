@@ -35,7 +35,7 @@ kasi-dm/
 │   ├── Kasi.*.Tests/         One test project per src project
 │   ├── Kasi.TestServer/      Controllable HTTP test server with chaos middleware
 │   ├── Kasi.FaultInjection/  Kill-loop, power-cut and soak harnesses (planned, M1.14)
-│   └── fixtures/             HLS/DASH manifests, torrent files, Content-Disposition cases (planned)
+│   └── fixtures/             Content-Disposition corpus (HLS/DASH manifests and torrent files planned, M3/M4)
 ├── bench/                    Kasi.Bench BenchmarkDotNet micro-benchmarks (sources.json and weekly results planned, M1.15)
 ├── build/                    Packaging (Velopack), signing, FFmpeg fetch script (planned, M3/M4)
 ├── docs/                     Architecture decision records (ADRs), specs, per-milestone plans, runbooks
