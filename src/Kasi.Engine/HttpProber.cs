@@ -155,7 +155,12 @@ public sealed class HttpProber
 
     private static HttpRequestMessage CreateRequest(Uri url, bool includeRange, long? firstRangeLength)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var request = new HttpRequestMessage(HttpMethod.Get, url)
+        {
+            // Prefer HTTP/2 over TLS but fall back to HTTP/1.1 for plaintext and h1-only servers (TRD 6.2, ADR 0006).
+            Version = HttpVersion.Version20,
+            VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+        };
         request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
         if (includeRange)
         {
