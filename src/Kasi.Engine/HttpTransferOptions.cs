@@ -1,3 +1,5 @@
+using Kasi.Core;
+
 namespace Kasi.Engine;
 
 /// <summary>Options for one <see cref="HttpTransferRunner"/> download or resume (M1.7b).</summary>
@@ -25,6 +27,21 @@ public sealed record HttpTransferOptions
     /// <summary>Retry classification and backoff for probes and leases (TRD 6.6).</summary>
     public TransferRetryPolicy RetryPolicy { get; init; } = new();
 
+    /// <summary>The job whose segments are checkpointed; null disables checkpointing.</summary>
+    public JobId? CheckpointJobId { get; init; }
+
+    /// <summary>Writes flushed segment cursors; must be started by the caller when supplied.</summary>
+    public ICheckpointWriter? CheckpointWriter { get; init; }
+
+    /// <summary>Persists the segment structure (initial download and every split).</summary>
+    public ISegmentRepository? SegmentRepository { get; init; }
+
+    /// <summary>Persists the probe's URL, filename, size and validators so a restart can resume (M1.9).</summary>
+    public IJobRepository? JobRepository { get; init; }
+
+    /// <summary>How often the active transfer flushes the part file and records its cursors (TRD 6.5).</summary>
+    public TimeSpan CheckpointInterval { get; init; } = TimeSpan.FromSeconds(2);
+
     /// <summary>Test-only mid-transfer write fault; the runner forwards it to the part writer.</summary>
     internal Func<long, int, Exception?>? WriteFaultInjector { get; init; }
 
@@ -38,7 +55,12 @@ public sealed record HttpTransferOptions
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(WriteBufferMaxAge, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(SupersededLeaseDrainTimeout, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(CheckpointInterval, TimeSpan.Zero);
         RetryPolicy.Validate();
         SchedulerOptions.Validate();
+        if (CheckpointJobId is not null && (CheckpointWriter is null || SegmentRepository is null))
+        {
+            throw new ArgumentException("Checkpointing needs a job id, a checkpoint writer and a segment repository.");
+        }
     }
 }

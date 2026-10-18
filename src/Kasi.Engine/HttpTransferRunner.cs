@@ -99,6 +99,18 @@ public sealed class HttpTransferRunner
             }
 
             var fileName = ResolveFileName(probe.FileName, settings.OverrideFileName);
+            if (settings.CheckpointJobId is { } checkpointJob && settings.JobRepository is { } jobs)
+            {
+                try
+                {
+                    await PersistProbeMetadataAsync(jobs, checkpointJob, probe, fileName, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    return Failed(CheckpointFailure(ex), fileName, probe.TotalBytes, probe.ETag, probe.LastModified);
+                }
+            }
+
             var finalPath = ResolveFinalPath(destinationFolder, fileName, out var pathFailure);
             if (pathFailure is not null)
             {
@@ -282,6 +294,32 @@ public sealed class HttpTransferRunner
                 InitialConnections = Math.Min(scheduler.InitialConnections, max),
             },
         };
+    }
+
+    private static async Task PersistProbeMetadataAsync(
+        IJobRepository jobs,
+        JobId jobId,
+        ProbeResponse probe,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        var job = await jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        if (job is null)
+        {
+            return;
+        }
+
+        await jobs.UpdateAsync(
+            job with
+            {
+                FinalUrl = probe.FinalUrl.AbsoluteUri,
+                FileName = fileName,
+                TotalBytes = probe.TotalBytes,
+                ETag = probe.ETag,
+                LastModified = probe.LastModified,
+                Resumable = probe.Resumable,
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<TransferOutcome> SingleStreamAsync(
@@ -504,10 +542,36 @@ public sealed class HttpTransferRunner
             }
         }
 
+        SegmentCheckpointCoordinator? checkpoint = null;
+        if (options.CheckpointJobId is { } checkpointJob && options.CheckpointWriter is { } checkpointWriter && options.SegmentRepository is { } segmentRepository)
+        {
+            checkpoint = new SegmentCheckpointCoordinator(
+                checkpointJob,
+                checkpointWriter,
+                segmentRepository,
+                writer,
+                scheduler,
+                time,
+                options.CheckpointInterval);
+            try
+            {
+                await checkpoint.SaveStructureAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (SegmentCheckpointException ex)
+            {
+                return Failed(DiskFailure(ex.Status), fileName, totalBytes, eTag, lastModified);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return Failed(CheckpointFailure(ex), fileName, totalBytes, eTag, lastModified);
+            }
+        }
+
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var state = new FailureState();
         using var signal = new WorkerWakeSignal(options.SchedulerOptions.MaxConnections);
         var throttleGate = new ThrottleGate(time);
+        var checkpointTask = checkpoint?.RunAsync(linked.Token);
         var workers = new Task[options.SchedulerOptions.MaxConnections];
         for (var worker = 0; worker < workers.Length; worker++)
         {
@@ -527,6 +591,10 @@ public sealed class HttpTransferRunner
         {
             await linked.CancelAsync().ConfigureAwait(false);
             await pulse.ConfigureAwait(false);
+            if (checkpointTask is not null)
+            {
+                await checkpointTask.ConfigureAwait(false);
+            }
         }
 
         if (probe is not null)
@@ -534,19 +602,41 @@ public sealed class HttpTransferRunner
             await probe.DisposeAsync().ConfigureAwait(false);
         }
 
-        if (state.Failure is { } failure)
+        var failure = state.Failure;
+        if (failure is null && checkpoint?.Failure is { } checkpointFailure)
         {
-            return await FailedSegmentedAsync(writer, scheduler, failure, fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
+            failure = CheckpointFailure(checkpointFailure);
+        }
+
+        if (failure is { } transferFailure)
+        {
+            return await FailedSegmentedAsync(writer, scheduler, checkpoint, transferFailure, fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return await FailedSegmentedAsync(writer, scheduler, new TransferFailure(TransferErrorKind.Cancelled, "The download was cancelled."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
+            return await FailedSegmentedAsync(writer, scheduler, checkpoint, new TransferFailure(TransferErrorKind.Cancelled, "The download was cancelled."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
         }
 
         if (!scheduler.IsComplete)
         {
-            return await FailedSegmentedAsync(writer, scheduler, Protocol("The transfer stopped before every segment was complete."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
+            return await FailedSegmentedAsync(writer, scheduler, checkpoint, Protocol("The transfer stopped before every segment was complete."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
+        }
+
+        if (checkpoint is not null)
+        {
+            try
+            {
+                await checkpoint.SaveAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (SegmentCheckpointException ex)
+            {
+                return Failed(DiskFailure(ex.Status), fileName, totalBytes, eTag, lastModified);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return Failed(CheckpointFailure(ex), fileName, totalBytes, eTag, lastModified);
+            }
         }
 
         var snapshot = scheduler.GetSegmentsSnapshot();
@@ -564,7 +654,7 @@ public sealed class HttpTransferRunner
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return await FailedSegmentedAsync(writer, scheduler, new TransferFailure(TransferErrorKind.Cancelled, "The download was cancelled before it committed."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
+            return await FailedSegmentedAsync(writer, scheduler, checkpoint, new TransferFailure(TransferErrorKind.Cancelled, "The download was cancelled before it committed."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
         }
 
         if (!commit.IsSuccess)
@@ -1041,6 +1131,7 @@ public sealed class HttpTransferRunner
     private async Task<TransferFailed> FailedSegmentedAsync(
         PartFileWriter writer,
         SegmentScheduler scheduler,
+        SegmentCheckpointCoordinator? checkpoint,
         TransferFailure failure,
         string fileName,
         long totalBytes,
@@ -1055,6 +1146,22 @@ public sealed class HttpTransferRunner
         if (!flush.IsSuccess)
         {
             return Failed(DiskFailure(flush), fileName, totalBytes, eTag, lastModified);
+        }
+
+        if (checkpoint is not null)
+        {
+            try
+            {
+                await checkpoint.SaveAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (SegmentCheckpointException ex)
+            {
+                return Failed(DiskFailure(ex.Status), fileName, totalBytes, eTag, lastModified);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return Failed(CheckpointFailure(ex), fileName, totalBytes, eTag, lastModified);
+            }
         }
 
         return Failed(failure, fileName, totalBytes, eTag, lastModified, snapshot.Sum(s => s.Written), snapshot);
@@ -1214,6 +1321,10 @@ public sealed class HttpTransferRunner
         },
         status.Detail ?? "A disk operation failed.",
         DiskStatus: status);
+
+    private static TransferFailure CheckpointFailure(Exception exception) => new(
+        TransferErrorKind.CheckpointError,
+        $"The segment checkpoint failed ({exception.GetType().Name}).");
 
     private static TransferFailure Protocol(string detail) => new(TransferErrorKind.ProtocolError, detail);
 
