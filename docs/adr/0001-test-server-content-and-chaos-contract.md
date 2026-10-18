@@ -29,9 +29,19 @@ requests may be numbered in a different order between runs, so replay-sensitive 
 `MaxConnectionsPerClient` counts connections open from one client address at accept time and answers `503` on the
 connections beyond the limit.
 
+**TLS, HTTP/2 and metrics (M1.7a).** `TestServerOptions` selects `None`, `Valid`, `Expired`, `SelfSigned` or `WrongHost`
+for TLS, and `Http1`, `Http2` or `Http1AndHttp2` for the protocol (plaintext defaults to HTTP/1.1, TLS to both). The
+certificates are ephemeral: a root CA plus a leaf, with the expired, self-signed and wrong-host leaves differing only in
+validity, issuer or SAN. `TestServerHost.RootCertificate` exposes the root for a custom trust store, and
+`TestServerMetrics` counts accepted and peak connections, TLS handshakes, aborted requests and HTTP/1.1 versus HTTP/2
+requests. A TLS connection is counted once, on its first request, so a certificate the client rejects is never counted as
+a completed handshake. `ChaosProfile.OtherConnectionsBytesPerSecond` throttles every connection except
+`ThrottleConnectionIndex`, which lets a live slow-lane test keep one connection at 50 KB/s while the others run at a
+realistic rate.
+
 ## Consequences
 
 - Changing the hash, block size or RNG derivation silently invalidates every recorded seed; any change needs a new ADR.
 - Chaos cannot be selected per connection from outside the process other than by header, which is enough for HttpClient
   default headers and for browsers through the extension's test hooks.
-- HTTP/2 and TLS are not served yet; add them (with a generated certificate) when the first HTTP/2 test case needs them.
+- TLS and HTTP/2 were added in M1.7a with generated certificates; the production pool's TLS rules are in ADR 0006.

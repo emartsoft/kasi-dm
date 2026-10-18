@@ -10,7 +10,7 @@ internal sealed record ConnectionInfo(int Index, int ClientOrdinal);
 /// Numbers connections in accept order (for per-connection throttling) and counts open connections per client address
 /// (for the connection cap). Hooked into Kestrel as connection middleware.
 /// </summary>
-internal sealed class ConnectionTracker
+internal sealed class ConnectionTracker(TestServerMetrics metrics)
 {
     private readonly ConcurrentDictionary<string, ConnectionInfo> _connections = new();
     private readonly Dictionary<string, int> _openPerClient = [];
@@ -31,6 +31,7 @@ internal sealed class ConnectionTracker
         }
 
         _connections[context.ConnectionId] = info;
+        metrics.ConnectionAccepted();
         try
         {
             await next();
@@ -38,6 +39,7 @@ internal sealed class ConnectionTracker
         finally
         {
             _connections.TryRemove(context.ConnectionId, out _);
+            metrics.ConnectionClosed(context.ConnectionId);
             lock (_gate)
             {
                 _openPerClient[client]--;

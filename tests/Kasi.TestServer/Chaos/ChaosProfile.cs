@@ -26,6 +26,12 @@ public sealed record ChaosProfile
     /// <summary>Zero-based index of the connection in the order the server accepted them.</summary>
     public int? ThrottleConnectionIndex { get; init; }
 
+    /// <summary>
+    /// Rate for every connection except <see cref="ThrottleConnectionIndex"/>; the selected one keeps
+    /// <see cref="ThrottleBytesPerSecond"/>. Lets one connection run slow while the others keep a realistic rate.
+    /// </summary>
+    public long? OtherConnectionsBytesPerSecond { get; init; }
+
     /// <summary>Answer with this status (429, 500, 502, 503, 504, …) instead of the real response.</summary>
     public int? StatusCode { get; init; }
 

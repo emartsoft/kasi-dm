@@ -26,10 +26,24 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
         set => throw new NotSupportedException();
     }
 
-    private long? ThrottleRate =>
-        _profile.ThrottleBytesPerSecond is { } rate && (_profile.ThrottleConnectionIndex is null || _profile.ThrottleConnectionIndex == connection?.Index)
-            ? rate
-            : null;
+    private long? ThrottleRate
+    {
+        get
+        {
+            if (_profile.OtherConnectionsBytesPerSecond is { } other)
+            {
+                // The indexed connection keeps its own rate; every other connection gets the steady rate.
+                return _profile.ThrottleConnectionIndex is { } selected && connection?.Index == selected
+                    ? _profile.ThrottleBytesPerSecond
+                    : other;
+            }
+
+            return _profile.ThrottleBytesPerSecond is { } rate
+                && (_profile.ThrottleConnectionIndex is null || _profile.ThrottleConnectionIndex == connection?.Index)
+                ? rate
+                : null;
+        }
+    }
 
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
