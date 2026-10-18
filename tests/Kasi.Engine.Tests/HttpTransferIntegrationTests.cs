@@ -397,15 +397,18 @@ public sealed class HttpTransferIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("TC", "TC-ENG-015")]
-    public async Task A_truncated_lease_fails_with_ProtocolError_and_preserves_the_part_file()
+    public async Task A_persistently_truncated_lease_fails_with_ProtocolError_after_the_retry_limit()
     {
         var ct = TestContext.Current.CancellationToken;
         const string seed = "runner-truncated";
         const int size = 8 * 1024 * 1024;
-        var chaosId = _host.Chaos.Register(new ChaosProfile { TruncateAfterBytes = 128 * 1024 });
+        // 8 KiB per attempt is below the retry policy's progress threshold (16 KiB), so the budget is never reset and runs out;
+        // a server that delivers more than that on every attempt is making progress and would complete instead.
+        var chaosId = _host.Chaos.Register(new ChaosProfile { TruncateAfterBytes = 8 * 1024 });
         var options = Options(initialConnections: 4) with
         {
             RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = chaosId },
+            RetryPolicy = new TransferRetryPolicy { MaxAttempts = 2 },
         };
 
         var outcome = await new HttpTransferRunner().DownloadAsync(

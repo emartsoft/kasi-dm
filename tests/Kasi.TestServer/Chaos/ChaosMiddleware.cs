@@ -36,18 +36,25 @@ internal sealed class ChaosMiddleware(RequestDelegate next, ChaosRegistry regist
             return;
         }
 
-        if (profile.StatusCode is { } status && session.Rng.NextDouble() < profile.StatusRate)
+        if (profile.StatusCode is { } status)
         {
-            context.Response.StatusCode = status;
-            if (profile.RetryAfterSeconds is { } retryAfter)
+            var statusStart = profile.StatusAfterRequests ?? 0;
+            var statusActive = session.RequestIndex >= statusStart
+                && (profile.StatusCount is not { } statusCount || session.RequestIndex < statusStart + statusCount);
+            if (statusActive && session.Rng.NextDouble() < profile.StatusRate)
             {
-                context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            }
+                context.Response.StatusCode = status;
+                if (profile.RetryAfterSeconds is { } retryAfter)
+                {
+                    context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
 
-            return;
+                return;
+            }
         }
 
-        if (profile.ResetAfterBytes <= 0)
+        if (profile.ResetAfterBytes is <= 0
+            && (profile.ResetOnRequest is null || profile.ResetOnRequest == session.RequestIndex))
         {
             session.Aborted = true;
             context.Abort();

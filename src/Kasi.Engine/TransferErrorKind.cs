@@ -1,6 +1,6 @@
 namespace Kasi.Engine;
 
-/// <summary>The reason <see cref="HttpTransferRunner"/> could not complete a transfer (M1.7b).</summary>
+/// <summary>The reason <see cref="HttpTransferRunner"/> could not complete a transfer (M1.7b, M1.8).</summary>
 public enum TransferErrorKind
 {
     /// <summary>The probe failed; <see cref="TransferFailed.ProbeFailure"/> carries the classified failure.</summary>
@@ -32,4 +32,7 @@ public enum TransferErrorKind
 
     /// <summary>The caller cancelled the transfer; any flushed progress is reported for a later resume.</summary>
     Cancelled,
+
+    /// <summary>The machine is offline; the engine facade pauses all jobs and resumes them on reconnect.</summary>
+    Offline,
 }
