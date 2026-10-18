@@ -68,6 +68,49 @@ public sealed class GateAndDispositionTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("TC", "TC-ENG-016")]
+    public async Task Digest_auth_challenges_anonymous_and_wrong_credentials_then_serves_a_range()
+    {
+        var path = "/auth/digest/files/dg/1024";
+        using var anonymousClient = TestClient.Create(_host);
+        using var anonymous = await anonymousClient.GetAsync(path, TestClient.Ct);
+        anonymous.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        anonymous.Headers.WwwAuthenticate.Should().ContainSingle().Which.Scheme.Should().Be("Digest");
+
+        using var wrongHandler = new HttpClientHandler { Credentials = new NetworkCredential(PathGates.BasicUser, "wrong") };
+        using var wrongClient = new HttpClient(wrongHandler, disposeHandler: false)
+        {
+            BaseAddress = _host.BaseAddress,
+        };
+        using var wrong = await wrongClient.GetAsync(path, TestClient.Ct);
+        wrong.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        using var rightHandler = new HttpClientHandler { Credentials = new NetworkCredential(PathGates.BasicUser, PathGates.BasicPassword) };
+        using var rightClient = new HttpClient(rightHandler, disposeHandler: false)
+        {
+            BaseAddress = _host.BaseAddress,
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Range = new RangeHeaderValue(0, 99);
+        using var right = await rightClient.SendAsync(request, TestClient.Ct);
+        right.StatusCode.Should().Be(HttpStatusCode.PartialContent);
+        (await right.Content.ReadAsByteArrayAsync(TestClient.Ct)).Should().Equal(GeneratedContent.Bytes("dg", 1024)[..100]);
+    }
+
+    [Fact]
+    [Trait("TC", "TC-ENG-017")]
+    public async Task Redirect_to_an_absolute_uri_returns_302_with_that_location()
+    {
+        var target = "http://localhost:5080/files/rd/100?token=abc";
+        using var client = TestClient.Create(_host, autoRedirect: false);
+
+        using var response = await client.GetAsync("/redirect-to?target=" + Uri.EscapeDataString(target), TestClient.Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Found);
+        response.Headers.Location!.AbsoluteUri.Should().Be(target);
+    }
+
+    [Fact]
     public async Task Cookie_auth_requires_the_session_cookie_issued_by_login()
     {
         using var client = TestClient.Create(_host, cookies: new CookieContainer());

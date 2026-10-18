@@ -17,7 +17,9 @@ As a process: `dotnet run --project tests/Kasi.TestServer -- 5080` (`KASI_TESTSE
 | `/norange/{seed}/{size}` | Ignores Range, always 200 |
 | `/chunked/{seed}/{size}` | No Content-Length |
 | `/redirect/{hops}/…` | `hops` 302s, then the wrapped path |
+| `/redirect-to?target=<absolute URI>` | 302 to an absolute URI, including another host |
 | `/auth/basic/…` | Basic auth (`PathGates.BasicUser` / `BasicPassword`), else 401 |
+| `/auth/digest/…` | MD5 Digest with `qop=auth`, else 401 |
 | `/auth/cookie/…` | `GET /auth/cookie/login` sets the session cookie; else 401 |
 | `/signed/…?exp=<unix seconds>` | 403 after `exp` or without it |
 | `/mutable/{id}` | `host.Mutable.Change(id)` or `POST /_mutable/{id}/change?size=` changes bytes and ETag |
@@ -27,4 +29,4 @@ As a process: `dotnet run --project tests/Kasi.TestServer -- 5080` (`KASI_TESTSE
 | `/_chaos` | `POST` a `ChaosProfile` as JSON, returns `{ "id": … }`; `DELETE` clears all |
 
 Gates nest: `/redirect/2/signed/files/a/10?exp=…`. HLS and DASH segments are opaque deterministic bytes, not decodable media.
-Not yet served: HTTP/2 and TLS, live (no `ENDLIST`) playlists, SegmentBase addressing.
+HTTP/2 and TLS are available through `TestServerOptions`. Not yet served: live (no `ENDLIST`) playlists and SegmentBase addressing.

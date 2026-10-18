@@ -14,14 +14,28 @@ namespace Kasi.Engine;
 public sealed class HttpHostPool : IDisposable
 {
     private readonly HttpHostPoolOptions _options;
+    private readonly string? _credentialOrigin;
+    private readonly NetworkCredential? _credentials;
     private readonly Lock _gate = new();
     private readonly Dictionary<LaneKey, Lane> _lanes = [];
     private bool _disposed;
 
-    public HttpHostPool(HttpHostPoolOptions? options = null)
+    public HttpHostPool(HttpHostPoolOptions? options = null, (Uri Origin, NetworkCredential Credentials)? credentials = null)
     {
         _options = options ?? new HttpHostPoolOptions();
         _options.Validate();
+        if (credentials is { } supplied)
+        {
+            ArgumentNullException.ThrowIfNull(supplied.Origin);
+            ArgumentNullException.ThrowIfNull(supplied.Credentials);
+            if (!IsSupported(supplied.Origin))
+            {
+                throw new ArgumentException("Credentials need an absolute HTTP or HTTPS origin.", nameof(credentials));
+            }
+
+            _credentialOrigin = Origin(supplied.Origin);
+            _credentials = supplied.Credentials;
+        }
     }
 
     /// <summary>
@@ -47,7 +61,7 @@ public sealed class HttpHostPool : IDisposable
             }
 
 #pragma warning disable CA2000 // the invoker owns the handler and the pool owns the invoker
-            var handler = CreateHandler();
+            var handler = CreateHandler(key.Origin);
             var invoker = new HttpMessageInvoker(handler, disposeHandler: true);
 #pragma warning restore CA2000
             _lanes.Add(key, new Lane(invoker, handler));
@@ -98,7 +112,7 @@ public sealed class HttpHostPool : IDisposable
         }
     }
 
-    private SocketsHttpHandler CreateHandler()
+    private SocketsHttpHandler CreateHandler(string origin)
     {
         var handler = new SocketsHttpHandler
         {
@@ -114,6 +128,12 @@ public sealed class HttpHostPool : IDisposable
             MaxConnectionsPerServer = 1,
             SslOptions = new SslClientAuthenticationOptions(),
         };
+
+        if (string.Equals(origin, _credentialOrigin, StringComparison.Ordinal))
+        {
+            handler.Credentials = _credentials;
+            handler.PreAuthenticate = true;
+        }
 
         if (_options.CustomTrustRoots is { Count: > 0 } roots)
         {

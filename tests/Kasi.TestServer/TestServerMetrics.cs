@@ -14,6 +14,9 @@ public sealed class TestServerMetrics
     private int _abortedRequests;
     private int _http1Requests;
     private int _http2Requests;
+    private int _requestsWithAuthorization;
+    private int _requestsWithCookie;
+    private int _authChallenges;
 
     public int TotalConnectionsAccepted => Volatile.Read(ref _totalConnections);
 
@@ -34,6 +37,12 @@ public sealed class TestServerMetrics
 
     public int Http2RequestsServed => Volatile.Read(ref _http2Requests);
 
+    public int RequestsWithAuthorization => Volatile.Read(ref _requestsWithAuthorization);
+
+    public int RequestsWithCookie => Volatile.Read(ref _requestsWithCookie);
+
+    public int AuthChallengesSent => Volatile.Read(ref _authChallenges);
+
     /// <summary>
     /// Starts a new measurement. Counters are zeroed, but connections that are still open (keep-alive) stay counted as open
     /// and the peak restarts from them, and a TLS connection already counted is not counted again when it is reused. Call it
@@ -47,6 +56,9 @@ public sealed class TestServerMetrics
         Interlocked.Exchange(ref _abortedRequests, 0);
         Interlocked.Exchange(ref _http1Requests, 0);
         Interlocked.Exchange(ref _http2Requests, 0);
+        Interlocked.Exchange(ref _requestsWithAuthorization, 0);
+        Interlocked.Exchange(ref _requestsWithCookie, 0);
+        Interlocked.Exchange(ref _authChallenges, 0);
     }
 
     internal void ConnectionAccepted()
@@ -74,6 +86,16 @@ public sealed class TestServerMetrics
 
     internal void RequestServed(HttpContext context)
     {
+        if (!string.IsNullOrEmpty(context.Request.Headers.Authorization))
+        {
+            Interlocked.Increment(ref _requestsWithAuthorization);
+        }
+
+        if (!string.IsNullOrEmpty(context.Request.Headers.Cookie))
+        {
+            Interlocked.Increment(ref _requestsWithCookie);
+        }
+
         var protocol = context.Request.Protocol;
         if (string.Equals(protocol, "HTTP/2", StringComparison.OrdinalIgnoreCase))
         {
@@ -91,4 +113,6 @@ public sealed class TestServerMetrics
     }
 
     internal void RequestAborted() => Interlocked.Increment(ref _abortedRequests);
+
+    internal void AuthChallengeSent() => Interlocked.Increment(ref _authChallenges);
 }

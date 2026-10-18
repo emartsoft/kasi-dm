@@ -11,7 +11,7 @@ namespace Kasi.Engine;
 /// <see cref="MaxRedirects"/> hops, re-probing once without <c>Range</c> on <c>416</c>, and keeping the response stream
 /// open for segment 0 (TRD 6.1, KASI-ENG-003, KASI-ENG-007, KASI-ENG-010, KASI-RES-005).
 /// <para>
-/// Preconditions on the supplied <see cref="HttpMessageInvoker"/>: <c>AllowAutoRedirect = false</c> and
+/// Preconditions on supplied <see cref="HttpMessageInvoker"/> instances: <c>AllowAutoRedirect = false</c> and
 /// <c>AutomaticDecompression = DecompressionMethods.None</c>.
 /// </para>
 /// </summary>
@@ -19,9 +19,10 @@ public sealed class HttpProber
 {
     public const int MaxRedirects = 10;
 
-    private readonly HttpMessageInvoker _httpClient;
+    private readonly Func<Uri, HttpMessageInvoker> _invokerForUrl;
     private readonly TimeProvider _time;
     private readonly IReadOnlyDictionary<string, string>? _defaultHeaders;
+    private readonly RequestScope? _requestScope;
 
     public HttpProber(
         HttpMessageInvoker httpClient,
@@ -29,9 +30,18 @@ public sealed class HttpProber
         IReadOnlyDictionary<string, string>? defaultHeaders = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
-        _httpClient = httpClient;
+        _invokerForUrl = _ => httpClient;
         _time = timeProvider ?? TimeProvider.System;
         _defaultHeaders = defaultHeaders;
+    }
+
+    internal HttpProber(Func<Uri, HttpMessageInvoker> invokerForUrl, RequestScope requestScope, TimeProvider? timeProvider = null)
+    {
+        ArgumentNullException.ThrowIfNull(invokerForUrl);
+        ArgumentNullException.ThrowIfNull(requestScope);
+        _invokerForUrl = invokerForUrl;
+        _requestScope = requestScope;
+        _time = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<ProbeOutcome> ProbeAsync(
@@ -56,6 +66,7 @@ public sealed class HttpProber
         }
 
         var currentUrl = url;
+        var scope = _requestScope ?? new RequestScope(url, _defaultHeaders, secret: null);
         var redirects = 0;
         var includeRange = true;
 
@@ -66,7 +77,7 @@ public sealed class HttpProber
             HttpResponseMessage? response = null;
             try
             {
-                using var request = CreateRequest(currentUrl, includeRange, firstRangeLength);
+                using var request = CreateRequest(currentUrl, includeRange, firstRangeLength, scope);
                 response = await SendHeadersReadAsync(request, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -158,7 +169,7 @@ public sealed class HttpProber
         }
     }
 
-    private HttpRequestMessage CreateRequest(Uri url, bool includeRange, long? firstRangeLength)
+    private static HttpRequestMessage CreateRequest(Uri url, bool includeRange, long? firstRangeLength, RequestScope scope)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url)
         {
@@ -167,13 +178,7 @@ public sealed class HttpProber
             VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
         };
         request.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("identity"));
-        if (_defaultHeaders is not null)
-        {
-            foreach (var header in _defaultHeaders)
-            {
-                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            }
-        }
+        scope.Apply(request);
 
         if (includeRange)
         {
@@ -185,10 +190,13 @@ public sealed class HttpProber
         return request;
     }
 
-    private Task<HttpResponseMessage> SendHeadersReadAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-        _httpClient is HttpClient client
+    private Task<HttpResponseMessage> SendHeadersReadAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var invoker = _invokerForUrl(request.RequestUri!);
+        return invoker is HttpClient client
             ? client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            : _httpClient.SendAsync(request, cancellationToken);
+            : invoker.SendAsync(request, cancellationToken);
+    }
 
     private static async Task<ProbeOutcome> HandlePartialContentAsync(
         Uri finalUrl,
