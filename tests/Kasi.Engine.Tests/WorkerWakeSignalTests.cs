@@ -1,5 +1,6 @@
 namespace Kasi.Engine.Tests;
 
+[Trait("Requirement", "KASI-ENG-004")]
 public sealed class WorkerWakeSignalTests
 {
     [Fact]

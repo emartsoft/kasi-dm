@@ -1,5 +1,7 @@
 namespace Kasi.Engine.Tests;
 
+[Trait("Requirement", "KASI-ENG-001")]
+[Trait("Requirement", "KASI-RES-003")]
 public sealed class HttpTransferRunnerTests
 {
     [Fact]

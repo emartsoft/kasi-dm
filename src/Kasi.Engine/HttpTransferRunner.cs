@@ -266,16 +266,7 @@ public sealed class HttpTransferRunner
                     break;
                 }
 
-                int read;
-                try
-                {
-                    read = await ReadBodyAsync(probe.Body, window, cancellationToken).ConfigureAwait(false);
-                }
-                catch (TransferException)
-                {
-                    throw;
-                }
-
+                var read = await ReadBodyAsync(probe.Body, window, cancellationToken).ConfigureAwait(false);
                 if (read == 0)
                 {
                     break;
