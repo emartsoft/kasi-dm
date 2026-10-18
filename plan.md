@@ -3,7 +3,7 @@
 Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5). It turns the roadmap in TRD section 16 and the gates in TPL section 4 into ordered tasks, each with the requirement and test-case IDs it covers and how it is verified.
 
 - **Sources of truth:** TRD `docs/specs/KASI-TRD-2026-001.md` (what to build), test plan `docs/specs/KASI-TPL-2026-001.md` (how it is proven), `CONTRIBUTING.md` (how we work). If this file disagrees with them, they win; fix this file.
-- **Last updated:** 2026-10-18, after M1.7 (HTTP transfer: M1.7a and M1.7b merged, M1.7c live scheduler scenarios in this PR); M1.1 to M1.6 merged.
+- **Last updated:** 2026-10-18, after M1.7 (HTTP transfer, PRs #20 to #22) merged; M1.8 (retry and classification, runner half) in review; M1.1 to M1.7 merged.
 - **Estimates:** week numbers are the TRD's (24 weeks for v1.0, engine first). The TRD says estimates are confirmed at the end of M0. Sub-task weeks below are indicative.
 - **Status marks:** in the task tables ✅ done and verified, 🔶 partly done, ⬜ not started; only the gate checklists keep `- [ ]` boxes. Update this file in the same PR that finishes a task.
 
@@ -12,7 +12,7 @@ Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5
 | Phase | Weeks | Theme | Gate at the end | Status |
 | --- | --- | --- | --- | --- |
 | M0 | 1 to 2 | Foundations: solution, data layer, test server, CI | End of M0 | ✅ closed for engineering; owner items open (code signing, Native AOT check) |
-| M1 | 3 to 8 | Download engine, resume, bandwidth | **Engine gate** | 🔶 7 of 16 tasks done (M1.1 to M1.7) |
+| M1 | 3 to 8 | Download engine, resume, bandwidth | **Engine gate** | 🔶 7 of 16 tasks done (M1.1 to M1.7); M1.8 in review |
 | M2 | 9 to 13 | Browser extension, host, queues, categories, main UI flows | **Internal alpha** | ⬜ not started |
 | M3 | 14 to 17 | Media capture, FFmpeg, scheduler wake and quotas | none (plan v0.4) | ⬜ not started |
 | M4 | 18 to 21 | BitTorrent, installer, portable, updates, signing | **Public beta** | ⬜ not started |
