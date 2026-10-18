@@ -22,6 +22,9 @@ public sealed record HttpTransferOptions
     /// <summary>Headers added to the probe and every lease request; tests use <c>X-Kasi-Chaos</c>.</summary>
     public IReadOnlyDictionary<string, string>? RequestHeaders { get; init; }
 
+    /// <summary>Retry classification and backoff for probes and leases (TRD 6.6).</summary>
+    public TransferRetryPolicy RetryPolicy { get; init; } = new();
+
     /// <summary>Test-only mid-transfer write fault; the runner forwards it to the part writer.</summary>
     internal Func<long, int, Exception?>? WriteFaultInjector { get; init; }
 
@@ -35,6 +38,7 @@ public sealed record HttpTransferOptions
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(WriteBufferMaxAge, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(SupersededLeaseDrainTimeout, TimeSpan.Zero);
+        RetryPolicy.Validate();
         SchedulerOptions.Validate();
     }
 }

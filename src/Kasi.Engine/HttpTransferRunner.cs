@@ -38,14 +38,20 @@ public sealed class HttpTransferRunner
         ProbeResponse probe;
         try
         {
-            var prober = new HttpProber(pool.GetInvoker(url, 0), time, settings.RequestHeaders);
-            var outcome = await prober.ProbeAsync(url, settings.SchedulerOptions.MinLeaseBytes, cancellationToken).ConfigureAwait(false);
-            if (outcome is ProbeFailure failure)
+            var initial = await ProbeWithRetryAsync(
+                pool,
+                url,
+                settings.SchedulerOptions.MinLeaseBytes,
+                settings,
+                time,
+                cancellationToken).ConfigureAwait(false);
+            settings = initial.Settings;
+            if (initial.Outcome is ProbeFailure failure)
             {
                 return ProbeFailed(failure);
             }
 
-            probe = (ProbeResponse)outcome;
+            probe = (ProbeResponse)initial.Outcome;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -67,14 +73,20 @@ public sealed class HttpTransferRunner
                 await probe.DisposeAsync().ConfigureAwait(false);
                 try
                 {
-                    var fullProber = new HttpProber(pool.GetInvoker(url, 0), time, settings.RequestHeaders);
-                    var fullOutcome = await fullProber.ProbeAsync(url, firstRangeLength: null, cancellationToken).ConfigureAwait(false);
-                    if (fullOutcome is ProbeFailure failure)
+                    var full = await ProbeWithRetryAsync(
+                        pool,
+                        url,
+                        firstRangeLength: null,
+                        settings,
+                        time,
+                        cancellationToken).ConfigureAwait(false);
+                    settings = full.Settings;
+                    if (full.Outcome is ProbeFailure failure)
                     {
                         return ProbeFailed(failure);
                     }
 
-                    probe = (ProbeResponse)fullOutcome;
+                    probe = (ProbeResponse)full.Outcome;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -201,6 +213,75 @@ public sealed class HttpTransferRunner
                 LastModified = lastModified,
             };
         }
+    }
+
+    private async Task<ProbeAttempt> ProbeWithRetryAsync(
+        HttpHostPool pool,
+        Uri url,
+        long? firstRangeLength,
+        HttpTransferOptions settings,
+        TimeProvider time,
+        CancellationToken cancellationToken)
+    {
+        var failedAttempts = 0;
+        while (true)
+        {
+            ProbeOutcome outcome;
+            try
+            {
+                var prober = new HttpProber(pool.GetInvoker(url, 0), time, settings.RequestHeaders);
+                outcome = await prober.ProbeAsync(url, firstRangeLength, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                outcome = new ProbeFailure(ProbeErrorKind.TransientError, $"The probe failed ({ex.GetType().Name}).");
+            }
+
+            if (outcome is ProbeResponse)
+            {
+                return new ProbeAttempt(outcome, settings);
+            }
+
+            var failure = (ProbeFailure)outcome;
+            var decision = settings.RetryPolicy.Decide(
+                TransferErrorKind.ProbeFailed,
+                failure.StatusCode,
+                failure.RetryAfter,
+                failure,
+                ++failedAttempts);
+            if (!decision.Retry)
+            {
+                return new ProbeAttempt(failure, settings);
+            }
+
+            if (decision.ReduceConnections)
+            {
+                settings = ReduceConnections(settings);
+            }
+
+            if (decision.Delay > TimeSpan.Zero)
+            {
+                await Task.Delay(decision.Delay, time, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static HttpTransferOptions ReduceConnections(HttpTransferOptions settings)
+    {
+        var scheduler = settings.SchedulerOptions;
+        var max = Math.Max(1, scheduler.MaxConnections - 1);
+        return settings with
+        {
+            SchedulerOptions = scheduler with
+            {
+                MaxConnections = max,
+                InitialConnections = Math.Min(scheduler.InitialConnections, max),
+            },
+        };
     }
 
     private async Task<TransferOutcome> SingleStreamAsync(
@@ -389,6 +470,8 @@ public sealed class HttpTransferRunner
             };
         }
 
+        options.SchedulerTick?.Invoke(scheduler);
+
         LeaseAssignment? probeLease = null;
         if (probe is not null)
         {
@@ -423,13 +506,14 @@ public sealed class HttpTransferRunner
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var state = new FailureState();
         using var signal = new WorkerWakeSignal(options.SchedulerOptions.MaxConnections);
+        var throttleGate = new ThrottleGate();
         var workers = new Task[options.SchedulerOptions.MaxConnections];
         for (var worker = 0; worker < workers.Length; worker++)
         {
             var workerId = worker;
             var initial = worker == 0 ? probeLease : null;
             workers[worker] = Task.Run(
-                () => WorkerAsync(workerId, initial, probe, pool, finalUrl, fileName, writer, scheduler, totalBytes, eTag, lastModified, options, time, state, signal, linked),
+                () => WorkerAsync(workerId, initial, probe, pool, finalUrl, fileName, writer, scheduler, totalBytes, eTag, lastModified, options, time, state, signal, throttleGate, linked),
                 CancellationToken.None);
         }
 
@@ -519,10 +603,12 @@ public sealed class HttpTransferRunner
         TimeProvider time,
         FailureState state,
         WorkerWakeSignal signal,
+        ThrottleGate throttleGate,
         CancellationTokenSource linked)
     {
         var cancellationToken = linked.Token;
         var lease = initialLease;
+        var failedAttempts = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             if (state.Failure is not null)
@@ -555,9 +641,38 @@ public sealed class HttpTransferRunner
             try
             {
                 await TransferLeaseAsync(workerId, current, probe, pool, finalUrl, writer, scheduler, totalBytes, eTag, lastModified, options, time, cancellationToken).ConfigureAwait(false);
+                failedAttempts = 0;
             }
             catch (TransferException failure)
             {
+                var decision = options.RetryPolicy.Decide(
+                    failure.Failure.Kind,
+                    failure.Failure.HttpStatusCode,
+                    failure.Failure.RetryAfter,
+                    failure.Failure.ProbeFailure,
+                    ++failedAttempts);
+                if (decision.Retry)
+                {
+                    if (decision.ReduceConnections && throttleGate.TryReduce())
+                    {
+                        scheduler.ReduceAllowedConnections();
+                    }
+
+                    try
+                    {
+                        if (decision.Delay > TimeSpan.Zero)
+                        {
+                            await Task.Delay(decision.Delay, time, cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+
+                    continue;
+                }
+
                 state.TrySet(failure.Failure);
                 await linked.CancelAsync().ConfigureAwait(false);
                 return;
@@ -1086,6 +1201,8 @@ public sealed class HttpTransferRunner
         return null;
     }
 
+    private sealed record ProbeAttempt(ProbeOutcome Outcome, HttpTransferOptions Settings);
+
     private sealed record TransferFailure(
         TransferErrorKind Kind,
         string Detail,
@@ -1097,6 +1214,13 @@ public sealed class HttpTransferRunner
     private sealed class TransferException(TransferFailure failure) : Exception(failure.Detail)
     {
         public TransferFailure Failure { get; } = failure;
+    }
+
+    private sealed class ThrottleGate
+    {
+        private int _reduced;
+
+        public bool TryReduce() => Interlocked.Exchange(ref _reduced, 1) == 0;
     }
 
     private sealed class FailureState
