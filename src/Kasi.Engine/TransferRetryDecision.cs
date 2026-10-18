@@ -1,5 +1,3 @@
-using System.Net;
-
 namespace Kasi.Engine;
 
 /// <summary>How a failed transfer should be handled (TRD 6.6, KASI-RES-004).</summary>
