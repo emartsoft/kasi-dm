@@ -175,12 +175,42 @@ public sealed class HttpHostPoolTests
         host.Metrics.Http2RequestsServed.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(TestServerTlsMode.Expired)]
+    [InlineData(TestServerTlsMode.SelfSigned)]
+    [InlineData(TestServerTlsMode.WrongHost)]
+    public async Task The_transfer_runner_fails_before_writing_anything_for_a_bad_certificate(TestServerTlsMode mode)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var host = await TestServerHost.StartAsync(
+            new TestServerOptions { TlsMode = mode },
+            cancellationToken: ct);
+        var folder = Path.Combine(Path.GetTempPath(), "kasi-bad-cert-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var runner = new HttpTransferRunner(new HttpHostPoolOptions
+            {
+                CustomTrustRoots = new X509Certificate2Collection(host.RootCertificate!),
+            });
+
+            var outcome = await runner.DownloadAsync(new Uri(host.BaseAddress, "/files/bad-runner/65536"), folder, cancellationToken: ct);
+
+            outcome.Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.CertificateError);
+            Directory.GetFiles(folder).Should().BeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     [Fact]
     public void No_public_member_of_the_pool_or_options_offers_a_validation_bypass()
     {
         var forbidden = new[] { "callback", "bypass", "validation", "insecure", "dangerous", "disable", "trustroot" };
 
-        foreach (var type in new[] { typeof(HttpHostPool), typeof(HttpHostPoolOptions) })
+        foreach (var type in new[] { typeof(HttpHostPool), typeof(HttpHostPoolOptions), typeof(HttpTransferRunner), typeof(HttpTransferOptions) })
         {
             foreach (var member in type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
             {
