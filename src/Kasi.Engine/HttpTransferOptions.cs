@@ -21,8 +21,17 @@ public sealed record HttpTransferOptions
 
     public TimeSpan SupersededLeaseDrainTimeout { get; init; } = TimeSpan.FromSeconds(15);
 
-    /// <summary>Headers added to the probe and every lease request; tests use <c>X-Kasi-Chaos</c>.</summary>
+    /// <summary>Caller headers for probes and leases; sensitive names stay on the initial origin. Tests use <c>X-Kasi-Chaos</c>.</summary>
     public IReadOnlyDictionary<string, string>? RequestHeaders { get; init; }
+
+    /// <summary>The original job URL when resuming without a job repository; needed to scope credentials and sensitive headers.</summary>
+    public Uri? InitialUrl { get; init; }
+
+    /// <summary>Per-job cookies, captured headers and HTTP credentials. When null, a saved secret may be loaded.</summary>
+    public JobSecret? Secret { get; init; }
+
+    /// <summary>Loads the job's secret on resume and removes it after a completed transfer.</summary>
+    public IJobSecretRepository? SecretRepository { get; init; }
 
     /// <summary>Retry classification and backoff for probes and leases (TRD 6.6).</summary>
     public TransferRetryPolicy RetryPolicy { get; init; } = new();
@@ -55,6 +64,8 @@ public sealed record HttpTransferOptions
     /// <summary>Test-only observation hook, called on each scheduler pulse; production leaves it null.</summary>
     internal Action<SegmentScheduler>? SchedulerTick { get; init; }
 
+    internal RequestScope? Scope { get; init; }
+
     internal void Validate()
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(WriteBufferMaxAge, TimeSpan.Zero);
@@ -62,6 +73,10 @@ public sealed record HttpTransferOptions
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(CheckpointInterval, TimeSpan.Zero);
         RetryPolicy.Validate();
         SchedulerOptions.Validate();
+        if (InitialUrl is not null && (!InitialUrl.IsAbsoluteUri || InitialUrl.Scheme is not ("http" or "https")))
+        {
+            throw new ArgumentException("The initial URL must be an absolute HTTP or HTTPS URL.");
+        }
         if (CheckpointJobId is not null && (CheckpointWriter is null || SegmentRepository is null))
         {
             throw new ArgumentException("Checkpointing needs a job id, a checkpoint writer and a segment repository.");

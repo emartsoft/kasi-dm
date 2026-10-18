@@ -47,6 +47,7 @@ internal static class TestServerApp
         builder.Services.AddSingleton(metrics);
         builder.Services.AddSingleton<ChaosRegistry>();
         builder.Services.AddSingleton<MutableFiles>();
+        builder.Services.AddSingleton<DigestNonce>();
         builder.Services.AddSingleton(time ?? TimeProvider.System);
 
         var app = builder.Build();

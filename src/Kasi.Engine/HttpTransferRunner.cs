@@ -34,7 +34,22 @@ public sealed class HttpTransferRunner
         settings.Validate();
         var time = settings.TimeProvider ?? TimeProvider.System;
 
-        using var pool = new HttpHostPool(_hostPoolOptions);
+        try
+        {
+            settings = await LoadSecretAsync(settings, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Cancelled("The download was cancelled while the job secret was loaded.");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return Failed(SecretLoadFailure(ex));
+        }
+
+        settings = settings with { Scope = new RequestScope(url, settings.RequestHeaders, settings.Secret) };
+
+        using var pool = CreatePool(url, url, settings.Secret);
         ProbeResponse probe;
         try
         {
@@ -128,11 +143,12 @@ public sealed class HttpTransferRunner
 
             if (forceSingleStream || !probe.RangesSupported || probe.TotalBytes is null or <= 0)
             {
-                return await SingleStreamAsync(probe, destinationFolder, fileName, finalPath, settings, time, cancellationToken)
+                var single = await SingleStreamAsync(probe, destinationFolder, fileName, finalPath, settings, time, cancellationToken)
                     .ConfigureAwait(false);
+                return await DeleteSecretOnCompletionAsync(single, settings).ConfigureAwait(false);
             }
 
-            return await SegmentedAsync(
+            var segmented = await SegmentedAsync(
                 pool,
                 probe.FinalUrl,
                 probe,
@@ -145,6 +161,7 @@ public sealed class HttpTransferRunner
                 settings,
                 time,
                 cancellationToken).ConfigureAwait(false);
+            return await DeleteSecretOnCompletionAsync(segmented, settings).ConfigureAwait(false);
         }
         finally
         {
@@ -184,6 +201,34 @@ public sealed class HttpTransferRunner
         var settings = options ?? new HttpTransferOptions();
         settings.Validate();
         var time = settings.TimeProvider ?? TimeProvider.System;
+        try
+        {
+            settings = await LoadSecretAsync(settings, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Cancelled("The resume was cancelled while the job secret was loaded.", fileName, totalBytes, eTag, lastModified);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return Failed(SecretLoadFailure(ex), fileName, totalBytes, eTag, lastModified);
+        }
+
+        Uri? initialUrl;
+        try
+        {
+            initialUrl = await ResolveResumeInitialUrlAsync(settings, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Cancelled("The resume was cancelled while the job URL was loaded.", fileName, totalBytes, eTag, lastModified);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return Failed(CheckpointFailure(ex), fileName, totalBytes, eTag, lastModified);
+        }
+
+        settings = settings with { Scope = new RequestScope(initialUrl, settings.RequestHeaders, settings.Secret) };
         var safeName = FileNameSanitiser.Sanitise(fileName);
         var finalPath = ResolveFinalPath(destinationFolder, safeName, out var pathFailure);
         if (pathFailure is not null)
@@ -196,10 +241,11 @@ public sealed class HttpTransferRunner
             return TargetExists(safeName, finalPath);
         }
 
-        using var pool = new HttpHostPool(_hostPoolOptions);
+        using var pool = CreatePool(finalUrl, initialUrl, settings.Secret);
+        TransferOutcome outcome;
         try
         {
-            return await SegmentedAsync(
+            outcome = await SegmentedAsync(
                 pool,
                 finalUrl,
                 probe: null,
@@ -229,6 +275,8 @@ public sealed class HttpTransferRunner
                 LastModified = lastModified,
             };
         }
+
+        return await DeleteSecretOnCompletionAsync(outcome, settings).ConfigureAwait(false);
     }
 
     private async Task<ProbeAttempt> ProbeWithRetryAsync(
@@ -245,7 +293,7 @@ public sealed class HttpTransferRunner
             ProbeOutcome outcome;
             try
             {
-                var prober = new HttpProber(pool.GetInvoker(url, 0), time, settings.RequestHeaders);
+                var prober = new HttpProber(hop => pool.GetInvoker(hop, 0), settings.Scope!, time);
                 outcome = await prober.ProbeAsync(url, firstRangeLength, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -299,6 +347,64 @@ public sealed class HttpTransferRunner
             },
         };
     }
+
+    private HttpHostPool CreatePool(Uri targetUrl, Uri? initialUrl, JobSecret? secret)
+    {
+        if (initialUrl is not null && RequestScope.IsSameOrigin(initialUrl, targetUrl)
+            && secret?.Credentials is { } credentials)
+        {
+            return new HttpHostPool(_hostPoolOptions, (initialUrl, new NetworkCredential(credentials.UserName, credentials.Password)));
+        }
+
+        return new HttpHostPool(_hostPoolOptions);
+    }
+
+    private static async Task<Uri?> ResolveResumeInitialUrlAsync(HttpTransferOptions settings, CancellationToken cancellationToken)
+    {
+        if (settings.CheckpointJobId is { } jobId && settings.JobRepository is { } jobs)
+        {
+            var job = await jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+            if (job is not null && Uri.TryCreate(job.Url, UriKind.Absolute, out var savedUrl)
+                && savedUrl.Scheme is "http" or "https")
+            {
+                return savedUrl;
+            }
+        }
+
+        return settings.InitialUrl;
+    }
+
+    private static async Task<HttpTransferOptions> LoadSecretAsync(HttpTransferOptions settings, CancellationToken cancellationToken)
+    {
+        if (settings.Secret is null && settings.CheckpointJobId is { } jobId && settings.SecretRepository is { } repository)
+        {
+            return settings with { Secret = await repository.GetAsync(jobId, cancellationToken).ConfigureAwait(false) };
+        }
+
+        return settings;
+    }
+
+    private static async Task<TransferOutcome> DeleteSecretOnCompletionAsync(TransferOutcome outcome, HttpTransferOptions settings)
+    {
+        if (outcome is TransferCompleted && settings.CheckpointJobId is { } jobId && settings.SecretRepository is { } repository)
+        {
+            try
+            {
+                await repository.DeleteAsync(jobId, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // The file is already committed, so a database failure here must not turn the download into an error; the
+                // engine facade (M1.13) removes a leftover secret when it completes the job.
+            }
+        }
+
+        return outcome;
+    }
+
+    private static TransferFailure SecretLoadFailure(Exception exception) => new(
+        TransferErrorKind.CheckpointError,
+        $"The job secret could not be loaded ({exception.GetType().Name}).");
 
     private static async Task PersistProbeMetadataAsync(
         IJobRepository jobs,
@@ -846,7 +952,7 @@ public sealed class HttpTransferRunner
             {
 #pragma warning disable CA2000 // the pool owns and disposes every invoker it returns
                 var invoker = pool.GetInvoker(finalUrl, workerId);
-                using var request = CreateLeaseRequest(finalUrl, lease, eTag, lastModified, options.RequestHeaders);
+                using var request = CreateLeaseRequest(finalUrl, lease, eTag, lastModified, options.Scope!);
 #pragma warning restore CA2000
                 try
                 {
@@ -1004,7 +1110,7 @@ public sealed class HttpTransferRunner
         LeaseAssignment lease,
         string? eTag,
         string? lastModified,
-        IReadOnlyDictionary<string, string>? headers)
+        RequestScope scope)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, finalUrl)
         {
@@ -1019,13 +1125,7 @@ public sealed class HttpTransferRunner
             request.Headers.TryAddWithoutValidation("If-Range", validator);
         }
 
-        if (headers is not null)
-        {
-            foreach (var header in headers)
-            {
-                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            }
-        }
+        scope.Apply(request);
 
         return request;
     }
