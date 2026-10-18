@@ -15,6 +15,10 @@ public sealed class TransferFailed : TransferOutcome
 
     public long BytesFlushed { get; init; }
 
+    /// <summary>
+    /// Segment cursors taken before the final flush, offered only when that flush succeeded; empty when the flush failed or
+    /// when nothing was open yet. A caller records these cursors and nothing else (ADR 0003).
+    /// </summary>
     public IReadOnlyList<Segment> SegmentsSnapshot { get; init; } = [];
 
     public string? ResolvedFileName { get; init; }

@@ -25,6 +25,12 @@ public sealed record HttpTransferOptions
     /// <summary>Test-only mid-transfer write fault; the runner forwards it to the part writer.</summary>
     internal Func<long, int, Exception?>? WriteFaultInjector { get; init; }
 
+    /// <summary>Test-only flush fault; the runner forwards it to the part writer.</summary>
+    internal Func<Exception?>? FlushFaultInjector { get; init; }
+
+    /// <summary>Test-only observation hook, called on each scheduler pulse; production leaves it null.</summary>
+    internal Action<SegmentScheduler>? SchedulerTick { get; init; }
+
     internal void Validate()
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(WriteBufferMaxAge, TimeSpan.Zero);

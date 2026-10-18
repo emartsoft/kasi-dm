@@ -225,6 +225,7 @@ public sealed class HttpTransferRunner
 
         var writer = ((PartFileOpened)opened).Writer;
         writer.WriteFaultInjector = options.WriteFaultInjector;
+        writer.FlushFaultInjector = options.FlushFaultInjector;
         await using var writerScope = writer.ConfigureAwait(false);
 
         if (probe.TotalBytes is 0)
@@ -374,6 +375,7 @@ public sealed class HttpTransferRunner
 
         var writer = ((PartFileOpened)opened).Writer;
         writer.WriteFaultInjector = options.WriteFaultInjector;
+        writer.FlushFaultInjector = options.FlushFaultInjector;
         await using var writerScope = writer.ConfigureAwait(false);
 
         SegmentScheduler scheduler;
@@ -429,7 +431,7 @@ public sealed class HttpTransferRunner
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var state = new FailureState();
-        using var signal = new SemaphoreSlim(0, int.MaxValue);
+        using var signal = new WorkerWakeSignal(options.SchedulerOptions.MaxConnections);
         var workers = new Task[options.SchedulerOptions.MaxConnections];
         for (var worker = 0; worker < workers.Length; worker++)
         {
@@ -440,7 +442,7 @@ public sealed class HttpTransferRunner
                 CancellationToken.None);
         }
 
-        var pulse = PulseAsync(scheduler, signal, workers.Length, time, linked.Token);
+        var pulse = PulseAsync(scheduler, signal, workers.Length, time, options.SchedulerTick, linked.Token);
         try
         {
             await Task.WhenAll(workers).ConfigureAwait(false);
@@ -525,7 +527,7 @@ public sealed class HttpTransferRunner
         HttpTransferOptions options,
         TimeProvider time,
         FailureState state,
-        SemaphoreSlim signal,
+        WorkerWakeSignal signal,
         CancellationTokenSource linked)
     {
         var cancellationToken = linked.Token;
@@ -586,7 +588,7 @@ public sealed class HttpTransferRunner
                     await probe.DisposeAsync().ConfigureAwait(false);
                 }
 
-                signal.Release();
+                signal.Wake();
             }
         }
     }
@@ -842,9 +844,10 @@ public sealed class HttpTransferRunner
 
     private static async Task PulseAsync(
         SegmentScheduler scheduler,
-        SemaphoreSlim signal,
+        WorkerWakeSignal signal,
         int workers,
         TimeProvider time,
+        Action<SegmentScheduler>? onTick,
         CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(PulseMilliseconds), time);
@@ -853,7 +856,8 @@ public sealed class HttpTransferRunner
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
                 scheduler.EvaluateRampUp();
-                signal.Release(workers);
+                onTick?.Invoke(scheduler);
+                signal.Wake(workers);
             }
         }
         catch (OperationCanceledException)
@@ -871,8 +875,16 @@ public sealed class HttpTransferRunner
         string? eTag,
         string? lastModified)
     {
+        // Snapshot first, then flush, and offer the snapshot only if the flush succeeded: a cursor may be recorded only after
+        // the bytes below it are on disk (ADR 0003). If the flush fails, nothing since the caller's last durable checkpoint
+        // is known to be safe, so no snapshot is returned and the flush failure is what the caller must act on.
         var snapshot = scheduler.GetSegmentsSnapshot();
-        await writer.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        var flush = await writer.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        if (!flush.IsSuccess)
+        {
+            return Failed(DiskFailure(flush), fileName, totalBytes, eTag, lastModified);
+        }
+
         return Failed(failure, fileName, totalBytes, eTag, lastModified, snapshot.Sum(s => s.Written), snapshot);
     }
 

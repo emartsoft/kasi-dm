@@ -259,6 +259,34 @@ public sealed class HttpTransferIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("TC", "TC-RES-001")]
+    public async Task A_failed_flush_on_the_stop_path_offers_no_snapshot_because_nothing_new_is_known_to_be_durable()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        const string seed = "runner-flush-fails";
+        const int size = 16 * 1024 * 1024;
+        var chaosId = _host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 256 * 1024 });
+        var options = new HttpTransferOptions
+        {
+            SchedulerOptions = new SegmentSchedulerOptions { MaxConnections = 4, InitialConnections = 4 },
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = chaosId },
+            FlushFaultInjector = () => new IOException("simulated disk full", unchecked((int)0x80070070)),
+        };
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var download = new HttpTransferRunner().DownloadAsync(Url($"/files/{seed}/{size}"), _folder, options, cts.Token);
+        await EventuallyAsync(() => _host.Metrics.Http1RequestsServed >= 2);
+        await Task.Delay(900, ct);
+        await cts.CancelAsync();
+
+        var failed = (await download).Should().BeOfType<TransferFailed>().Subject;
+        failed.ErrorKind.Should().Be(TransferErrorKind.DiskNotEnoughSpace, "the failed flush, not the cancellation, is what the caller must act on");
+        failed.SegmentsSnapshot.Should().BeEmpty("a snapshot is only recordable after a successful flush (ADR 0003)");
+        failed.BytesFlushed.Should().Be(0);
+        File.Exists(Path.Combine(_folder, failed.ResolvedFileName! + PartFileWriter.PartExtension)).Should().BeTrue("the part file is still preserved");
+    }
+
+    [Fact]
     [Trait("TC", "TC-ENG-015")]
     public async Task Insufficient_space_at_open_preserves_the_destination_and_writes_no_part_file()
     {
