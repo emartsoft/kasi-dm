@@ -12,6 +12,16 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
     private long _sent;
     private bool _stalled;
 
+    private bool ResetActive => _profile.ResetOnRequest is null || _profile.ResetOnRequest == session.RequestIndex;
+
+    private long? ResetAt => ResetActive ? _profile.ResetAfterBytes : null;
+
+    private long? TruncateAt =>
+        _profile.TruncateAfterBytes is { } cut
+        && (_profile.TruncateOnRequest is null || _profile.TruncateOnRequest == session.RequestIndex)
+            ? cut
+            : null;
+
     public override bool CanRead => false;
 
     public override bool CanSeek => false;
@@ -49,7 +59,7 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
     {
         while (!buffer.IsEmpty)
         {
-            if (_profile.TruncateAfterBytes is { } cut && _sent >= cut)
+            if (TruncateAt is { } cut && _sent >= cut)
             {
                 return; // swallow the rest: the declared length is never reached
             }
@@ -102,19 +112,22 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
     public override void SetLength(long value) => throw new NotSupportedException();
 
     private bool ShouldReset() =>
-        (_profile.ResetAfterBytes is { } at && _sent >= at)
-        || (_profile.ResetProbabilityPer64KiB is { } probability && _sent % ProbabilityBlock == 0 && session.Rng.NextDouble() < probability);
+        (ResetAt is { } at && _sent >= at)
+        || (ResetActive
+            && _profile.ResetProbabilityPer64KiB is { } probability
+            && _sent % ProbabilityBlock == 0
+            && session.Rng.NextDouble() < probability);
 
     /// <summary>Largest slice that does not step over a point where a fault must fire.</summary>
     private int SliceLength(int available)
     {
         long take = available;
-        if (_profile.ResetAfterBytes is { } resetAt)
+        if (ResetAt is { } resetAt)
         {
             take = Math.Min(take, resetAt - _sent);
         }
 
-        if (_profile.TruncateAfterBytes is { } cut)
+        if (TruncateAt is { } cut)
         {
             take = Math.Min(take, cut - _sent);
         }
@@ -124,7 +137,7 @@ internal sealed class ChaosStream(Stream inner, HttpContext context, ChaosSessio
             take = Math.Min(take, _profile.StallAfterBytes - _sent);
         }
 
-        if (_profile.ResetProbabilityPer64KiB is not null)
+        if (ResetActive && _profile.ResetProbabilityPer64KiB is not null)
         {
             take = Math.Min(take, ProbabilityBlock - (_sent % ProbabilityBlock));
         }

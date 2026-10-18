@@ -397,7 +397,7 @@ public sealed class HttpTransferIntegrationTests : IAsyncLifetime
 
     [Fact]
     [Trait("TC", "TC-ENG-015")]
-    public async Task A_truncated_lease_fails_with_ProtocolError_and_preserves_the_part_file()
+    public async Task A_persistently_truncated_lease_fails_with_ProtocolError_after_the_retry_limit()
     {
         var ct = TestContext.Current.CancellationToken;
         const string seed = "runner-truncated";
@@ -406,6 +406,7 @@ public sealed class HttpTransferIntegrationTests : IAsyncLifetime
         var options = Options(initialConnections: 4) with
         {
             RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = chaosId },
+            RetryPolicy = new TransferRetryPolicy { MaxAttempts = 2 },
         };
 
         var outcome = await new HttpTransferRunner().DownloadAsync(

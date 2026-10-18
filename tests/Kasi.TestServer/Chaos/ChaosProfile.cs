@@ -12,6 +12,9 @@ public sealed record ChaosProfile
     /// <summary>Abort the connection after exactly this many body bytes.</summary>
     public long? ResetAfterBytes { get; init; }
 
+    /// <summary>Apply <see cref="ResetAfterBytes"/> only on this zero-based request index; null applies to every request.</summary>
+    public int? ResetOnRequest { get; init; }
+
     /// <summary>Abort the connection with this probability after each completed 64 KiB of body.</summary>
     public double? ResetProbabilityPer64KiB { get; init; }
 
@@ -38,6 +41,12 @@ public sealed record ChaosProfile
     /// <summary>Fraction of requests that receive <see cref="StatusCode"/>; 1 means all.</summary>
     public double StatusRate { get; init; } = 1;
 
+    /// <summary>Start injecting <see cref="StatusCode"/> from this zero-based request index; null starts at the first.</summary>
+    public int? StatusAfterRequests { get; init; }
+
+    /// <summary>Number of requests that receive <see cref="StatusCode"/> from <see cref="StatusAfterRequests"/>; null means all.</summary>
+    public int? StatusCount { get; init; }
+
     /// <summary>Sent as <c>Retry-After</c> with the injected status.</summary>
     public int? RetryAfterSeconds { get; init; }
 
@@ -49,6 +58,9 @@ public sealed record ChaosProfile
 
     /// <summary>Stop sending after this many body bytes but finish the response, so fewer bytes arrive than declared.</summary>
     public long? TruncateAfterBytes { get; init; }
+
+    /// <summary>Apply <see cref="TruncateAfterBytes"/> only on this zero-based request index; null applies to every request.</summary>
+    public int? TruncateOnRequest { get; init; }
 
     public int LatencyMs { get; init; }
 
