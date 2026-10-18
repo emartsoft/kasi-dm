@@ -102,6 +102,36 @@ public sealed class TlsAndHttp2ServerTests
     }
 
     [Fact]
+    public async Task Reset_keeps_open_connections_so_a_reused_connection_is_neither_a_new_handshake_nor_a_lower_peak()
+    {
+        await using var host = await TestServerHost.StartAsync(
+            new TestServerOptions { TlsMode = TestServerTlsMode.Valid },
+            cancellationToken: TestClient.Ct);
+        var client = CreateClient(host, HttpVersion.Version11);
+        try
+        {
+            (await client.GetByteArrayAsync("/files/reset-warmup/1024", TestClient.Ct)).Should().HaveCount(1024);
+            host.Metrics.TlsHandshakesCompleted.Should().Be(1);
+            host.Metrics.OpenConnections.Should().Be(1);
+
+            host.ResetMetrics();
+            (await client.GetByteArrayAsync("/files/reset-measured/1024", TestClient.Ct)).Should().HaveCount(1024);
+
+            host.Metrics.TlsHandshakesCompleted.Should().Be(0, "the keep-alive connection from before the reset was reused, so no handshake happened");
+            host.Metrics.TotalConnectionsAccepted.Should().Be(0);
+            host.Metrics.OpenConnections.Should().Be(1, "the warm-up connection is still open");
+            host.Metrics.PeakConcurrentConnections.Should().Be(1, "the peak starts from the connections open at the reset");
+        }
+        finally
+        {
+            client.Dispose();
+        }
+
+        await EventuallyAsync(() => host.Metrics.OpenConnections <= 0, "the client connection should close");
+        host.Metrics.OpenConnections.Should().Be(0, "the open count must never go below zero");
+    }
+
+    [Fact]
     public async Task OtherConnectionsBytesPerSecond_throttles_every_connection_except_the_indexed_one()
     {
         await using var host = await TestServerHost.StartAsync(cancellationToken: TestClient.Ct);

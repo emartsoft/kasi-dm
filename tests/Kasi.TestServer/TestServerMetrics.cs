@@ -34,13 +34,15 @@ public sealed class TestServerMetrics
 
     public int Http2RequestsServed => Volatile.Read(ref _http2Requests);
 
-    /// <summary>Zeroes the counters. Call it while the server is idle; it also resets the open-connection count.</summary>
+    /// <summary>
+    /// Starts a new measurement. Counters are zeroed, but connections that are still open (keep-alive) stay counted as open
+    /// and the peak restarts from them, and a TLS connection already counted is not counted again when it is reused. Call it
+    /// while the server is idle.
+    /// </summary>
     public void Reset()
     {
-        _tlsConnections.Clear();
         Interlocked.Exchange(ref _totalConnections, 0);
-        Interlocked.Exchange(ref _openConnections, 0);
-        Interlocked.Exchange(ref _peakConcurrentConnections, 0);
+        Interlocked.Exchange(ref _peakConcurrentConnections, Volatile.Read(ref _openConnections));
         Interlocked.Exchange(ref _tlsHandshakes, 0);
         Interlocked.Exchange(ref _abortedRequests, 0);
         Interlocked.Exchange(ref _http1Requests, 0);

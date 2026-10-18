@@ -158,6 +158,24 @@ public sealed class HttpHostPoolTests
     }
 
     [Fact]
+    public async Task Production_defaults_reject_a_valid_leaf_whose_root_is_not_trusted_by_the_operating_system()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var host = await TestServerHost.StartAsync(
+            new TestServerOptions { TlsMode = TestServerTlsMode.Valid },
+            cancellationToken: ct);
+        using var pool = new HttpHostPool();
+        var prober = new HttpProber(pool.GetInvoker(host.BaseAddress, 0));
+
+        var outcome = await prober.ProbeAsync(new Uri(host.BaseAddress, "/files/untrusted-root/65536"), cancellationToken: ct);
+
+        var failure = outcome.Should().BeOfType<ProbeFailure>().Subject;
+        failure.Kind.Should().Be(ProbeErrorKind.CertificateError, "only the internal test trust roots may accept the private CA");
+        host.Metrics.Http1RequestsServed.Should().Be(0);
+        host.Metrics.Http2RequestsServed.Should().Be(0);
+    }
+
+    [Fact]
     public void No_public_member_of_the_pool_or_options_offers_a_validation_bypass()
     {
         var forbidden = new[] { "callback", "bypass", "validation", "insecure", "dangerous", "disable", "trustroot" };
