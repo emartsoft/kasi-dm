@@ -3,9 +3,9 @@
 Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5). It turns the roadmap in TRD section 16 and the gates in TPL section 4 into ordered tasks, each with the requirement and test-case IDs it covers and how it is verified.
 
 - **Sources of truth:** TRD `docs/specs/KASI-TRD-2026-001.md` (what to build), test plan `docs/specs/KASI-TPL-2026-001.md` (how it is proven), `CONTRIBUTING.md` (how we work). If this file disagrees with them, they win; fix this file.
-- **Last updated:** 2026-10-17, after M0 steps 0 to 6 were committed on `chore/m0-foundations`.
+- **Last updated:** 2026-10-18, after M1.6 (disk writer) merged and the status symbols replaced the `[x]` markers in the tables.
 - **Estimates:** week numbers are the TRD's (24 weeks for v1.0, engine first). The TRD says estimates are confirmed at the end of M0. Sub-task weeks below are indicative.
-- **Status marks:** `[x]` done and verified, `[ ]` not started, `[~]` partly done. Update this file in the same PR that finishes a task.
+- **Status marks:** in the task tables ✅ done and verified, 🔶 partly done, ⬜ not started; only the gate checklists keep `- [ ]` boxes. Update this file in the same PR that finishes a task.
 
 ## 1. Roadmap at a glance
 
