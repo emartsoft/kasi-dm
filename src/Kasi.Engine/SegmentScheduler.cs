@@ -176,6 +176,15 @@ public sealed class SegmentScheduler
         }
     }
 
+    /// <summary>The segment snapshot and the structure version it belongs to, read atomically for the checkpoint writer.</summary>
+    internal (IReadOnlyList<Segment> Segments, int Version) GetCheckpointSnapshot()
+    {
+        lock (_gate)
+        {
+            return ([.. _segments.Select(s => new Segment(s.Index, s.Start, s.End, s.Written))], _structureVersion);
+        }
+    }
+
     /// <summary>
     /// Gives an idle worker its next lease, or null if there is nothing for it: the download is complete, the worker may not
     /// transfer yet, it already holds a lease, or every remaining byte is being fetched and cannot usefully be split.

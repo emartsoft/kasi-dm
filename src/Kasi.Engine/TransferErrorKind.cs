@@ -35,4 +35,7 @@ public enum TransferErrorKind
 
     /// <summary>The machine is offline; the engine facade pauses all jobs and resumes them on reconnect.</summary>
     Offline,
+
+    /// <summary>The persisted segment structure or cursors could not be written (M1.9).</summary>
+    CheckpointError,
 }
