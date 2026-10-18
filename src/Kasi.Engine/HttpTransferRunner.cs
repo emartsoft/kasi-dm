@@ -279,6 +279,182 @@ public sealed class HttpTransferRunner
         return await DeleteSecretOnCompletionAsync(outcome, settings).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Validates a refreshed signed URL against the paused file before changing the saved URLs or requesting any
+    /// remaining bytes. The original final URL identifies the paused checkpoint; M1.13 owns the job-state transition.
+    /// </summary>
+    public async Task<TransferOutcome> RefreshAndResumeAsync(
+        Uri finalUrl,
+        Uri refreshedUrl,
+        string destinationFolder,
+        string fileName,
+        long totalBytes,
+        string? eTag,
+        string? lastModified,
+        IReadOnlyList<Segment> existingSegments,
+        HttpTransferOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(finalUrl);
+        ArgumentNullException.ThrowIfNull(refreshedUrl);
+        if (!finalUrl.IsAbsoluteUri || finalUrl.Scheme is not ("http" or "https"))
+        {
+            throw new ArgumentException("The saved final URL must be an absolute HTTP or HTTPS URL.", nameof(finalUrl));
+        }
+
+        if (!refreshedUrl.IsAbsoluteUri || refreshedUrl.Scheme is not ("http" or "https"))
+        {
+            throw new ArgumentException("The refreshed URL must be an absolute HTTP or HTTPS URL.", nameof(refreshedUrl));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationFolder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        ArgumentNullException.ThrowIfNull(existingSegments);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(totalBytes);
+
+        var settings = options ?? new HttpTransferOptions();
+        settings.Validate();
+        var savedBytes = existingSegments.Sum(segment => segment.Written);
+        TransferFailed Failure(TransferFailure failure) =>
+            Failed(failure, fileName, totalBytes, eTag, lastModified, savedBytes, existingSegments);
+        if (settings.CheckpointJobId is not { } jobId || settings.JobRepository is not { } jobs
+            || settings.SecretRepository is not { } secrets)
+        {
+            return Failure(new TransferFailure(TransferErrorKind.CheckpointError,
+                "Link refresh needs the job, secret and checkpoint repositories."));
+        }
+
+        Job? job;
+        try
+        {
+            job = await jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Failure(new TransferFailure(TransferErrorKind.Cancelled, "The link refresh was cancelled."));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return Failure(CheckpointFailure(ex));
+        }
+
+        if (job is null || job.FinalUrl != finalUrl.AbsoluteUri || job.TotalBytes != totalBytes
+            || job.ETag != eTag || job.LastModified != lastModified
+            || !Uri.TryCreate(job.Url, UriKind.Absolute, out var oldSourceUrl)
+            || oldSourceUrl.Scheme is not ("http" or "https"))
+        {
+            return Failure(new TransferFailure(TransferErrorKind.FileChanged,
+                "The saved job identity changed before the link could be refreshed."));
+        }
+
+        var freshSecretSupplied = settings.Secret is not null;
+        try
+        {
+            settings = await LoadSecretAsync(settings, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Failure(new TransferFailure(TransferErrorKind.Cancelled, "The link refresh was cancelled."));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return Failure(SecretLoadFailure(ex));
+        }
+
+        var boundSecret = settings.Secret is { } secret
+            ? secret with
+            {
+                SensitiveOrigin = secret.SensitiveOrigin
+                    ?? (freshSecretSupplied ? OriginOf(refreshedUrl) : OriginOf(oldSourceUrl)),
+            }
+            : null;
+        var headers = RequestScope.IsSameOrigin(oldSourceUrl, refreshedUrl)
+            ? settings.RequestHeaders
+            : settings.RequestHeaders?.Where(header => !RequestScope.IsSensitiveHeader(header.Key))
+                .ToDictionary(header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
+        settings = settings with
+        {
+            Secret = boundSecret,
+            RequestHeaders = headers,
+            Scope = new RequestScope(refreshedUrl, headers, boundSecret),
+        };
+
+        Uri resolvedUrl;
+        using (var pool = CreatePool(refreshedUrl, refreshedUrl, boundSecret))
+        {
+            ProbeAttempt attempt;
+            try
+            {
+                attempt = await ProbeWithRetryAsync(pool, refreshedUrl, firstRangeLength: 1, settings,
+                    settings.TimeProvider ?? TimeProvider.System, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return Failure(new TransferFailure(TransferErrorKind.Cancelled, "The link refresh probe was cancelled."));
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return Failure(TransientNetworkError(ex));
+            }
+
+            settings = attempt.Settings;
+            if (attempt.Outcome is ProbeFailure probeFailure)
+            {
+                var kind = probeFailure.Kind == ProbeErrorKind.CertificateError
+                    ? TransferErrorKind.CertificateError : TransferErrorKind.ProbeFailed;
+                return Failure(new TransferFailure(kind, probeFailure.Message, probeFailure.StatusCode,
+                    probeFailure.RetryAfter, ProbeFailure: probeFailure));
+            }
+
+            var probe = (ProbeResponse)attempt.Outcome;
+            await using var probeScope = probe.ConfigureAwait(false);
+            if (!probe.RangesSupported || probe.TotalBytes != totalBytes)
+            {
+                return Failure(new TransferFailure(TransferErrorKind.FileChanged,
+                    "The refreshed link does not serve the paused file's length and byte ranges."));
+            }
+
+            var sameValidator = !string.IsNullOrWhiteSpace(eTag)
+                ? string.Equals(eTag, probe.ETag, StringComparison.Ordinal)
+                : !string.IsNullOrWhiteSpace(lastModified)
+                    && string.Equals(lastModified, probe.LastModified, StringComparison.Ordinal);
+            if (!sameValidator)
+            {
+                return Failure(new TransferFailure(TransferErrorKind.FileChanged,
+                    "The refreshed link's file validator differs from the paused file."));
+            }
+
+            resolvedUrl = probe.FinalUrl;
+        }
+
+        try
+        {
+            if (boundSecret is not null)
+            {
+                await secrets.SetAsync(jobId, boundSecret, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!await jobs.UpdateUrlAsync(jobId, refreshedUrl.AbsoluteUri, resolvedUrl.AbsoluteUri, cancellationToken).ConfigureAwait(false))
+            {
+                return Failure(new TransferFailure(TransferErrorKind.CheckpointError,
+                    "The saved job disappeared before its refreshed URL could be stored."));
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Failure(new TransferFailure(TransferErrorKind.Cancelled, "The link refresh was cancelled."));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return Failure(CheckpointFailure(ex));
+        }
+
+        return await ResumeAsync(resolvedUrl, destinationFolder, fileName, totalBytes, eTag, lastModified,
+            existingSegments, settings, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static Uri OriginOf(Uri url) => new(url.GetLeftPart(UriPartial.Authority));
+
     private async Task<ProbeAttempt> ProbeWithRetryAsync(
         HttpHostPool pool,
         Uri url,
@@ -350,10 +526,11 @@ public sealed class HttpTransferRunner
 
     private HttpHostPool CreatePool(Uri targetUrl, Uri? initialUrl, JobSecret? secret)
     {
-        if (initialUrl is not null && RequestScope.IsSameOrigin(initialUrl, targetUrl)
+        var credentialOrigin = secret?.SensitiveOrigin ?? initialUrl;
+        if (credentialOrigin is not null && RequestScope.IsSameOrigin(credentialOrigin, targetUrl)
             && secret?.Credentials is { } credentials)
         {
-            return new HttpHostPool(_hostPoolOptions, (initialUrl, new NetworkCredential(credentials.UserName, credentials.Password)));
+            return new HttpHostPool(_hostPoolOptions, (credentialOrigin, new NetworkCredential(credentials.UserName, credentials.Password)));
         }
 
         return new HttpHostPool(_hostPoolOptions);

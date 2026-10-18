@@ -17,6 +17,9 @@ public sealed class TestServerMetrics
     private int _requestsWithAuthorization;
     private int _requestsWithCookie;
     private int _authChallenges;
+    private int _signedLinkRejects;
+    private int _requestsServed;
+    private long _bytesServed;
 
     public int TotalConnectionsAccepted => Volatile.Read(ref _totalConnections);
 
@@ -43,6 +46,13 @@ public sealed class TestServerMetrics
 
     public int AuthChallengesSent => Volatile.Read(ref _authChallenges);
 
+    public int SignedLinkRejects => Volatile.Read(ref _signedLinkRejects);
+
+    public int RequestsServed => Volatile.Read(ref _requestsServed);
+
+    /// <summary>Generated file bytes read for response bodies; range requests count only the requested slice.</summary>
+    public long BytesServed => Volatile.Read(ref _bytesServed);
+
     /// <summary>
     /// Starts a new measurement. Counters are zeroed, but connections that are still open (keep-alive) stay counted as open
     /// and the peak restarts from them, and a TLS connection already counted is not counted again when it is reused. Call it
@@ -59,6 +69,9 @@ public sealed class TestServerMetrics
         Interlocked.Exchange(ref _requestsWithAuthorization, 0);
         Interlocked.Exchange(ref _requestsWithCookie, 0);
         Interlocked.Exchange(ref _authChallenges, 0);
+        Interlocked.Exchange(ref _signedLinkRejects, 0);
+        Interlocked.Exchange(ref _requestsServed, 0);
+        Interlocked.Exchange(ref _bytesServed, 0);
     }
 
     internal void ConnectionAccepted()
@@ -86,6 +99,7 @@ public sealed class TestServerMetrics
 
     internal void RequestServed(HttpContext context)
     {
+        Interlocked.Increment(ref _requestsServed);
         if (!string.IsNullOrEmpty(context.Request.Headers.Authorization))
         {
             Interlocked.Increment(ref _requestsWithAuthorization);
@@ -115,4 +129,8 @@ public sealed class TestServerMetrics
     internal void RequestAborted() => Interlocked.Increment(ref _abortedRequests);
 
     internal void AuthChallengeSent() => Interlocked.Increment(ref _authChallenges);
+
+    internal void SignedLinkRejected() => Interlocked.Increment(ref _signedLinkRejects);
+
+    internal void FileBytesServed(int count) => Interlocked.Add(ref _bytesServed, count);
 }

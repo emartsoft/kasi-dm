@@ -30,3 +30,4 @@ As a process: `dotnet run --project tests/Kasi.TestServer -- 5080` (`KASI_TESTSE
 
 Gates nest: `/redirect/2/signed/files/a/10?exp=…`. HLS and DASH segments are opaque deterministic bytes, not decodable media.
 HTTP/2 and TLS are available through `TestServerOptions`. Not yet served: live (no `ENDLIST`) playlists and SegmentBase addressing.
+`TestServerMetrics` reports request counts and generated file bytes served, including the requested slice of a range response.

@@ -187,7 +187,13 @@ public static class PathGates
         var time = context.RequestServices.GetRequiredService<TimeProvider>();
         var valid = long.TryParse(context.Request.Query["exp"], NumberStyles.None, CultureInfo.InvariantCulture, out var exp)
             && exp > time.GetUtcNow().ToUnixTimeSeconds();
-        return valid ? Unwrap(context, rest.Value) : Respond(context, StatusCodes.Status403Forbidden);
+        if (valid)
+        {
+            return Unwrap(context, rest.Value);
+        }
+
+        context.RequestServices.GetRequiredService<TestServerMetrics>().SignedLinkRejected();
+        return Respond(context, StatusCodes.Status403Forbidden);
     }
 
     private static Outcome Unwrap(HttpContext context, string? target)

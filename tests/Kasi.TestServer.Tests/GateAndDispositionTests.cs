@@ -49,6 +49,24 @@ public sealed class GateAndDispositionTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("TC", "TC-ENG-018")]
+    public async Task Metrics_count_only_the_file_bytes_served_for_a_range()
+    {
+        using var client = TestClient.Create(_host);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/files/range-metrics/1024");
+        request.Headers.Range = new RangeHeaderValue(100, 199);
+
+        using var response = await client.SendAsync(request, TestClient.Ct);
+        (await response.Content.ReadAsByteArrayAsync(TestClient.Ct)).Should().HaveCount(100);
+        _host.Metrics.RequestsServed.Should().Be(1);
+        _host.Metrics.BytesServed.Should().Be(100);
+
+        _host.ResetMetrics();
+        _host.Metrics.RequestsServed.Should().Be(0);
+        _host.Metrics.BytesServed.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Basic_auth_rejects_missing_and_wrong_credentials_and_accepts_the_right_ones()
     {
         using var client = TestClient.Create(_host);

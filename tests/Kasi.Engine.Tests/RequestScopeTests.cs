@@ -104,4 +104,27 @@ public sealed class RequestScopeTests
         request.Headers.Contains("Cookie").Should().BeFalse();
         request.Headers.GetValues("Accept-Language").Should().ContainSingle().Which.Should().Be("en");
     }
+
+    [Fact]
+    [Trait("TC", "TC-ENG-018")]
+    public void A_saved_secret_remains_bound_to_its_old_origin_after_a_link_refresh()
+    {
+        var oldOrigin = new Uri("https://old.example.com/");
+        var scope = new RequestScope(
+            new Uri("https://new.example.com/file"),
+            requestHeaders: null,
+            new JobSecret
+            {
+                SensitiveOrigin = oldOrigin,
+                Headers = new Dictionary<string, string> { ["Authorization"] = "old-secret" },
+            });
+        using var newRequest = new HttpRequestMessage(HttpMethod.Get, "https://new.example.com/file");
+        using var oldRequest = new HttpRequestMessage(HttpMethod.Get, "https://old.example.com/file");
+
+        scope.Apply(newRequest);
+        scope.Apply(oldRequest);
+
+        newRequest.Headers.Contains("Authorization").Should().BeFalse();
+        oldRequest.Headers.GetValues("Authorization").Should().ContainSingle().Which.Should().Be("old-secret");
+    }
 }
