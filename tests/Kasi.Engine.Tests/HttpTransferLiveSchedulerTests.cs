@@ -77,7 +77,9 @@ public sealed class HttpTransferLiveSchedulerTests : IAsyncLifetime
         // The takeover rule itself (carve after 10 s below 30% of the median) is proven in the scheduler simulation tests;
         // this live run proves its effect end to end: the aggregate rate stays near what the seven healthy connections can
         // deliver (about 7 MB/s) instead of collapsing onto the 50 KB/s connection, so the file finishes in a bounded time
-        // (with the takeover disabled the same run takes over a minute, so this test does notice a regression).
+        // (with the takeover disabled the same run takes over a minute, so this test does notice a regression). The bounds are
+        // relative to the rate this run reaches before the window opens, so a slow or busy runner scales them instead of
+        // failing them.
         var ct = TestContext.Current.CancellationToken;
         const string seed = "live-slow-lane";
         const int size = 128 * 1024 * 1024;
@@ -113,7 +115,6 @@ public sealed class HttpTransferLiveSchedulerTests : IAsyncLifetime
         (await Sha256FileAsync(completed.FinalPath, ct)).Should().Be(GeneratedContent.Sha256Hex(seed, size));
         _host.Metrics.AbortedRequests.Should().Be(0);
         timer.Elapsed.Should().BeGreaterThan(TimeSpan.FromSeconds(10), "the run must last past the 10 s slow-lane window");
-        timer.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(45), "seven healthy connections at 1 MB/s need about 19 s; a lane stuck at 50 KB/s would take minutes");
 
         (double Seconds, long Written)[] samples;
         lock (gate)
@@ -121,11 +122,18 @@ public sealed class HttpTransferLiveSchedulerTests : IAsyncLifetime
             samples = [.. updates];
         }
 
+        double Rate(double from, double to)
+        {
+            var window = samples.Where(sample => sample.Seconds >= from && sample.Seconds <= to).ToArray();
+            window.Length.Should().BeGreaterThan(4, $"the period {from}-{to} s must be sampled");
+            return (window[^1].Written - window[0].Written) / (window[^1].Seconds - window[0].Seconds);
+        }
+
         var elapsed = timer.Elapsed.TotalSeconds;
-        var window = samples.Where(sample => sample.Seconds >= 10 && sample.Seconds <= elapsed - 2).ToArray();
-        window.Length.Should().BeGreaterThan(4, "the window after the slow-lane threshold must be sampled");
-        var rate = (window[^1].Written - window[0].Written) / (window[^1].Seconds - window[0].Seconds);
-        rate.Should().BeGreaterThan(4 * 1024 * 1024, "after the window the healthy connections keep carrying the download (about 7 MB/s expected)");
+        var before = Rate(3, 9); // all connections up, the slow lane not yet carved: about 7 MB/s on a developer machine
+        var after = Rate(10, elapsed - 2);
+        after.Should().BeGreaterThan(before * 0.5, "after the window the healthy connections keep carrying the download");
+        elapsed.Should().BeLessThan(size / before * 2 + 10, "the run takes about size over the healthy rate; a lane stuck at 50 KB/s would take several times that");
     }
 
     [Fact]

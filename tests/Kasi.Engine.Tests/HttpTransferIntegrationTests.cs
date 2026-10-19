@@ -308,13 +308,23 @@ public sealed class HttpTransferIntegrationTests : IAsyncLifetime
         var ct = TestContext.Current.CancellationToken;
         const string seed = "runner-disk-full";
         const int size = 8 * 1024 * 1024;
+        var calls = 0;
         var injected = 0;
         var options = Options(initialConnections: 4) with
         {
-            WriteFaultInjector = (offset, _) =>
-                offset >= 256 * 1024 && Interlocked.Exchange(ref injected, 1) == 0
-                    ? new IOException("simulated disk full", unchecked((int)0x80070070))
-                    : null,
+            // The fifth write fails, after a pause that lets the four before it land and advance their cursors. Failing on the
+            // first write at a high offset instead is often another worker's first buffer, before anything is flushed, and
+            // BytesFlushed is then zero on a slow runner.
+            WriteFaultInjector = (_, _) =>
+            {
+                if (Interlocked.Increment(ref calls) <= 4 || Interlocked.Exchange(ref injected, 1) != 0)
+                {
+                    return null;
+                }
+
+                Thread.Sleep(250);
+                return new IOException("simulated disk full", unchecked((int)0x80070070));
+            },
         };
 
         var outcome = await new HttpTransferRunner().DownloadAsync(
