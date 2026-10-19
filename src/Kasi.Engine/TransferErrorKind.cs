@@ -18,6 +18,9 @@ public enum TransferErrorKind
     /// <summary>A part-file or write operation failed for a reason other than no space.</summary>
     DiskError,
 
+    /// <summary>The sealed part file did not match the supplied checksum; it is kept for inspection.</summary>
+    VerificationFailed,
+
     /// <summary>The server returned an HTTP status the transfer loop cannot use.</summary>
     HttpStatusError,
 
