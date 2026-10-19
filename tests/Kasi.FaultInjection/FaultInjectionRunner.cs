@@ -132,7 +132,7 @@ public static class FaultInjectionRunner
 
             var before = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
             var servedBefore = harness.Host.Metrics.BytesServed;
-            File.Delete(marker);
+            await DeleteWithRetryAsync(marker, cancellationToken).ConfigureAwait(false);
             using var child = harness.StartChild(job.Id, options.BytesPerSecond, commitKill ? ChildEnvironment.CommitKill(marker, random.Next(1, 6)) : null);
             var hit = commitKill
                 ? await WaitForMarkerOrExitAsync(child, marker, _commitWait, cancellationToken).ConfigureAwait(false)
@@ -250,6 +250,23 @@ public static class FaultInjectionRunner
         }
     }
 
+
+    /// <summary>The killed child may still hold the marker for a moment while Windows closes its handles.</summary>
+    private static async Task DeleteWithRetryAsync(string path, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Delete(path);
+                return;
+            }
+            catch (IOException) when (attempt < 100)
+            {
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
 
     /// <summary>
     /// True when the marker appeared (the child is stuck inside a commit) or when the wait ran out (the caller then kills the child and
