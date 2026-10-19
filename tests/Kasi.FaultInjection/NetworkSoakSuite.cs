@@ -165,7 +165,7 @@ internal static class NetworkSoakSuite
         while (!child.HasExited)
         {
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
-            var job = await harness.Jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+            var job = await harness.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
             if (job is null || job.State != JobState.Downloading || job.DoneBytes != lastDone)
             {
                 lastDone = job?.DoneBytes ?? -1;
@@ -182,7 +182,7 @@ internal static class NetworkSoakSuite
     }
 
     private static async Task<bool> IsCompletedAsync(FaultHarness harness, JobId jobId, CancellationToken cancellationToken) =>
-        (await harness.Jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false))?.State == JobState.Completed;
+        (await harness.GetJobAsync(jobId, cancellationToken).ConfigureAwait(false))?.State == JobState.Completed;
 
     /// <summary>A throttled window, a reset and a partition, one after the other, until the job is over; returns why it stopped early, if it did.</summary>
     private static async Task<string?> DisturbAsync(ToxiproxyClient client, string proxy, JobPlan plan, CancellationToken cancellationToken)
