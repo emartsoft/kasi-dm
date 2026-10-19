@@ -664,7 +664,7 @@ public sealed class HttpTransferRunner
                     break;
                 }
 
-                var read = await ReadBodyAsync(probe.Body, window, stallGuard, cancellationToken).ConfigureAwait(false);
+                var read = await ReadBodyAsync(probe.Body, window, stallGuard, options, cancellationToken).ConfigureAwait(false);
                 if (read == 0)
                 {
                     break;
@@ -1154,7 +1154,7 @@ public sealed class HttpTransferRunner
             using var buffer = new PooledPartWriteBuffer(writer, options.WriteBufferMaxAge, time);
             buffer.BeginLease(lease.Start, lease.End);
             using var stallGuard = new StallGuard(time, options.RetryPolicy.ReadStallTimeout, cancellationToken);
-            await ReadLeaseAsync(lease, body, buffer, scheduler, options.SupersededLeaseDrainTimeout, progress, stallGuard, cancellationToken).ConfigureAwait(false);
+            await ReadLeaseAsync(lease, body, buffer, scheduler, options, progress, stallGuard, cancellationToken).ConfigureAwait(false);
             completed = true;
         }
         catch
@@ -1184,7 +1184,7 @@ public sealed class HttpTransferRunner
         Stream body,
         PooledPartWriteBuffer buffer,
         SegmentScheduler scheduler,
-        TimeSpan drainTimeout,
+        HttpTransferOptions options,
         LeaseProgress progress,
         StallGuard stallGuard,
         CancellationToken cancellationToken)
@@ -1199,10 +1199,10 @@ public sealed class HttpTransferRunner
             }
 
             int read;
-            stallGuard.Reset();
             try
             {
-                read = await body.ReadAsync(window, stallGuard.Token).ConfigureAwait(false);
+                read = await ReadLimitedAsync(body, window, stallGuard, options.BandwidthLimiter, options.JobBandwidthLimit, cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stallGuard.Stalled)
             {
@@ -1235,7 +1235,8 @@ public sealed class HttpTransferRunner
                 {
                     buffer.DropSuperseded();
                     scheduler.CompleteLease(lease.LeaseId);
-                    await DrainAsync(body, drainTimeout, cancellationToken).ConfigureAwait(false);
+                    await DrainAsync(body, options.SupersededLeaseDrainTimeout, options.BandwidthLimiter, options.JobBandwidthLimit, cancellationToken)
+                        .ConfigureAwait(false);
                     return;
                 }
             }
@@ -1361,14 +1362,19 @@ public sealed class HttpTransferRunner
         }
     }
 
-    private static async Task DrainAsync(Stream body, TimeSpan timeout, CancellationToken cancellationToken)
+    private static async Task DrainAsync(
+        Stream body,
+        TimeSpan timeout,
+        BandwidthLimiter? limiter,
+        BandwidthLimiter.JobBandwidthLimit? jobLimit,
+        CancellationToken cancellationToken)
     {
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
         var buffer = ArrayPool<byte>.Shared.Rent(8 * 1024);
         try
         {
-            while (await body.ReadAsync(buffer.AsMemory(), timeoutSource.Token).ConfigureAwait(false) > 0)
+            while (await ReadLimitedAsync(body, buffer.AsMemory(), null, limiter, jobLimit, timeoutSource.Token).ConfigureAwait(false) > 0)
             {
             }
         }
@@ -1457,12 +1463,17 @@ public sealed class HttpTransferRunner
         }
     }
 
-    private static async ValueTask<int> ReadBodyAsync(Stream body, Memory<byte> buffer, StallGuard guard, CancellationToken cancellationToken)
+    private static async ValueTask<int> ReadBodyAsync(
+        Stream body,
+        Memory<byte> buffer,
+        StallGuard guard,
+        HttpTransferOptions options,
+        CancellationToken cancellationToken)
     {
-        guard.Reset();
         try
         {
-            return await body.ReadAsync(buffer, guard.Token).ConfigureAwait(false);
+            return await ReadLimitedAsync(body, buffer, guard, options.BandwidthLimiter, options.JobBandwidthLimit, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (guard.Stalled && !cancellationToken.IsCancellationRequested)
         {
@@ -1471,6 +1482,30 @@ public sealed class HttpTransferRunner
         catch (Exception ex) when (ex is IOException or HttpRequestException)
         {
             throw new TransferException(NetworkFailure(ex));
+        }
+    }
+
+    private static async ValueTask<int> ReadLimitedAsync(
+        Stream body,
+        Memory<byte> buffer,
+        StallGuard? guard,
+        BandwidthLimiter? limiter,
+        BandwidthLimiter.JobBandwidthLimit? jobLimit,
+        CancellationToken cancellationToken)
+    {
+        var requested = Math.Min(buffer.Length, BandwidthLimiter.MaximumReadBytes);
+        var reserved = limiter is null ? requested : await limiter.AcquireAsync(requested, jobLimit, cancellationToken).ConfigureAwait(false);
+        var read = 0;
+        try
+        {
+            guard?.Reset();
+            read = await body.ReadAsync(buffer[..reserved], guard?.Token ?? cancellationToken).ConfigureAwait(false);
+            return read;
+        }
+        finally
+        {
+            guard?.Pause();
+            limiter?.ReturnUnused(reserved - read, jobLimit);
         }
     }
 

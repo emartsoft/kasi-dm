@@ -17,6 +17,12 @@ public sealed record HttpTransferOptions
 
     public TimeProvider? TimeProvider { get; init; }
 
+    /// <summary>Shared global byte budget; pass the same instance to concurrent jobs and future torrent traffic.</summary>
+    public BandwidthLimiter? BandwidthLimiter { get; init; }
+
+    /// <summary>Optional job byte budget created by <see cref="BandwidthLimiter.CreateJobLimit"/>.</summary>
+    public BandwidthLimiter.JobBandwidthLimit? JobBandwidthLimit { get; init; }
+
     public TimeSpan WriteBufferMaxAge { get; init; } = TimeSpan.FromMilliseconds(500);
 
     public TimeSpan SupersededLeaseDrainTimeout { get; init; } = TimeSpan.FromSeconds(15);
@@ -73,6 +79,10 @@ public sealed record HttpTransferOptions
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(CheckpointInterval, TimeSpan.Zero);
         RetryPolicy.Validate();
         SchedulerOptions.Validate();
+        if (JobBandwidthLimit is not null && (BandwidthLimiter is null || !BandwidthLimiter.Owns(JobBandwidthLimit)))
+        {
+            throw new ArgumentException("The job bandwidth budget must belong to the supplied bandwidth limiter.");
+        }
         if (InitialUrl is not null && (!InitialUrl.IsAbsoluteUri || InitialUrl.Scheme is not ("http" or "https")))
         {
             throw new ArgumentException("The initial URL must be an absolute HTTP or HTTPS URL.");
