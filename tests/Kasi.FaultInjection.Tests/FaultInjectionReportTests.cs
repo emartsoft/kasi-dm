@@ -52,4 +52,14 @@ public sealed class FaultInjectionReportTests
         report.Passed.Should().BeFalse();
         report.ToMarkdown().Should().Contain("FAIL").And.Contain("iteration 0: integrity_check returned 'bad'").And.Contain("--scenario kill --seed 7");
     }
+
+    [Fact]
+    public void A_suite_that_could_not_run_is_reported_as_skipped_and_is_not_a_pass()
+    {
+        var report = FaultInjectionReport.NotRun("disk-pressure", 5, "needs Administrator rights");
+
+        report.Skipped.Should().BeTrue();
+        report.Passed.Should().BeFalse();
+        report.ToMarkdown().Should().Contain("SKIPPED").And.Contain("needs Administrator rights");
+    }
 }

@@ -51,6 +51,31 @@ static async Task<int> RunChildAsync(string database, JobId jobId, long bytesPer
 
     checkpoints.Start();
     await using var engine = new DownloadEngine(jobs, segments, checkpoints, new BandwidthLimiter(bytesPerSecond));
+
+    // Storage stall: delay a few part-file writes and arm a short read-stall timeout. The stall guard must only watch the network
+    // read, so a slow write must not cost a retry.
+    if (int.TryParse(Environment.GetEnvironmentVariable(ChildEnvironment.StallMilliseconds), NumberStyles.Integer, CultureInfo.InvariantCulture, out var stallMs)
+        && int.TryParse(Environment.GetEnvironmentVariable(ChildEnvironment.StallCount), NumberStyles.Integer, CultureInfo.InvariantCulture, out var stallCount)
+        && int.TryParse(Environment.GetEnvironmentVariable(ChildEnvironment.ReadStallMilliseconds), NumberStyles.Integer, CultureInfo.InvariantCulture, out var readStallMs))
+    {
+        var writes = 0;
+        engine.OptionsDecorator = (_, options) => options with
+        {
+            RetryPolicy = options.RetryPolicy with { ReadStallTimeout = TimeSpan.FromMilliseconds(readStallMs) },
+            WriteFaultInjector = (_, _) =>
+            {
+                // let the transfer settle first, then stall the next few writes
+                var n = Interlocked.Increment(ref writes);
+                if (n > 3 && n <= 3 + stallCount)
+                {
+                    Thread.Sleep(stallMs);
+                }
+
+                return null;
+            },
+        };
+    }
+
     await engine.StartAsync();
     var job = await jobs.GetAsync(jobId);
     switch (job?.State)

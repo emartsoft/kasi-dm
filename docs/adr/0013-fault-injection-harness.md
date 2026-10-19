@@ -1,6 +1,6 @@
 # 0013. Fault-injection harness and nightly reporting
 
-- Status: Accepted incrementally for M1.14 (14a landed first; 14b to 14d extend it)
+- Status: Accepted incrementally for M1.14 (14a and 14b landed; 14c and 14d extend it)
 - Date: 2026-10-19
 - Requirements: KASI-RES-001 to KASI-RES-006, KASI-NFR-007, KASI-NFR-009
 - Related: ADR 0012, TPL 7
@@ -37,6 +37,26 @@ vary. A failure prints the seed and the command that replays the schedule, and t
 
 **Defaults belong to the suite.** `--iterations`, `--size` and `--rate` are unset until a suite applies its default (200 kills,
 100 commit kills, 4 GiB at 16 MiB/s), so a value the caller passes is never replaced.
+
+## Decision (14b)
+
+**Server mutation.** One job per iteration on `/mutable/{id}`, with a seeded shape: a change between sessions, in the middle of a
+session, or both (two changes, the engine's cap). A change between sessions meets a fresh probe and must be detected. A change
+in the middle of a session is seen only by the next lease request, so when every lease was already open the finished file is
+the old version, whole. The pass rule is therefore not "every change detected" but "never a mix": the finished file equals the
+content version the job last restarted on (`1 + RestartCount`), and a between-session change always counts.
+
+**Storage stall.** The child delays two part-file writes by 5 s (`WriteFaultInjector`) with a 1 s read-stall timeout and one
+connection. A guard that fires during a write shows as bytes served twice, so the suite fails on bytes served beyond the file
+size as well as on aborted requests. Removing the `guard.Pause()` calls from the read path makes it fail.
+
+**Disk pressure.** A 2 GiB expandable VHDX mounted in a folder, with a filler file that leaves half of what the download needs.
+The job must be Paused with `NotEnoughSpace`, the database must pass `integrity_check`, and a resume after the filler is
+deleted must finish with the right SHA-256. It needs Administrator rights; without them the report is marked skipped (exit
+code 0, but not a pass) so the nightly summary shows it.
+
+**Child hooks.** The child reads its test hooks from environment variables (`ChildEnvironment`); the command line stays
+`<database> <job id> <bytes/s>`.
 
 ## Consequences
 
