@@ -57,6 +57,7 @@ public static class FaultInjectionRunner
             "server-mutation" => await ServerMutationSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
             "storage-stall" => await StorageStallSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
             "disk-pressure" => await DiskPressureSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
+            "network-soak" => await NetworkSoakSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
             _ => await RunKillLoopAsync(harness, options, cancellationToken).ConfigureAwait(false),
         };
         return report with { Replay = options.ToCommandLine() };

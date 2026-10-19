@@ -41,8 +41,11 @@ internal sealed class FaultHarness : IAsyncDisposable
         return new FaultHarness(root, database, host, new JobRepository(factory));
     }
 
-    /// <summary>A queued job for <paramref name="path"/> on the test server; <paramref name="folder"/> defaults to a folder under the root.</summary>
-    public Job NewJob(string path, string fileName, int connections, string? folder = null)
+    /// <summary>
+    /// A queued job for <paramref name="path"/> on the test server, or on <paramref name="server"/> when the job should reach it through
+    /// a proxy; <paramref name="folder"/> defaults to a folder under the root.
+    /// </summary>
+    public Job NewJob(string path, string fileName, int connections, string? folder = null, Uri? server = null)
     {
         folder ??= Path.Combine(Root, "downloads");
         Directory.CreateDirectory(folder);
@@ -50,7 +53,7 @@ internal sealed class FaultHarness : IAsyncDisposable
         {
             Id = JobId.New(TimeProvider.System),
             Kind = JobKind.Http,
-            Url = new Uri(Host.BaseAddress, path).AbsoluteUri,
+            Url = new Uri(server ?? Host.BaseAddress, path).AbsoluteUri,
             FileName = fileName,
             Folder = folder,
             QueueId = 1,

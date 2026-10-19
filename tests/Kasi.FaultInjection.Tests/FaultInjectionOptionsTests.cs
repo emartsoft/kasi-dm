@@ -22,6 +22,7 @@ public sealed class FaultInjectionOptionsTests
     [InlineData("server-mutation", 50, 24L * 1024 * 1024, 4)]
     [InlineData("disk-pressure", 20, 512L * 1024 * 1024, 4)]
     [InlineData("storage-stall", 10, 32L * 1024 * 1024, 1)]
+    [InlineData("network-soak", 50, 64L * 1024 * 1024, 4)]
     public void Every_suite_has_the_count_of_the_test_plan_and_its_own_size_and_connections(string scenario, int iterations, long size, int connections)
     {
         var options = FaultInjectionOptions.Parse(["--scenario", scenario]).Validate();

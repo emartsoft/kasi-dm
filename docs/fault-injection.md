@@ -22,11 +22,14 @@ dotnet run --project tests/Kasi.FaultInjection -c Release -- --scenario storage-
 # 20 rounds on a full 2 GiB VHDX (run elevated: it mounts a volume)
 dotnet run --project tests/Kasi.FaultInjection -c Release -- --scenario disk-pressure --report artifacts/disk-pressure/fault-report.json
 
+# 50 jobs through Toxiproxy over up to 2 hours (needs a daemon: see below)
+dotnet run --project tests/Kasi.FaultInjection -c Release -- --scenario network-soak --toxiproxy 127.0.0.1:8474 --report artifacts/network-soak/fault-report.json
+
 # a short local run
 dotnet run --project tests/Kasi.FaultInjection -c Release -- --iterations 10 --size 67108864 --rate 8388608 --max-kill-seconds 3
 ```
 
-Options: `--scenario`, `--iterations`, `--seed`, `--size`, `--connections`, `--rate`, `--max-kill-seconds`, `--vhd-mib`, `--free-after-seconds`, `--report`. Size, rate and connections default per suite (see `--help`). The suites
+Options: `--scenario`, `--iterations`, `--seed`, `--size`, `--connections`, `--rate`, `--max-kill-seconds`, `--vhd-mib`, `--free-after-seconds`, `--toxiproxy`, `--duration-seconds`, `--parallel`, `--report`. Size, rate and connections default per suite (see `--help`). The suites
 need about 4 GiB of free disk space at the default size. The process exits non-zero when any iteration fails.
 
 ## What a pass means
@@ -41,6 +44,12 @@ segments' `written` bytes. The data the next run had to fetch again stays within
 - **storage-stall:** the child delays two part-file writes by 5 s with a 1 s read-stall timeout. The stall guard watches only the network read, so the download must finish with no aborted request and no byte fetched twice.
 - **disk-pressure:** the download goes to a VHDX mounted in a folder that has half the free space the file needs. The job must pause with `NotEnoughSpace`, leave the database consistent, and finish after the filler file is deleted (30 s later by default). Mounting needs Administrator rights; without them the report says **SKIPPED** and the exit code is 0. A skip is not a pass.
 
+- **network-soak:** every job reaches the test server through its own Toxiproxy proxy and meets a schedule drawn from the seed: latency of 100 to 500 ms with jitter for the whole run, a 20 s window at 64 KiB/s, a connection reset and a 30 s partition. Jobs start spread over `--duration-seconds` (default 2 h), `--parallel` (default 10) at a time. A child that ends without a finished job is started again, as a user would resume it, up to five times. Pass: every job finishes with the right SHA-256 and none sits in `Downloading` with no progress for two minutes. Without a daemon the report says **SKIPPED**.
+
+### Running a Toxiproxy daemon
+
+Toxiproxy (MIT) is a separate server, not a dependency of the solution. Download the release for your platform from the project's GitHub releases, check its SHA-256 against the release's checksum file, and start it (`toxiproxy-server`, REST API on `127.0.0.1:8474`). The nightly workflow does the same with a pinned version. `ToxiproxyClient` is plain `HttpClient` calls and its unit tests need no daemon.
+
 ## Fast versions in pull requests
 
-`Kasi.FaultInjection.Tests` runs the same code with three kills on 16 MiB downloads (`KillLoopSmokeTests`) and small runs of the other suites (`FaultSuiteSmokeTests`); the disk-pressure test skips itself unless the process is elevated.
+`Kasi.FaultInjection.Tests` runs the same code with three kills on 16 MiB downloads (`KillLoopSmokeTests`) and small runs of the other suites (`FaultSuiteSmokeTests`); the disk-pressure test skips itself unless the process is elevated, and the soak test unless `KASI_TOXIPROXY` points at a daemon.
