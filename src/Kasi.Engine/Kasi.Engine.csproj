@@ -7,6 +7,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Kasi.Engine.Tests" />
     <ProjectReference Include="../Kasi.Core/Kasi.Core.csproj" />
+    <PackageReference Include="FluentFTP" />
   </ItemGroup>
 
 </Project>
