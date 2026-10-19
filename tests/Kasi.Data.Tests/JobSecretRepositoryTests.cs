@@ -60,6 +60,7 @@ public sealed class JobSecretRepositoryTests : IAsyncLifetime, IDisposable
         var blobText = Encoding.UTF8.GetString(payload);
         blobText.Should().NotContain("cookie-value");
         blobText.Should().NotContain("password-value");
+        blobText.Should().NotContain("proxy-password-value");
         blobText.Should().NotContain("header-value");
 
         byte[] plaintext;
@@ -84,6 +85,7 @@ public sealed class JobSecretRepositoryTests : IAsyncLifetime, IDisposable
             cookie.GetProperty("httpOnly").GetBoolean().Should().BeTrue();
             json.RootElement.GetProperty("headers").GetProperty("Authorization").GetString().Should().Be("header-value");
             json.RootElement.GetProperty("credentials").GetProperty("userName").GetString().Should().Be("alice");
+            json.RootElement.GetProperty("proxyCredentials").GetProperty("userName").GetString().Should().Be("proxy-alice");
             json.RootElement.GetProperty("sensitiveOrigin").GetString().Should().Be("https://example.com/");
         }
         finally
@@ -163,6 +165,7 @@ public sealed class JobSecretRepositoryTests : IAsyncLifetime, IDisposable
         }],
         Headers = new Dictionary<string, string> { ["Authorization"] = "header-value" },
         Credentials = new HttpCredentials { UserName = "alice", Password = "password-value" },
+        ProxyCredentials = new HttpCredentials { UserName = "proxy-alice", Password = "proxy-password-value" },
         SensitiveOrigin = new Uri("https://example.com/"),
     };
 }

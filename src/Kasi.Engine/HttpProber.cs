@@ -158,9 +158,11 @@ public sealed class HttpProber
             catch (HttpRequestException ex)
             {
                 response?.Dispose();
-                var kind = IsCertificateFailure(ex)
-                    ? ProbeErrorKind.CertificateError
-                    : ProbeErrorKind.TransientError;
+                var kind = ex.StatusCode == HttpStatusCode.ProxyAuthenticationRequired
+                    ? ProbeErrorKind.AuthRequired
+                    : IsCertificateFailure(ex)
+                        ? ProbeErrorKind.CertificateError
+                        : ProbeErrorKind.TransientError;
                 return new ProbeFailure(
                     kind,
                     $"HTTP request failed while probing '{Redact.Url(currentUrl.AbsoluteUri)}': {DescribeFailure(ex)}",

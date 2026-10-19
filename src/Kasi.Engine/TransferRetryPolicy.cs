@@ -117,7 +117,7 @@ public sealed record TransferRetryPolicy
             429 => TransferRetryClass.Throttled,
             503 => retryAfter is null ? TransferRetryClass.Transient : TransferRetryClass.Throttled,
             500 or 502 or 504 => TransferRetryClass.Transient,
-            401 or 403 => TransferRetryClass.AuthRequired,
+            401 or 403 or 407 => TransferRetryClass.AuthRequired,
             404 or 410 => TransferRetryClass.Permanent,
             >= 500 => TransferRetryClass.Transient,
             _ => TransferRetryClass.Permanent,

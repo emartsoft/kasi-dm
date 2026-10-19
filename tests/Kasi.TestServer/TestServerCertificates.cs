@@ -43,7 +43,7 @@ internal sealed class TestServerCertificates : IDisposable
 
         var server = mode switch
         {
-            TestServerTlsMode.Valid => CreateLeaf(root, notBefore, notAfter, "localhost", dnsNames: ["localhost"], includeLoopbackIp: true),
+            TestServerTlsMode.Valid => CreateLeaf(root, notBefore, notAfter, "localhost", dnsNames: ["localhost", "kasi-origin.test"], includeLoopbackIp: true),
             TestServerTlsMode.Expired => CreateLeaf(root, now.AddDays(-2), now.AddDays(-1), "localhost", dnsNames: ["localhost"], includeLoopbackIp: true),
             TestServerTlsMode.WrongHost => CreateLeaf(root, notBefore, notAfter, "wrong.example.test", dnsNames: ["wrong.example.test"], includeLoopbackIp: false),
             TestServerTlsMode.SelfSigned => CreateSelfSignedLeaf(notBefore, notAfter, "localhost", dnsNames: ["localhost"], includeLoopbackIp: true),

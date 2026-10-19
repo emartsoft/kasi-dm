@@ -11,6 +11,9 @@ public sealed record JobSecret
 
     public HttpCredentials? Credentials { get; init; }
 
+    /// <summary>Proxy authentication, kept separate from credentials for the origin server.</summary>
+    public HttpCredentials? ProxyCredentials { get; init; }
+
     /// <summary>Origin that owns captured headers and credentials; retained when a refreshed URL changes origin.</summary>
     public Uri? SensitiveOrigin { get; init; }
 
