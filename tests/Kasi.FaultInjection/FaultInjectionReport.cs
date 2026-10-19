@@ -27,14 +27,14 @@ public sealed record FaultInjectionReport(
     string? FinalSha256,
     TimeSpan Duration,
     string? Error,
-    IReadOnlyList<FaultIterationResult> Results)
+    IReadOnlyList<FaultIterationResult> Results,
+    string? Replay = null)
 {
     public bool Passed => Failed == 0 && Error is null && ChecksumVerified;
 
+    /// <summary>The arguments that replay this schedule: every option that shapes it, not only the seed.</summary>
     public string ToCommandLine() =>
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"--scenario {Scenario} --seed {Seed} --iterations {Math.Max(Iterations, 1)}");
+        Replay ?? string.Create(CultureInfo.InvariantCulture, $"--scenario {Scenario} --seed {Seed} --iterations {Math.Max(Iterations, 1)}");
 
     /// <summary>The summary a person reads first: the verdict, the counters and every failed iteration.</summary>
     public string ToMarkdown()

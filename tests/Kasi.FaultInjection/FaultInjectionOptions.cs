@@ -36,6 +36,11 @@ public sealed record FaultInjectionOptions
 
     public long BytesPerSecond => Rate ?? DefaultRate;
 
+    /// <summary>The command line that repeats this run's schedule: the seed and everything that changes kill times or download sizes.</summary>
+    public string ToCommandLine() => string.Create(
+        CultureInfo.InvariantCulture,
+        $"--scenario {Scenario} --seed {Seed} --iterations {IterationCount} --size {DownloadSize} --rate {BytesPerSecond} --connections {Connections} --max-kill-seconds {MaxKillSeconds}");
+
     public static FaultInjectionOptions Parse(string[] args)
     {
         var options = new FaultInjectionOptions();

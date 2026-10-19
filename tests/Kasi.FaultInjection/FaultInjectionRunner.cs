@@ -47,7 +47,9 @@ public static class FaultInjectionRunner
     public static async Task<FaultInjectionReport> RunToReportAsync(FaultInjectionOptions options, CancellationToken cancellationToken = default)
     {
         await using var harness = await Harness.CreateAsync(cancellationToken).ConfigureAwait(false);
-        return await RunKillLoopAsync(harness, options.Validate(), cancellationToken).ConfigureAwait(false);
+        options = options.Validate();
+        var report = await RunKillLoopAsync(harness, options, cancellationToken).ConfigureAwait(false);
+        return report with { Replay = options.ToCommandLine() };
     }
 
     /// <summary>
@@ -290,7 +292,10 @@ public static class FaultInjectionRunner
         }
     }
 
-    /// <summary>True when the marker appeared (the child is stuck inside a commit); false when the child ended first or the wait ran out.</summary>
+    /// <summary>
+    /// True when the marker appeared (the child is stuck inside a commit) or when the wait ran out (the caller then kills the child and
+    /// the iteration reports the missing hook); false only when the child exited first without writing the marker.
+    /// </summary>
     private static async Task<bool> WaitForMarkerOrExitAsync(Process child, string marker, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = Stopwatch.StartNew();

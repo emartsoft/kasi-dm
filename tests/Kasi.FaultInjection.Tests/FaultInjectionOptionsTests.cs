@@ -17,6 +17,16 @@ public sealed class FaultInjectionOptionsTests
     }
 
     [Fact]
+    public void The_replay_command_carries_every_option_that_shapes_the_schedule()
+    {
+        var options = FaultInjectionOptions.Parse(["--seed", "9", "--size", "1024", "--rate", "2048", "--max-kill-seconds", "5"]).Validate();
+
+        var replay = options.ToCommandLine();
+        replay.Should().Contain("--seed 9").And.Contain("--size 1024").And.Contain("--max-kill-seconds 5");
+        FaultInjectionOptions.Parse(replay.Split(' ')).Validate().ToCommandLine().Should().Be(replay);
+    }
+
+    [Fact]
     public void Defaults_are_the_nightly_kill_loop()
     {
         var options = FaultInjectionOptions.Parse([]).Validate();
