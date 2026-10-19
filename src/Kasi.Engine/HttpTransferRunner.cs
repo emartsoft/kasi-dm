@@ -627,26 +627,32 @@ public sealed class HttpTransferRunner
 
         if (probe.TotalBytes is 0)
         {
-            var emptySeal = await writer.SealAsync(0, 0, cancellationToken).ConfigureAwait(false);
-            if (!emptySeal.IsSuccess)
+            TransferFailure? emptyFailure;
+            try
             {
-                return Failed(DiskFailure(emptySeal), fileName, 0, probe.ETag, probe.LastModified);
+                emptyFailure = await FinalizePartAsync(writer, 0, 0, options, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return Cancelled("The download was cancelled before it committed.", fileName, 0, probe.ETag, probe.LastModified);
             }
 
-            var emptyCommit = await writer.CommitAsync(options.OverwriteDestination, cancellationToken).ConfigureAwait(false);
-            return emptyCommit.IsSuccess
-                ? new TransferCompleted
-                {
-                    FinalUrl = probe.FinalUrl,
-                    FileName = fileName,
-                    FinalPath = finalPath,
-                    TotalBytes = 0,
-                    RangesSupported = false,
-                    Resumable = false,
-                    ETag = probe.ETag,
-                    LastModified = probe.LastModified,
-                }
-                : Failed(DiskFailure(emptyCommit), fileName, 0, probe.ETag, probe.LastModified);
+            if (emptyFailure is not null)
+            {
+                return Failed(emptyFailure, fileName, 0, probe.ETag, probe.LastModified);
+            }
+
+            return new TransferCompleted
+            {
+                FinalUrl = probe.FinalUrl,
+                FileName = fileName,
+                FinalPath = finalPath,
+                TotalBytes = 0,
+                RangesSupported = false,
+                Resumable = false,
+                ETag = probe.ETag,
+                LastModified = probe.LastModified,
+            };
         }
 
         using var buffer = new PooledPartWriteBuffer(writer, options.WriteBufferMaxAge, time);
@@ -692,16 +698,10 @@ public sealed class HttpTransferRunner
                 throw new TransferException(Protocol($"The server sent {readTotal} bytes but declared {expected}."));
             }
 
-            var seal = await writer.SealAsync(readTotal, readTotal, cancellationToken).ConfigureAwait(false);
-            if (!seal.IsSuccess)
+            var finalFailure = await FinalizePartAsync(writer, readTotal, readTotal, options, cancellationToken).ConfigureAwait(false);
+            if (finalFailure is not null)
             {
-                throw new TransferException(DiskFailure(seal));
-            }
-
-            var commit = await writer.CommitAsync(options.OverwriteDestination, cancellationToken).ConfigureAwait(false);
-            if (!commit.IsSuccess)
-            {
-                throw new TransferException(DiskFailure(commit));
+                throw new TransferException(finalFailure);
             }
 
             var total = probe.TotalBytes ?? readTotal;
@@ -928,26 +928,19 @@ public sealed class HttpTransferRunner
         }
 
         var snapshot = scheduler.GetSegmentsSnapshot();
-        DiskStatus seal;
-        DiskStatus commit;
+        TransferFailure? finalFailure;
         try
         {
-            seal = await writer.SealAsync(totalBytes, scheduler.TotalWritten, cancellationToken).ConfigureAwait(false);
-            if (!seal.IsSuccess)
-            {
-                return Failed(DiskFailure(seal), fileName, totalBytes, eTag, lastModified, snapshot.Sum(s => s.Written), snapshot);
-            }
-
-            commit = await writer.CommitAsync(options.OverwriteDestination, cancellationToken).ConfigureAwait(false);
+            finalFailure = await FinalizePartAsync(writer, totalBytes, scheduler.TotalWritten, options, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return await FailedSegmentedAsync(writer, scheduler, checkpoint, new TransferFailure(TransferErrorKind.Cancelled, "The download was cancelled before it committed."), fileName, totalBytes, eTag, lastModified).ConfigureAwait(false);
         }
 
-        if (!commit.IsSuccess)
+        if (finalFailure is not null)
         {
-            return Failed(DiskFailure(commit), fileName, totalBytes, eTag, lastModified, snapshot.Sum(s => s.Written), snapshot);
+            return Failed(finalFailure, fileName, totalBytes, eTag, lastModified, snapshot.Sum(s => s.Written), snapshot);
         }
 
         return new TransferCompleted
@@ -1473,6 +1466,43 @@ public sealed class HttpTransferRunner
         {
             // Best effort on the failure path; the part file is still preserved.
         }
+    }
+
+    private static async Task<TransferFailure?> FinalizePartAsync(
+        PartFileWriter writer,
+        long expectedLength,
+        long bytesWritten,
+        HttpTransferOptions options,
+        CancellationToken cancellationToken)
+    {
+        var seal = await writer.SealAsync(expectedLength, bytesWritten, cancellationToken).ConfigureAwait(false);
+        if (!seal.IsSuccess)
+        {
+            return DiskFailure(seal);
+        }
+
+        if (options.ExpectedChecksum is { } expected)
+        {
+            string computed;
+            try
+            {
+                computed = await ChecksumVerifier.ComputeAsync(writer.PartPath, expected.Algorithm, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return DiskFailure(DiskStatus.FromException(ex, writer.PartPath));
+            }
+
+            if (!string.Equals(expected.Hex, computed, StringComparison.OrdinalIgnoreCase))
+            {
+                return new TransferFailure(
+                    TransferErrorKind.VerificationFailed,
+                    $"Checksum mismatch: expected {expected.Hex.ToLowerInvariant()}, computed {computed}.");
+            }
+        }
+
+        var commit = await writer.CommitAsync(options.OverwriteDestination, cancellationToken).ConfigureAwait(false);
+        return commit.IsSuccess ? null : DiskFailure(commit);
     }
 
     private static async ValueTask<int> ReadBodyAsync(
