@@ -148,6 +148,12 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
         await TryCommitAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Test-only seam for the fault-injection harness (TC-RES-011): runs inside the open transaction, just before the commit,
+    /// so a test can kill the process or fail the commit at that exact point. Null in production.
+    /// </summary>
+    internal Func<Task>? BeforeCommit { get; set; }
+
     /// <summary>Commits the pending updates; returns null on success (or nothing to do) and the error otherwise, keeping the updates.</summary>
     private async Task<Exception?> TryCommitAsync()
     {
@@ -175,6 +181,11 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
                     "UPDATE job SET done_bytes = (SELECT COALESCE(SUM(written), 0) FROM segment WHERE job_id = @job) WHERE id = @job;",
                     new { job = job.ToString() },
                     transaction).ConfigureAwait(false);
+            }
+
+            if (BeforeCommit is { } hook)
+            {
+                await hook().ConfigureAwait(false);
             }
 
             await transaction.CommitAsync().ConfigureAwait(false);

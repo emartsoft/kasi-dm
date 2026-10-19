@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Kasi.Data.Tests" />
+    <InternalsVisibleTo Include="Kasi.FaultInjection" />
   </ItemGroup>
 
 </Project>

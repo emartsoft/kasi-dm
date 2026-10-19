@@ -154,6 +154,33 @@ public sealed class CheckpointWriterTests : IAsyncLifetime, IDisposable
         act.Should().Throw<ObjectDisposedException>();
     }
 
+    [Trait("TC", "TC-RES-011")]
+    [Fact]
+    public async Task The_before_commit_hook_runs_inside_the_open_transaction_and_a_failure_there_rolls_everything_back()
+    {
+        var inside = -1L;
+        _writer.BeforeCommit = async () =>
+        {
+            // another connection must not see the uncommitted update yet
+            inside = await WrittenAsync(_a, 0);
+            throw new InvalidOperationException("killed mid-commit");
+        };
+        _writer.Record(_a, 0, 400);
+        _writer.Record(_a, 1, 100);
+
+        _time.Advance(_interval);
+        await EventuallyAsync(() => _writer.FaultCount == 1);
+
+        inside.Should().Be(0);
+        (await WrittenAsync(_a, 0)).Should().Be(0, "the transaction was rolled back");
+        (await DoneBytesAsync(_a)).Should().Be(0);
+
+        _writer.BeforeCommit = null;
+        _time.Advance(_interval);
+        await EventuallyAsync(() => _writer.CommitCount == 1);
+        (await DoneBytesAsync(_a)).Should().Be(500, "the kept updates commit later");
+    }
+
     [Fact]
     public async Task A_failed_commit_keeps_the_updates_and_a_later_tick_commits_them()
     {
