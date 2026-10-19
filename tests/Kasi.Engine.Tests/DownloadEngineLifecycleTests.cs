@@ -422,6 +422,28 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Recovery_finalises_a_complete_part_left_in_Verifying()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root, startEngine: false);
+        var job = harness.NewJob("/files/recover-verifying/4", "recover-verifying.bin") with
+        {
+            State = JobState.Verifying,
+            TotalBytes = 4,
+            DoneBytes = 4,
+            ETag = "\"verifying\"",
+        };
+        await harness.Jobs.AddAsync(job, ct);
+        await harness.Segments.ReplaceAsync(job.Id, [new Segment(0, 0, 4, 4)], ct);
+        await File.WriteAllBytesAsync(Path.Combine(job.Folder, job.FileName + PartFileWriter.PartExtension), [9, 8, 7, 6], ct);
+
+        await harness.Engine.StartAsync(ct);
+
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
+        (await File.ReadAllBytesAsync(Path.Combine(job.Folder, job.FileName), ct)).Should().Equal(9, 8, 7, 6);
+    }
+
+    [Fact]
     public async Task Recovery_requeues_a_job_that_was_still_probing()
     {
         var ct = TestContext.Current.CancellationToken;

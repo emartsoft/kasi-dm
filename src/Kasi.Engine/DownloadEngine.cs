@@ -742,6 +742,23 @@ public sealed class DownloadEngine : IAsyncDisposable
         var segments = await _segments.LoadAsync(job.Id, cancellationToken).ConfigureAwait(false);
         if (File.Exists(partPath) && segments.Count > 0 && PartMatches(job, partPath, segments))
         {
+            if (job.State == JobState.Verifying && segments.All(s => s.IsComplete))
+            {
+                var outcome = await RunResumeAsync(job, segments, cancellationToken).ConfigureAwait(false);
+                if (outcome is TransferCompleted)
+                {
+                    await TransitionAsync(job.Id, JobState.Verifying, JobState.Completed, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    Publish(new JobProgressed(job.Id, job.TotalBytes ?? segments.Sum(s => s.Written), job.TotalBytes, 0));
+                }
+                else
+                {
+                    var message = outcome is TransferFailed failed ? failed.Detail : "Verification failed.";
+                    await TransitionAsync(job.Id, JobState.Verifying, JobState.Failed, message, cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+
+                return;
+            }
+
             await _jobs.ReconcileProgressAsync(job.Id, segments.Sum(s => s.Written), cancellationToken).ConfigureAwait(false);
             await TransitionAsync(
                 job.Id,
