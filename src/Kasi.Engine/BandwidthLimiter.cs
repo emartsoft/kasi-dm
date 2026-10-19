@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Kasi.Engine;
 
 /// <summary>
@@ -208,11 +210,11 @@ public sealed class BandwidthLimiter
 
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private static void ValidateRate(long? rate)
+    private static void ValidateRate(long? rate, [CallerArgumentExpression(nameof(rate))] string? paramName = null)
     {
         if (rate is <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(rate), "A bandwidth cap must be positive, or null for unlimited.");
+            throw new ArgumentOutOfRangeException(paramName, "A bandwidth cap must be positive, or null for unlimited.");
         }
     }
 

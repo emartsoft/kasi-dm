@@ -139,6 +139,18 @@ public sealed class BandwidthLimiterTests
     }
 
     [Fact]
+    public void A_bad_cap_names_the_parameter_of_the_method_that_was_called()
+    {
+        var limiter = new BandwidthLimiter();
+        var job = limiter.CreateJobLimit();
+
+        new Action(() => _ = new BandwidthLimiter(0)).Should().Throw<ArgumentOutOfRangeException>().Which.ParamName.Should().Be("globalBytesPerSecond");
+        new Action(() => limiter.SetGlobalRate(-1)).Should().Throw<ArgumentOutOfRangeException>().Which.ParamName.Should().Be("bytesPerSecond");
+        new Action(() => limiter.CreateJobLimit(0)).Should().Throw<ArgumentOutOfRangeException>().Which.ParamName.Should().Be("bytesPerSecond");
+        new Action(() => job.SetRate(0)).Should().Throw<ArgumentOutOfRangeException>().Which.ParamName.Should().Be("bytesPerSecond");
+    }
+
+    [Fact]
     public void Job_budget_must_belong_to_the_configured_limiter()
     {
         var otherJob = new BandwidthLimiter().CreateJobLimit(200_000);
