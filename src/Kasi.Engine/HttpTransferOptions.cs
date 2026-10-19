@@ -78,6 +78,9 @@ public sealed record HttpTransferOptions
 
     internal RequestScope? Scope { get; init; }
 
+    /// <summary>Called after the part file is sealed and before the published checksum is computed; the facade shows Verifying.</summary>
+    internal Func<Task>? BeforeVerifyAsync { get; init; }
+
     internal void Validate()
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(WriteBufferMaxAge, TimeSpan.Zero);

@@ -54,7 +54,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
             }
         };
 
-        await harness.Engine.StartJobAsync(job.Id, ct);
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
         await harness.Engine.StopAsync(ct);
         var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
         stored.Error.Should().BeNull($"the engine stored state {stored.State}");
@@ -87,7 +87,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
             }
         };
 
-        await harness.Engine.StartJobAsync(job.Id, ct);
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
 
         (await seen.Task.WaitAsync(TimeSpan.FromSeconds(10), ct)).Should().Be(JobState.Completed);
         await harness.Engine.StopAsync(ct);
@@ -102,7 +102,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.EventRaised += _ => throw new InvalidOperationException("subscriber failed");
 
-        await harness.Engine.StartJobAsync(job.Id, ct);
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
         await harness.Engine.StopAsync(ct);
 
         (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
@@ -134,7 +134,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob("/files/pause-resume/8388608", "pause-resume.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
 
         await harness.Engine.PauseJobAsync(job.Id, ct);
@@ -147,7 +147,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         File.Exists(Path.Combine(job.Folder, job.FileName + PartFileWriter.PartExtension)).Should().BeTrue();
 
         harness.Engine.OptionsDecorator = null;
-        await harness.Engine.ResumeJobAsync(job.Id, ct);
+        await harness.Engine.ResumeAndWaitAsync(job.Id, ct);
 
         (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
         (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
@@ -165,14 +165,14 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var space = new NoSpaceProvider();
         harness.Engine.OptionsDecorator = (_, options) => options with { SpaceProvider = space };
 
-        await harness.Engine.StartJobAsync(job.Id, ct);
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
 
         var paused = (await harness.Jobs.GetAsync(job.Id, ct))!;
         paused.State.Should().Be(JobState.Paused);
         paused.PauseReason.Should().Be(PauseReason.NotEnoughSpace);
 
         space.Full = false;
-        await harness.Engine.ResumeJobAsync(job.Id, ct);
+        await harness.Engine.ResumeAndWaitAsync(job.Id, ct);
 
         (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
         (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
@@ -189,7 +189,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob("/files/offline-resume/8388608", "offline-resume.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
 
         network.SetOnline(false);
@@ -216,7 +216,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob("/files/user-pause/8388608", "user-pause.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
 
         await harness.Engine.PauseJobAsync(job.Id, ct);
@@ -239,7 +239,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob("/files/cancel-job/8388608", "cancel-job.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
 
         await harness.Engine.CancelJobAsync(job.Id, cancellationToken: ct);
@@ -260,7 +260,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob($"/signed/files/refresh/4194304?exp={expiry}", "refresh.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
         await harness.Engine.PauseJobAsync(job.Id, ct);
         await download;
@@ -297,7 +297,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
             }
         };
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
         _host.Mutable.Change(id);
 
@@ -323,7 +323,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob($"/mutable/{id}", "engine-mutable-cap.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
@@ -351,7 +351,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var job = harness.NewJob("/files/shutdown-pause/8388608", "shutdown-pause.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
         harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
-        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
         await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
 
         await harness.Engine.StopAsync(ct);
@@ -477,6 +477,127 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
             DateTime.UtcNow.Should().BeBefore(deadline, "the condition should become true within 20 s");
             await Task.Delay(20, cancellationToken);
         }
+    }
+
+    [Fact]
+    public async Task Start_returns_while_the_job_runs_and_a_caller_token_does_not_govern_the_run()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/start-returns/8388608", "start-returns.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        using var shortLived = new CancellationTokenSource();
+
+        await harness.Engine.StartJobAsync(job.Id, shortLived.Token);
+        await shortLived.CancelAsync(); // the call is over; this must not pause the job
+
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().NotBe(JobState.Completed, "Start returned long before the slow download ended");
+        harness.Engine.OptionsDecorator = null;
+        await harness.Engine.PauseJobAsync(job.Id, ct);
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Paused);
+        (await harness.Jobs.GetAsync(job.Id, ct))!.PauseReason.Should().Be(PauseReason.UserRequested);
+        await harness.Engine.ResumeAndWaitAsync(job.Id, ct);
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
+    }
+
+    [Fact]
+    public async Task A_new_job_must_be_queued_with_no_progress()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/bad-add/1048576", "bad-add.bin");
+
+        var downloading = async () => await harness.Engine.AddJobAsync(job with { State = JobState.Downloading }, cancellationToken: ct);
+        var progressed = async () => await harness.Engine.AddJobAsync(job with { DoneBytes = 10 }, cancellationToken: ct);
+
+        await downloading.Should().ThrowAsync<ArgumentException>();
+        await progressed.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task An_authentication_failure_pauses_with_its_own_reason()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/auth/basic/files/needs-login/1048576", "needs-login.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Paused);
+        stored.PauseReason.Should().Be(PauseReason.AuthRequired);
+    }
+
+    [Fact]
+    public async Task A_running_job_reports_progress_and_enters_verifying_before_it_completes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        const int size = 3 * 1024 * 1024;
+        var job = harness.NewJob($"/files/progress-verify/{size}", "progress-verify.bin") with
+        {
+            ChecksumAlgo = "sha256",
+            Checksum = GeneratedContent.Sha256Hex("progress-verify", size),
+        };
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        JobState? stateWhenHashing = null;
+        harness.Engine.OptionsDecorator = (_, options) => options with
+        {
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = harness.Host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 512 * 1024 }) },
+            BeforeVerifyAsync = async () =>
+            {
+                await options.BeforeVerifyAsync!();
+                stateWhenHashing = (await harness.Jobs.GetAsync(job.Id, ct))!.State;
+            },
+        };
+        var events = new ConcurrentQueue<EngineEvent>();
+        harness.Engine.EventRaised += events.Enqueue;
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+        await Task.Delay(200, ct); // the dispatcher is asynchronous
+
+        events.OfType<JobProgressed>().Count(p => p.Id == job.Id && p.BytesPerSecond > 0).Should().BeGreaterThan(0, "a running job publishes speed samples");
+        var order = events.OfType<JobStateChanged>().Where(e => e.Id == job.Id).Select(e => e.To).ToList();
+        order.Should().ContainInOrder(JobState.Downloading, JobState.Verifying, JobState.Completed);
+        stateWhenHashing.Should().Be(JobState.Verifying, "the job shows Verifying while the checksum is computed, not after the commit");
+    }
+
+    [Fact]
+    public async Task The_engine_refuses_a_transition_the_state_machine_does_not_allow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/illegal-edge/1048576", "illegal-edge.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+
+        var act = async () => await harness.Engine.TransitionAsync(job.Id, JobState.Queued, JobState.Completed, cancellationToken: ct);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Queued);
+    }
+
+    [Fact]
+    public async Task Start_up_does_not_wait_for_a_network_paused_job_to_finish()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root, startEngine: false, network: new FakeNetworkStatus());
+        var job = harness.NewJob("/files/startup-resume/8388608", "startup-resume.bin") with
+        {
+            State = JobState.Paused,
+            PauseReason = PauseReason.NetworkOffline,
+        };
+        await harness.Jobs.AddAsync(job, ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
+        await harness.Engine.StartAsync(ct);
+
+        started.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5), "StartAsync resumes the job in the background");
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().NotBe(JobState.Completed);
+        harness.Engine.OptionsDecorator = null;
+        await harness.Engine.PauseJobAsync(job.Id, ct);
     }
 
     private sealed class FakeNetworkStatus : INetworkStatus
