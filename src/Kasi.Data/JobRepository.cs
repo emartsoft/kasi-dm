@@ -3,11 +3,13 @@ using Kasi.Core;
 
 namespace Kasi.Data;
 
-public sealed class JobRepository(SqliteConnectionFactory factory) : IJobRepository
+public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider? timeProvider = null) : IJobRepository
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+
     private const string Select =
         "SELECT id AS Id, kind AS Kind, url AS Url, final_url AS FinalUrl, referrer AS Referrer, file_name AS FileName, folder AS Folder, " +
-        "total_bytes AS TotalBytes, done_bytes AS DoneBytes, state AS State, error AS Error, etag AS ETag, last_modified AS LastModified, " +
+        "total_bytes AS TotalBytes, done_bytes AS DoneBytes, state AS State, error AS Error, pause_reason AS PauseReason, etag AS ETag, last_modified AS LastModified, " +
         "resumable AS Resumable, connections AS Connections, speed_limit_bps AS SpeedLimitBps, checksum_algo AS ChecksumAlgo, checksum AS Checksum, " +
         "queue_id AS QueueId, queue_pos AS QueuePos, category_id AS CategoryId, created_utc AS CreatedUtc, completed_utc AS CompletedUtc FROM job";
 
@@ -15,9 +17,9 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
     {
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(
-            "INSERT INTO job (id, kind, url, final_url, referrer, file_name, folder, total_bytes, done_bytes, state, error, etag, last_modified, " +
+            "INSERT INTO job (id, kind, url, final_url, referrer, file_name, folder, total_bytes, done_bytes, state, error, pause_reason, etag, last_modified, " +
             "resumable, connections, speed_limit_bps, checksum_algo, checksum, queue_id, queue_pos, category_id, created_utc, completed_utc) " +
-            "VALUES (@Id, @Kind, @Url, @FinalUrl, @Referrer, @FileName, @Folder, @TotalBytes, @DoneBytes, @State, @Error, @ETag, @LastModified, " +
+            "VALUES (@Id, @Kind, @Url, @FinalUrl, @Referrer, @FileName, @Folder, @TotalBytes, @DoneBytes, @State, @Error, @PauseReason, @ETag, @LastModified, " +
             "@Resumable, @Connections, @SpeedLimitBps, @ChecksumAlgo, @Checksum, @QueueId, @QueuePos, @CategoryId, @CreatedUtc, @CompletedUtc);",
             Parameters(job),
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -46,7 +48,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
         var changed = await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE job SET url = @Url, final_url = @FinalUrl, referrer = @Referrer, file_name = @FileName, folder = @Folder, total_bytes = @TotalBytes, " +
-            "done_bytes = MAX(done_bytes, @DoneBytes), state = @State, error = @Error, etag = @ETag, last_modified = @LastModified, resumable = @Resumable, " +
+            "done_bytes = MAX(done_bytes, @DoneBytes), state = @State, error = @Error, pause_reason = @PauseReason, etag = @ETag, last_modified = @LastModified, resumable = @Resumable, " +
             "connections = @Connections, speed_limit_bps = @SpeedLimitBps, checksum_algo = @ChecksumAlgo, checksum = @Checksum, queue_id = @QueueId, " +
             "queue_pos = @QueuePos, category_id = @CategoryId, completed_utc = @CompletedUtc WHERE id = @Id;",
             Parameters(job),
@@ -102,6 +104,66 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
         return changed > 0;
     }
 
+    public async Task<bool> TryChangeStateAsync(
+        JobId id,
+        JobState fromState,
+        JobState toState,
+        string? failureMessage = null,
+        PauseReason? pauseReason = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (toState == JobState.Failed)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(failureMessage);
+        }
+
+        if (toState == JobState.Paused && pauseReason is null)
+        {
+            throw new ArgumentException("A paused job needs a pause reason.", nameof(pauseReason));
+        }
+
+        if (toState != JobState.Paused && pauseReason is not null)
+        {
+            throw new ArgumentException("Only a paused job may carry a pause reason.", nameof(pauseReason));
+        }
+
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE job SET state = @to, error = @error, pause_reason = @pauseReason, " +
+            "completed_utc = CASE WHEN @to = 'Completed' THEN @completedUtc ELSE completed_utc END " +
+            "WHERE id = @id AND state = @from;",
+            new
+            {
+                id = id.ToString(),
+                from = JobStateText.ToText(fromState),
+                to = JobStateText.ToText(toState),
+                error = failureMessage,
+                pauseReason = pauseReason is { } reason ? PauseReasonText.ToText(reason) : null,
+                completedUtc = toState == JobState.Completed ? DbText.FromDate(_time.GetUtcNow()) : null,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return changed > 0;
+    }
+
+    public async Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(doneBytes);
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE job SET done_bytes = @doneBytes WHERE id = @id;",
+            new { id = id.ToString(), doneBytes },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return changed > 0;
+    }
+
+    public async Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var result = await connection.QuerySingleAsync<string>(
+            new CommandDefinition("PRAGMA quick_check;", cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return string.Equals(result, "ok", StringComparison.Ordinal);
+    }
+
     private static object Parameters(Job job) => new
     {
         Id = job.Id.ToString(),
@@ -115,6 +177,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
         job.DoneBytes,
         State = JobStateText.ToText(job.State),
         job.Error,
+        PauseReason = job.PauseReason is { } reason ? PauseReasonText.ToText(reason) : null,
         job.ETag,
         job.LastModified,
         Resumable = job.Resumable ? 1 : 0,
@@ -155,6 +218,8 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
 
         public string? Error { get; set; }
 
+        public string? PauseReason { get; set; }
+
         public string? ETag { get; set; }
 
         public string? LastModified { get; set; }
@@ -192,6 +257,11 @@ public sealed class JobRepository(SqliteConnectionFactory factory) : IJobReposit
             DoneBytes = DoneBytes,
             State = JobStateText.TryParse(State, out var state) ? state : throw new InvalidDataException($"Unknown job state '{State}' in job {Id}."),
             Error = Error,
+            PauseReason = PauseReason is null
+                ? null
+                : PauseReasonText.TryParse(PauseReason, out var pauseReason)
+                    ? pauseReason
+                    : throw new InvalidDataException($"Unknown pause reason '{PauseReason}' in job {Id}."),
             ETag = ETag,
             LastModified = LastModified,
             Resumable = Resumable != 0,

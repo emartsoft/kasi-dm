@@ -1,5 +1,6 @@
 using Kasi.Core;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Kasi.Data.Tests;
 
@@ -264,5 +265,87 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
         Func<Task> act = () => _jobs.ListAsync(cancellationToken: TempDatabase.Ct);
 
         await act.Should().ThrowAsync<InvalidDataException>();
+    }
+
+    [Fact]
+    public async Task TryChangeState_is_a_compare_and_set_and_never_touches_progress()
+    {
+        var job = NewJob() with { State = JobState.Downloading, DoneBytes = 5000 };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+
+        (await _jobs.TryChangeStateAsync(job.Id, JobState.Probing, JobState.Downloading, cancellationToken: TempDatabase.Ct)).Should().BeFalse();
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!.State.Should().Be(JobState.Downloading);
+
+        (await _jobs.TryChangeStateAsync(
+            job.Id,
+            JobState.Downloading,
+            JobState.Paused,
+            failureMessage: "Paused by the user.",
+            pauseReason: PauseReason.UserRequested,
+            cancellationToken: TempDatabase.Ct)).Should().BeTrue();
+
+        var paused = (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!;
+        paused.State.Should().Be(JobState.Paused);
+        paused.Error.Should().Be("Paused by the user.");
+        paused.PauseReason.Should().Be(PauseReason.UserRequested);
+        paused.DoneBytes.Should().Be(5000);
+
+        (await _jobs.TryChangeStateAsync(job.Id, JobState.Paused, JobState.Downloading, cancellationToken: TempDatabase.Ct)).Should().BeTrue();
+        var resumed = (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!;
+        resumed.State.Should().Be(JobState.Downloading);
+        resumed.Error.Should().BeNull();
+        resumed.PauseReason.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task TryChangeState_rejects_a_missing_pause_reason_or_failure_message()
+    {
+        var job = NewJob() with { State = JobState.Downloading };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+
+        Func<Task> pause = () => _jobs.TryChangeStateAsync(job.Id, JobState.Downloading, JobState.Paused, cancellationToken: TempDatabase.Ct);
+        Func<Task> fail = () => _jobs.TryChangeStateAsync(job.Id, JobState.Downloading, JobState.Failed, cancellationToken: TempDatabase.Ct);
+        Func<Task> resumeWithReason = () => _jobs.TryChangeStateAsync(
+            job.Id, JobState.Downloading, JobState.Queued, pauseReason: PauseReason.UserRequested, cancellationToken: TempDatabase.Ct);
+
+        await pause.Should().ThrowAsync<ArgumentException>();
+        await fail.Should().ThrowAsync<ArgumentException>();
+        await resumeWithReason.Should().ThrowAsync<ArgumentException>();
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!.State.Should().Be(JobState.Downloading);
+    }
+
+    [Fact]
+    public async Task Completing_through_TryChangeState_stamps_the_completion_time()
+    {
+        var clock = new FakeTimeProvider(_created);
+        var jobs = new JobRepository(_db.Factory, clock);
+        var job = NewJob() with { State = JobState.Verifying };
+        await jobs.AddAsync(job, TempDatabase.Ct);
+
+        (await jobs.TryChangeStateAsync(job.Id, JobState.Verifying, JobState.Completed, cancellationToken: TempDatabase.Ct)).Should().BeTrue();
+
+        (await jobs.GetAsync(job.Id, TempDatabase.Ct))!.CompletedUtc.Should().Be(_created);
+    }
+
+    [Fact]
+    public async Task ReconcileProgress_sets_the_saved_byte_count_and_QuickCheck_succeeds_on_a_healthy_database()
+    {
+        var job = NewJob() with { DoneBytes = 5000 };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+
+        (await _jobs.ReconcileProgressAsync(job.Id, 3000, TempDatabase.Ct)).Should().BeTrue();
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!.DoneBytes.Should().Be(3000);
+        (await _jobs.QuickCheckAsync(TempDatabase.Ct)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_pause_reason_round_trips_through_the_job_row()
+    {
+        var job = NewJob() with { State = JobState.Paused, PauseReason = PauseReason.CrashRecovery };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+
+        var loaded = (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!;
+
+        loaded.PauseReason.Should().Be(PauseReason.CrashRecovery);
     }
 }

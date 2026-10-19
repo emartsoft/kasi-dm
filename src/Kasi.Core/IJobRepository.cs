@@ -32,4 +32,22 @@ public interface IJobRepository
 
     /// <summary>Deletes the job and, by cascade, its segments and secrets. Returns false if there is no such job.</summary>
     Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Compare-and-set state transition. Changes the row only when it still holds <paramref name="from"/>; writes the
+    /// error, the pause reason and the completion timestamp in the same statement, and never touches <c>done_bytes</c>.
+    /// </summary>
+    Task<bool> TryChangeStateAsync(
+        JobId id,
+        JobState fromState,
+        JobState toState,
+        string? failureMessage = null,
+        PauseReason? pauseReason = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Reconciles <c>done_bytes</c> with the sum of the segment cursors during recovery. Never used for normal progress.</summary>
+    Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default);
+
+    /// <summary>Runs SQLite's <c>PRAGMA quick_check</c>; false means the database must not be used until repaired.</summary>
+    Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default);
 }

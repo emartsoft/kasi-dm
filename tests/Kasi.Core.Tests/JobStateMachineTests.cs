@@ -107,6 +107,30 @@ public class JobStateMachineTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Fact]
+    public void Recovery_edges_are_separate_from_the_normal_state_machine()
+    {
+        var expected = new (JobState From, JobState To)[]
+        {
+            (JobState.Probing, JobState.Queued),
+            (JobState.Downloading, JobState.Paused),
+            (JobState.Retrying, JobState.Paused),
+            (JobState.Verifying, JobState.Paused),
+        };
+
+        foreach (var from in Enum.GetValues<JobState>())
+        {
+            JobStateMachine.RecoveryNextStates(from).Should().Equal(expected.Where(e => e.From == from).Select(e => e.To));
+            foreach (var to in Enum.GetValues<JobState>())
+            {
+                JobStateMachine.CanRecover(from, to).Should().Be(expected.Contains((from, to)), "{0} -> {1}", from, to);
+            }
+        }
+
+        JobStateMachine.CanRecover(JobState.Downloading, JobState.Queued).Should().BeFalse();
+        JobStateMachine.CanTransition(JobKind.Http, JobState.Probing, JobState.Queued).Should().BeFalse();
+    }
+
     private static HashSet<JobState> Reachable(JobKind kind, JobState start)
     {
         var seen = new HashSet<JobState> { start };

@@ -9,6 +9,19 @@ public static class JobStateMachine
     public static bool CanTransition(JobKind kind, JobState from, JobState to) => NextStates(kind, from).Contains(to);
 
     /// <summary>
+    /// Recovery-only edges used by start-up recovery. They are deliberately outside <see cref="CanTransition"/> so normal
+    /// operations cannot pretend a crash happened (ADR 0002).
+    /// </summary>
+    public static IReadOnlyList<JobState> RecoveryNextStates(JobState from) => from switch
+    {
+        JobState.Probing => [JobState.Queued],
+        JobState.Downloading or JobState.Retrying or JobState.Verifying => [JobState.Paused],
+        _ => [],
+    };
+
+    public static bool CanRecover(JobState from, JobState to) => RecoveryNextStates(from).Contains(to);
+
+    /// <summary>
     /// States reachable from <paramref name="from"/>. A pause can come from any active state and resume goes back to
     /// <see cref="JobState.Downloading"/> or, for a job paused before it started, to <see cref="JobState.Queued"/>;
     /// which one applies depends on where the pause happened, so the engine chooses.
