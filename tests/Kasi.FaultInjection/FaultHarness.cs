@@ -128,6 +128,28 @@ internal sealed class FaultHarness : IAsyncDisposable
     }
 
     /// <summary>
+    /// Reads a job, trying again for a few seconds when SQLite reports an I/O or lock error: right after a child was killed, Windows can
+    /// take a moment to release the database's lock and shared-memory files.
+    /// </summary>
+    public Task<Job?> GetJobAsync(JobId jobId, CancellationToken cancellationToken) =>
+        RetryAsync(() => Jobs.GetAsync(jobId, cancellationToken), cancellationToken);
+
+    public static async Task<T> RetryAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await action().ConfigureAwait(false);
+            }
+            catch (SqliteException) when (attempt < 100)
+            {
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
     /// Waits until the job has restarted at least <paramref name="restarts"/> times and has a checkpoint between 1 byte and
     /// <paramref name="belowFraction"/> of <paramref name="size"/>; false if the child ended first.
     /// </summary>
@@ -136,7 +158,7 @@ internal sealed class FaultHarness : IAsyncDisposable
         var deadline = Stopwatch.StartNew();
         while (deadline.Elapsed < TimeSpan.FromSeconds(60) && !child.HasExited)
         {
-            var job = await Jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+            var job = await GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
             if (job is { DoneBytes: > 0 } && job.RestartCount >= restarts && job.DoneBytes < size * belowFraction)
             {
                 return true;

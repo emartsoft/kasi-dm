@@ -127,7 +127,7 @@ internal static class DiskPressureSuite
         }
 
         SqliteConnection.ClearAllPools();
-        var paused = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
+        var paused = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
         if (paused is not { State: JobState.Paused, PauseReason: PauseReason.NotEnoughSpace })
         {
             return ($"on a full disk the job was {paused.State} ({paused.PauseReason}), not Paused with NotEnoughSpace", null);

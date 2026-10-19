@@ -100,7 +100,7 @@ public static class FaultInjectionRunner
         {
             // the child ended on its own: the file must be the generated content, then make room for the next download
             var path = Path.Combine(job!.Folder, job.FileName);
-            var state = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!.State;
+            var state = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!.State;
             if (state != JobState.Completed)
             {
                 Fail($"download {downloads} ended in state {state}, not Completed");
@@ -130,7 +130,7 @@ public static class FaultInjectionRunner
                 await harness.Jobs.AddAsync(job, cancellationToken).ConfigureAwait(false);
             }
 
-            var before = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
+            var before = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
             var servedBefore = harness.Host.Metrics.BytesServed;
             await DeleteWithRetryAsync(marker, cancellationToken).ConfigureAwait(false);
             using var child = harness.StartChild(job.Id, options.BytesPerSecond, commitKill ? ChildEnvironment.CommitKill(marker, random.Next(1, 6)) : null);
@@ -164,11 +164,11 @@ public static class FaultInjectionRunner
             kills++;
             SqliteConnection.ClearAllPools();
 
-            var after = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
+            var after = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
             var served = harness.Host.Metrics.BytesServed - servedBefore;
             var refetched = Math.Max(0, served - Math.Max(0, after.DoneBytes - before.DoneBytes));
             maxRefetch = Math.Max(maxRefetch, refetched);
-            var problem = await CheckDatabaseAsync(harness.DatabasePath, job.Id, cancellationToken).ConfigureAwait(false);
+            var problem = await FaultHarness.RetryAsync(() => CheckDatabaseAsync(harness.DatabasePath, job.Id, cancellationToken), cancellationToken).ConfigureAwait(false);
             if (problem is null && commitKill && !File.Exists(marker))
             {
                 problem = "the commit hook never fired, so the kill did not land inside a commit";

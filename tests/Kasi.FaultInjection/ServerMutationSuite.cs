@@ -110,7 +110,7 @@ internal static class ServerMutationSuite
             return $"the child did not complete (exit {exit})";
         }
 
-        var final = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
+        var final = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
         var changes = version - 1;
         if (final.State != JobState.Completed)
         {
