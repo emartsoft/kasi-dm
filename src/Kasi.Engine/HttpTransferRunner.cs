@@ -49,7 +49,7 @@ public sealed class HttpTransferRunner
 
         settings = settings with { Scope = new RequestScope(url, settings.RequestHeaders, settings.Secret) };
 
-        using var pool = CreatePool(url, url, settings.Secret);
+        using var pool = CreatePool(url, url, settings);
         ProbeResponse probe;
         try
         {
@@ -241,7 +241,7 @@ public sealed class HttpTransferRunner
             return TargetExists(safeName, finalPath);
         }
 
-        using var pool = CreatePool(finalUrl, initialUrl, settings.Secret);
+        using var pool = CreatePool(finalUrl, initialUrl, settings);
         TransferOutcome outcome;
         try
         {
@@ -380,7 +380,7 @@ public sealed class HttpTransferRunner
         };
 
         Uri resolvedUrl;
-        using (var pool = CreatePool(refreshedUrl, refreshedUrl, boundSecret))
+        using (var pool = CreatePool(refreshedUrl, refreshedUrl, settings))
         {
             ProbeAttempt attempt;
             try
@@ -524,16 +524,21 @@ public sealed class HttpTransferRunner
         };
     }
 
-    private HttpHostPool CreatePool(Uri targetUrl, Uri? initialUrl, JobSecret? secret)
+    private HttpHostPool CreatePool(Uri targetUrl, Uri? initialUrl, HttpTransferOptions options)
     {
+        var secret = options.Secret;
         var credentialOrigin = secret?.SensitiveOrigin ?? initialUrl;
+        var proxyCredentials = secret?.ProxyCredentials is { } proxySecret
+            ? new NetworkCredential(proxySecret.UserName, proxySecret.Password) : null;
         if (credentialOrigin is not null && RequestScope.IsSameOrigin(credentialOrigin, targetUrl)
             && secret?.Credentials is { } credentials)
         {
-            return new HttpHostPool(_hostPoolOptions, (credentialOrigin, new NetworkCredential(credentials.UserName, credentials.Password)));
+            return new HttpHostPool(_hostPoolOptions,
+                (credentialOrigin, new NetworkCredential(credentials.UserName, credentials.Password)),
+                options.Proxy, proxyCredentials);
         }
 
-        return new HttpHostPool(_hostPoolOptions);
+        return new HttpHostPool(_hostPoolOptions, proxy: options.Proxy, proxyCredentials: proxyCredentials);
     }
 
     private static async Task<Uri?> ResolveResumeInitialUrlAsync(HttpTransferOptions settings, CancellationToken cancellationToken)
@@ -1702,6 +1707,12 @@ public sealed class HttpTransferRunner
 
     private static TransferFailure NetworkFailure(Exception exception)
     {
+        if (exception is HttpRequestException { StatusCode: HttpStatusCode.ProxyAuthenticationRequired })
+        {
+            return new TransferFailure(TransferErrorKind.HttpStatusError,
+                "The proxy rejected authentication (407).", HttpStatusCode.ProxyAuthenticationRequired);
+        }
+
         if (exception is HttpRequestException { HttpRequestError: HttpRequestError.ResponseEnded or HttpRequestError.HttpProtocolError or HttpRequestError.InvalidResponse }
             or HttpIOException { HttpRequestError: HttpRequestError.ResponseEnded or HttpRequestError.HttpProtocolError or HttpRequestError.InvalidResponse })
         {

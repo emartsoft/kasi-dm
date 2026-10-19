@@ -26,6 +26,9 @@ public sealed record HttpTransferOptions
     /// <summary>Optional published checksum, verified after sealing and before committing the final file.</summary>
     public ExpectedChecksum? ExpectedChecksum { get; init; }
 
+    /// <summary>Per-transfer proxy routing; defaults to the operating system proxy.</summary>
+    public ProxySettings Proxy { get; init; } = new();
+
     public TimeSpan WriteBufferMaxAge { get; init; } = TimeSpan.FromMilliseconds(500);
 
     public TimeSpan SupersededLeaseDrainTimeout { get; init; } = TimeSpan.FromSeconds(15);
@@ -87,6 +90,7 @@ public sealed record HttpTransferOptions
             throw new ArgumentException("The job bandwidth budget must belong to the supplied bandwidth limiter.");
         }
         ExpectedChecksum?.Validate();
+        Proxy.Validate();
         if (InitialUrl is not null && (!InitialUrl.IsAbsoluteUri || InitialUrl.Scheme is not ("http" or "https")))
         {
             throw new ArgumentException("The initial URL must be an absolute HTTP or HTTPS URL.");

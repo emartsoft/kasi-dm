@@ -16,14 +16,20 @@ public sealed class HttpHostPool : IDisposable
     private readonly HttpHostPoolOptions _options;
     private readonly string? _credentialOrigin;
     private readonly NetworkCredential? _credentials;
+    private readonly ProxySettings _proxy;
+    private readonly NetworkCredential? _proxyCredentials;
     private readonly Lock _gate = new();
     private readonly Dictionary<LaneKey, Lane> _lanes = [];
     private bool _disposed;
 
-    public HttpHostPool(HttpHostPoolOptions? options = null, (Uri Origin, NetworkCredential Credentials)? credentials = null)
+    public HttpHostPool(HttpHostPoolOptions? options = null, (Uri Origin, NetworkCredential Credentials)? credentials = null,
+        ProxySettings? proxy = null, NetworkCredential? proxyCredentials = null)
     {
         _options = options ?? new HttpHostPoolOptions();
         _options.Validate();
+        _proxy = proxy ?? new ProxySettings();
+        _proxy.Validate();
+        _proxyCredentials = proxyCredentials;
         if (credentials is { } supplied)
         {
             ArgumentNullException.ThrowIfNull(supplied.Origin);
@@ -133,6 +139,19 @@ public sealed class HttpHostPool : IDisposable
         {
             handler.Credentials = _credentials;
             handler.PreAuthenticate = true;
+        }
+
+        switch (_proxy.Mode)
+        {
+            case ProxyMode.None:
+                handler.UseProxy = false;
+                break;
+            case ProxyMode.Custom:
+                handler.Proxy = new CustomWebProxy(_proxy, _proxyCredentials);
+                break;
+            case ProxyMode.System:
+                handler.DefaultProxyCredentials = _proxyCredentials;
+                break;
         }
 
         if (_options.CustomTrustRoots is { Count: > 0 } roots)
