@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Kasi.Core;
 using Kasi.Data;
 using Kasi.TestServer;
+using Kasi.TestServer.Chaos;
 using Microsoft.Data.Sqlite;
 
 namespace Kasi.Engine.Tests;
@@ -125,6 +126,177 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("TC", "TC-ENG-015")]
+    public async Task Pause_waits_for_the_checkpoint_and_resume_continues_from_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/pause-resume/8388608", "pause-resume.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
+
+        await harness.Engine.PauseJobAsync(job.Id, ct);
+        await download;
+
+        var paused = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        paused.State.Should().Be(JobState.Paused);
+        paused.PauseReason.Should().Be(PauseReason.UserRequested);
+        paused.DoneBytes.Should().BeGreaterThan(0);
+        File.Exists(Path.Combine(job.Folder, job.FileName + PartFileWriter.PartExtension)).Should().BeTrue();
+
+        harness.Engine.OptionsDecorator = null;
+        await harness.Engine.ResumeJobAsync(job.Id, ct);
+
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
+        (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
+            .Should().Be(GeneratedContent.Sha256Hex("pause-resume", 8 * 1024 * 1024));
+    }
+
+    [Fact]
+    [Trait("TC", "TC-ENG-015")]
+    public async Task Disk_full_pauses_with_NotEnoughSpace_and_resume_restarts_after_space_is_freed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/disk-full/2097152", "disk-full.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        var space = new NoSpaceProvider();
+        harness.Engine.OptionsDecorator = (_, options) => options with { SpaceProvider = space };
+
+        await harness.Engine.StartJobAsync(job.Id, ct);
+
+        var paused = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        paused.State.Should().Be(JobState.Paused);
+        paused.PauseReason.Should().Be(PauseReason.NotEnoughSpace);
+
+        space.Full = false;
+        await harness.Engine.ResumeJobAsync(job.Id, ct);
+
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
+        (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
+            .Should().Be(GeneratedContent.Sha256Hex("disk-full", 2 * 1024 * 1024));
+    }
+
+    [Fact]
+    [Trait("TC", "TC-RES-004")]
+    public async Task Going_offline_pauses_with_NetworkOffline_and_reconnecting_resumes_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var network = new FakeNetworkStatus();
+        await using var harness = await Harness.CreateAsync(_host, _root, network: network);
+        var job = harness.NewJob("/files/offline-resume/8388608", "offline-resume.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
+
+        network.SetOnline(false);
+        await download;
+        var paused = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        paused.State.Should().Be(JobState.Paused);
+        paused.PauseReason.Should().Be(PauseReason.NetworkOffline);
+
+        harness.Engine.OptionsDecorator = null;
+        network.SetOnline(true);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct))?.State == JobState.Completed, ct);
+
+        (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
+            .Should().Be(GeneratedContent.Sha256Hex("offline-resume", 8 * 1024 * 1024));
+    }
+
+    [Fact]
+    [Trait("TC", "TC-RES-004")]
+    public async Task Reconnecting_does_not_resume_a_job_the_user_paused()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var network = new FakeNetworkStatus();
+        await using var harness = await Harness.CreateAsync(_host, _root, network: network);
+        var job = harness.NewJob("/files/user-pause/8388608", "user-pause.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
+
+        await harness.Engine.PauseJobAsync(job.Id, ct);
+        await download;
+        harness.Engine.OptionsDecorator = null;
+        network.SetOnline(false);
+        network.SetOnline(true);
+        await Task.Delay(500, ct);
+
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Paused);
+        stored.PauseReason.Should().Be(PauseReason.UserRequested);
+    }
+
+    [Fact]
+    public async Task Cancel_stops_the_runner_and_removes_the_job_but_keeps_files_by_default()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/cancel-job/8388608", "cancel-job.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
+
+        await harness.Engine.CancelJobAsync(job.Id, cancellationToken: ct);
+        await download;
+
+        (await harness.Jobs.GetAsync(job.Id, ct)).Should().BeNull();
+        File.Exists(Path.Combine(job.Folder, job.FileName + PartFileWriter.PartExtension)).Should().BeTrue();
+    }
+
+    [Fact]
+    [Trait("TC", "TC-ENG-018")]
+    public async Task A_refreshed_signed_link_continues_a_paused_job()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Current-user DPAPI requires Windows.");
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+        var job = harness.NewJob($"/signed/files/refresh/4194304?exp={expiry}", "refresh.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
+        await harness.Engine.PauseJobAsync(job.Id, ct);
+        await download;
+
+        harness.Engine.OptionsDecorator = null;
+        var fresh = new Uri(_host.BaseAddress, $"/signed/files/refresh/4194304?exp={expiry + 3600}");
+        var outcome = await harness.Engine.RefreshLinkAsync(job.Id, fresh, cancellationToken: ct);
+
+        outcome.Should().BeOfType<TransferCompleted>();
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Completed);
+        stored.Url.Should().Be(fresh.AbsoluteUri);
+        (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
+            .Should().Be(GeneratedContent.Sha256Hex("refresh", 4 * 1024 * 1024));
+    }
+
+    [Fact]
+    public async Task Shutdown_pauses_a_running_job_with_its_checkpoint()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/shutdown-pause/8388608", "shutdown-pause.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
+
+        await harness.Engine.StopAsync(ct);
+        await download;
+
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Paused);
+        stored.PauseReason.Should().Be(PauseReason.UserRequested);
+    }
+
+    [Fact]
     [Trait("TC", "TC-RES-002")]
     public async Task Recovery_pauses_a_job_with_a_valid_part_and_reconciles_its_bytes()
     {
@@ -209,6 +381,45 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         await start.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    private static async Task EventuallyAsync(Func<Task<bool>> condition, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (!await condition())
+        {
+            DateTime.UtcNow.Should().BeBefore(deadline, "the condition should become true within 20 s");
+            await Task.Delay(20, cancellationToken);
+        }
+    }
+
+    private sealed class FakeNetworkStatus : INetworkStatus
+    {
+        public bool IsOnline { get; private set; } = true;
+
+        public event EventHandler? OnlineChanged;
+
+        public void SetOnline(bool online)
+        {
+            if (IsOnline == online)
+            {
+                return;
+            }
+
+            IsOnline = online;
+            OnlineChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private sealed class NoSpaceProvider : IDiskSpaceProvider
+    {
+        public bool Full { get; set; } = true;
+
+        public bool TryGetAvailableFreeBytes(string directoryPath, out long availableBytes)
+        {
+            availableBytes = Full ? 0 : long.MaxValue / 2;
+            return true;
+        }
+    }
+
     private static async Task<string> Sha256FileAsync(string path, CancellationToken cancellationToken)
     {
         await using var stream = File.OpenRead(path);
@@ -225,19 +436,25 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 
     private sealed class Harness : IAsyncDisposable
     {
-        private Harness(string folder, Uri baseAddress, JobRepository jobs, SegmentRepository segments, CheckpointWriter writer, DownloadEngine engine)
+        private Harness(string folder, TestServerHost host, Uri baseAddress, JobRepository jobs, SegmentRepository segments, JobSecretRepository secrets, CheckpointWriter writer, DownloadEngine engine)
         {
             Folder = folder;
+            Host = host;
             BaseAddress = baseAddress;
             Jobs = jobs;
             Segments = segments;
+            Secrets = secrets;
             Writer = writer;
             Engine = engine;
         }
 
         public string Folder { get; }
 
+        public TestServerHost Host { get; }
+
         public Uri BaseAddress { get; }
+
+        public JobSecretRepository Secrets { get; }
 
         public JobRepository Jobs { get; }
 
@@ -247,7 +464,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 
         public DownloadEngine Engine { get; }
 
-        public static async Task<Harness> CreateAsync(TestServerHost host, string root, bool startEngine = true)
+        public static async Task<Harness> CreateAsync(TestServerHost host, string root, bool startEngine = true, INetworkStatus? network = null)
         {
             var folder = Path.Combine(root, "downloads-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(folder);
@@ -255,18 +472,26 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
             await new MigrationRunner(factory).MigrateAsync(TestContext.Current.CancellationToken);
             var jobs = new JobRepository(factory);
             var segments = new SegmentRepository(factory);
+#pragma warning disable CA1416 // current-user DPAPI; the test runs on Windows or skips
+            var secrets = new JobSecretRepository(factory);
+#pragma warning restore CA1416
 #pragma warning disable CA2000 // Harness owns the writer and engine and disposes both
             var writer = new CheckpointWriter(factory);
             writer.Start();
-            var engine = new DownloadEngine(jobs, segments, writer, new BandwidthLimiter(), timeProvider: TimeProvider.System);
+            var engine = new DownloadEngine(jobs, segments, writer, new BandwidthLimiter(), secrets: secrets, timeProvider: TimeProvider.System, network: network);
 #pragma warning restore CA2000
             if (startEngine)
             {
                 await engine.StartAsync(TestContext.Current.CancellationToken);
             }
 
-            _ = host;
-            return new Harness(folder, host.BaseAddress, jobs, segments, writer, engine);
+            return new Harness(folder, host, host.BaseAddress, jobs, segments, secrets, writer, engine);
+        }
+
+        public Dictionary<string, string> AddSlowChaos()
+        {
+            var id = Host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 512 * 1024 });
+            return new Dictionary<string, string> { [ChaosRegistry.HeaderName] = id };
         }
 
         public Job NewJob(string path, string fileName) => new()
