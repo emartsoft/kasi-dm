@@ -18,7 +18,14 @@ internal sealed class LeaseBody(Stream body, IDisposable owner) : IAsyncDisposab
         }
         finally
         {
-            owner.Dispose();
+            if (owner is IAsyncDisposable asyncOwner)
+            {
+                await asyncOwner.DisposeAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                owner.Dispose();
+            }
         }
     }
 }

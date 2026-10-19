@@ -557,7 +557,7 @@ public sealed class HttpTransferRunner
         return settings.InitialUrl;
     }
 
-    private static async Task<HttpTransferOptions> LoadSecretAsync(HttpTransferOptions settings, CancellationToken cancellationToken)
+    internal static async Task<HttpTransferOptions> LoadSecretAsync(HttpTransferOptions settings, CancellationToken cancellationToken)
     {
         if (settings.Secret is null && settings.CheckpointJobId is { } jobId && settings.SecretRepository is { } repository)
         {
@@ -567,7 +567,7 @@ public sealed class HttpTransferRunner
         return settings;
     }
 
-    private static async Task<TransferOutcome> DeleteSecretOnCompletionAsync(TransferOutcome outcome, HttpTransferOptions settings)
+    internal static async Task<TransferOutcome> DeleteSecretOnCompletionAsync(TransferOutcome outcome, HttpTransferOptions settings)
     {
         if (outcome is TransferCompleted && settings.CheckpointJobId is { } jobId && settings.SecretRepository is { } repository)
         {
@@ -742,7 +742,7 @@ public sealed class HttpTransferRunner
         }
     }
 
-    private async Task<TransferOutcome> SegmentedAsync(
+    internal async Task<TransferOutcome> SegmentedAsync(
         ILeaseTransport transport,
         Uri finalUrl,
         ProbeResponse? probe,
@@ -754,7 +754,8 @@ public sealed class HttpTransferRunner
         IReadOnlyList<Segment>? existingSegments,
         HttpTransferOptions options,
         TimeProvider time,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool rangesSupported = true)
     {
         var opened = PartFileWriter.TryOpen(
             destinationFolder,
@@ -781,8 +782,8 @@ public sealed class HttpTransferRunner
         try
         {
             scheduler = existingSegments is null
-                ? new SegmentScheduler(totalBytes, rangesSupported: true, schedulerOptions, time, firstLeaseIsProbeStream: probe is not null)
-                : new SegmentScheduler(totalBytes, existingSegments, rangesSupported: true, schedulerOptions, time);
+                ? new SegmentScheduler(totalBytes, rangesSupported, schedulerOptions, time, firstLeaseIsProbeStream: probe is not null)
+                : new SegmentScheduler(totalBytes, existingSegments, rangesSupported, schedulerOptions, time);
         }
         catch (ArgumentException ex)
         {
@@ -955,8 +956,8 @@ public sealed class HttpTransferRunner
             FileName = fileName,
             FinalPath = writer.FinalPath,
             TotalBytes = totalBytes,
-            RangesSupported = true,
-            Resumable = !string.IsNullOrWhiteSpace(eTag) || !string.IsNullOrWhiteSpace(lastModified),
+            RangesSupported = rangesSupported,
+            Resumable = rangesSupported && (!string.IsNullOrWhiteSpace(eTag) || !string.IsNullOrWhiteSpace(lastModified)),
             ETag = eTag,
             LastModified = lastModified,
             FinalSegments = snapshot,
@@ -1786,19 +1787,6 @@ public sealed class HttpTransferRunner
     }
 
     private sealed record ProbeAttempt(ProbeOutcome Outcome, HttpTransferOptions Settings);
-
-    private sealed record TransferFailure(
-        TransferErrorKind Kind,
-        string Detail,
-        HttpStatusCode? HttpStatusCode = null,
-        TimeSpan? RetryAfter = null,
-        DiskStatus? DiskStatus = null,
-        ProbeFailure? ProbeFailure = null);
-
-    private sealed class TransferException(TransferFailure failure) : Exception(failure.Detail)
-    {
-        public TransferFailure Failure { get; } = failure;
-    }
 
     internal sealed class LeaseProgress
     {
