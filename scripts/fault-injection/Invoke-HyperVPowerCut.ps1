@@ -52,7 +52,8 @@ Write-Host "Power cut: VM=$VMName iterations=$Iterations seed=$Seed mode=$(if ($
 function Start-Guest {
     Restore-VMCheckpoint -VMName $VMName -Name $Checkpoint -Confirm:$false
     Start-VM -Name $VMName | Out-Null
-    Wait-GuestReady
+    # the session only proved the guest is ready; the caller opens its own
+    Remove-PSSession (Wait-GuestReady)
 }
 
 function Wait-GuestReady {

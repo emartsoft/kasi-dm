@@ -77,11 +77,15 @@ internal static class PowerGuest
             await File.WriteAllTextAsync(jobFile, jobId.ToString(), cancellationToken).ConfigureAwait(false);
         }
 
-        int exit;
-        var host = await TestServerHost.StartAsync(new TestServerOptions { Port = Port }, cancellationToken: cancellationToken).ConfigureAwait(false);
-        await using (host.ConfigureAwait(false))
+        // a database that failed its check goes straight to the report: resuming on it could crash instead of report
+        var exit = 3;
+        if (problem is null)
         {
-            exit = await ChildRunner.RunAsync(database, jobId, options.BytesPerSecond).ConfigureAwait(false);
+            var host = await TestServerHost.StartAsync(new TestServerOptions { Port = Port }, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await using (host.ConfigureAwait(false))
+            {
+                exit = await ChildRunner.RunAsync(database, jobId, options.BytesPerSecond).ConfigureAwait(false);
+            }
         }
 
         if (options.Phase != "verify")

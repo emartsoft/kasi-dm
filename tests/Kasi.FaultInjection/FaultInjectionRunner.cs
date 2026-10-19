@@ -225,6 +225,19 @@ public static class FaultInjectionRunner
     /// <summary>After a kill the database must open, pass SQLite's own check and still agree with itself about the job's bytes.</summary>
     internal static async Task<string?> CheckDatabaseAsync(string path, JobId jobId, CancellationToken cancellationToken)
     {
+        try
+        {
+            return await CheckCoreAsync(path, jobId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException ex)
+        {
+            // a file SQLite cannot open at all is the clearest damage there is
+            return $"the database cannot be read: {ex.Message}";
+        }
+    }
+
+    private static async Task<string?> CheckCoreAsync(string path, JobId jobId, CancellationToken cancellationToken)
+    {
         var connection = new SqliteConnection($"Data Source={path};Pooling=False");
         await using (connection.ConfigureAwait(false))
         {

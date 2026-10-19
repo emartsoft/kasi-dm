@@ -54,6 +54,30 @@ public sealed class PowerGuestTests
         }
     }
 
+    [Fact]
+    public async Task A_damaged_database_is_reported_as_a_failure_and_is_not_resumed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var state = Path.Combine(Path.GetTempPath(), "kasi-power-bad-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(state);
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(state, "job.id"), Kasi.Core.JobId.New(TimeProvider.System).ToString(), ct);
+            await File.WriteAllTextAsync(Path.Combine(state, "fault.db"), "this is not a sqlite database, the power went out mid-write", ct);
+
+            var exit = await FaultInjectionRunner.RunAsync(
+                new FaultInjectionOptions { Scenario = "power-guest", Phase = "verify", State = state, Size = Size, Rate = Rate }, ct);
+
+            exit.Should().Be(1);
+            (await File.ReadAllTextAsync(Path.Combine(state, "power-report.json"), ct)).Should().Contain("cannot be read");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(state, recursive: true);
+        }
+    }
+
     private static async Task WaitForProgressAsync(string state, CancellationToken ct)
     {
         var deadline = Stopwatch.StartNew();
