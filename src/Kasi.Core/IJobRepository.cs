@@ -48,6 +48,9 @@ public interface IJobRepository
     /// <summary>Reconciles <c>done_bytes</c> with the sum of the segment cursors during recovery. Never used for normal progress.</summary>
     Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default);
 
+    /// <summary>Increments the stored changed-file restart counter and returns the new value, or null when the job is gone.</summary>
+    Task<int?> IncrementRestartCountAsync(JobId id, CancellationToken cancellationToken = default);
+
     /// <summary>Runs SQLite's <c>PRAGMA quick_check</c>; false means the database must not be used until repaired.</summary>
     Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default);
 }

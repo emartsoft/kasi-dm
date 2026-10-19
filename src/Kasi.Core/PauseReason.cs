@@ -8,6 +8,7 @@ public enum PauseReason
     NetworkOffline,
     CrashRecovery,
     CheckpointFault,
+    AuthRequired,
 }
 
 /// <summary>The text stored in <c>job.pause_reason</c>; a storage format, so changing a string needs a migration.</summary>
@@ -20,6 +21,7 @@ public static class PauseReasonText
         PauseReason.NetworkOffline => "NetworkOffline",
         PauseReason.CrashRecovery => "CrashRecovery",
         PauseReason.CheckpointFault => "CheckpointFault",
+        PauseReason.AuthRequired => "AuthRequired",
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Not a defined pause reason."),
     };
 
@@ -32,6 +34,7 @@ public static class PauseReasonText
             "NetworkOffline" => (true, PauseReason.NetworkOffline),
             "CrashRecovery" => (true, PauseReason.CrashRecovery),
             "CheckpointFault" => (true, PauseReason.CheckpointFault),
+            "AuthRequired" => (true, PauseReason.AuthRequired),
             _ => (false, default(PauseReason)),
         };
         return found;

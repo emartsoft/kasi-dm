@@ -53,3 +53,15 @@ must persist a transition before notifying anyone, recover interrupted jobs at s
   jobs offline and resumes only jobs whose stored reason is `NetworkOffline`, including after a restart. A user pause is never
   auto-resumed.
 - `RefreshLinkAsync` reuses the validated HTTP refresh entry point and leaves a rejected refresh paused with its error.
+
+## 13c — changed-file restart
+
+- A `FileChanged` outcome deletes the old `.kasipart`, clears the segment rows, resets `done_bytes`, increments a persisted
+  `restart_count`, raises `JobRestarted` with the discarded byte count and starts a fresh download while remaining
+  `Downloading`.
+- The counter is stored in the job row, so the cap of two restarts survives an app restart; the third change fails with
+  "File changed repeatedly."
+- The `Kasi.FaultInjection` child runs a throttled engine download. The smoke test kills it mid-transfer, starts a new engine
+  on the same database, verifies recovery pauses with `CrashRecovery`, resumes and checks SHA-256. The child is reused by the
+  full M1.14 harness.
+- The headless end-to-end proof is the facade lifecycle test; no UI assembly is loaded.

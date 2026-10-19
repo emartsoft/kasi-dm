@@ -1509,6 +1509,11 @@ public sealed class HttpTransferRunner
 
         if (options.ExpectedChecksum is { } expected)
         {
+            if (options.BeforeVerifyAsync is { } beforeVerify)
+            {
+                await beforeVerify().ConfigureAwait(false);
+            }
+
             string computed;
             try
             {

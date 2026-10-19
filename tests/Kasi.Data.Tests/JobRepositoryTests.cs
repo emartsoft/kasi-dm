@@ -348,4 +348,16 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
 
         loaded.PauseReason.Should().Be(PauseReason.CrashRecovery);
     }
+
+    [Fact]
+    public async Task Restart_count_increments_atomically_and_is_reported_for_a_missing_job()
+    {
+        var job = NewJob();
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+
+        (await _jobs.IncrementRestartCountAsync(job.Id, TempDatabase.Ct)).Should().Be(1);
+        (await _jobs.IncrementRestartCountAsync(job.Id, TempDatabase.Ct)).Should().Be(2);
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!.RestartCount.Should().Be(2);
+        (await _jobs.IncrementRestartCountAsync(NewJob().Id, TempDatabase.Ct)).Should().BeNull();
+    }
 }

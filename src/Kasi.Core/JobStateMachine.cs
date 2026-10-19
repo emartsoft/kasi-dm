@@ -15,7 +15,8 @@ public static class JobStateMachine
     public static IReadOnlyList<JobState> RecoveryNextStates(JobState from) => from switch
     {
         JobState.Probing => [JobState.Queued],
-        JobState.Downloading or JobState.Retrying or JobState.Verifying => [JobState.Paused],
+        // a crash after the final rename completes the job; a mismatching published checksum fails it; otherwise it is paused
+        JobState.Downloading or JobState.Retrying or JobState.Verifying => [JobState.Paused, JobState.Completed, JobState.Failed],
         _ => [],
     };
 

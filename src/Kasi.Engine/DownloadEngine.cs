@@ -26,8 +26,8 @@ public sealed class DownloadEngine : IAsyncDisposable
     private readonly SemaphoreSlim _addGate = new(1, 1);
     private readonly SemaphoreSlim _networkGate = new(1, 1);
     private readonly CancellationTokenSource _lifecycle = new();
-    private readonly Channel<EngineEvent> _events = Channel.CreateBounded<EngineEvent>(
-        new BoundedChannelOptions(1024) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
+    // Unbounded on purpose: state events are rare and must never be dropped, and progress is throttled at its source.
+    private readonly Channel<EngineEvent> _events = Channel.CreateUnbounded<EngineEvent>(new UnboundedChannelOptions { SingleReader = true });
     private readonly List<Action<EngineEvent>> _subscribers = [];
     private Task? _dispatcher;
     private int _started;
@@ -171,6 +171,11 @@ public sealed class DownloadEngine : IAsyncDisposable
     {
         EnsureStarted();
         ArgumentNullException.ThrowIfNull(job);
+        if (job.State != JobState.Queued || job.DoneBytes != 0 || job.Kind is not (JobKind.Http or JobKind.Ftp))
+        {
+            throw new ArgumentException("A new HTTP or FTP job must be Queued with no progress.", nameof(job));
+        }
+
         await _addGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -207,8 +212,8 @@ public sealed class DownloadEngine : IAsyncDisposable
         try
         {
             var job = await GetStartableJobAsync(id, JobState.Queued, cancellationToken).ConfigureAwait(false);
-            var running = BeginRunning(id, cancellationToken);
-            await ExecuteRunningAsync(id, running, () => RunQueuedAsync(job, running.Cancellation.Token)).ConfigureAwait(false);
+            var running = BeginRunning(id);
+            LaunchRunning(id, running, () => RunQueuedAsync(job, running.Cancellation.Token));
         }
         finally
         {
@@ -254,8 +259,8 @@ public sealed class DownloadEngine : IAsyncDisposable
         {
             var job = await GetStartableJobAsync(id, JobState.Paused, cancellationToken).ConfigureAwait(false);
             var segments = await _segments.LoadAsync(id, cancellationToken).ConfigureAwait(false);
-            var running = BeginRunning(id, cancellationToken);
-            await ExecuteRunningAsync(id, running, async () =>
+            var running = BeginRunning(id);
+            LaunchRunning(id, running, async () =>
             {
                 if (NeedsRestart(job, segments))
                 {
@@ -268,8 +273,8 @@ public sealed class DownloadEngine : IAsyncDisposable
 
                 await TransitionAsync(id, JobState.Paused, JobState.Downloading, cancellationToken: CancellationToken.None).ConfigureAwait(false);
                 var outcome = await RunResumeAsync(job, segments, running.Cancellation.Token).ConfigureAwait(false);
-                await ApplyOutcomeAsync(job.Id, outcome).ConfigureAwait(false);
-            }).ConfigureAwait(false);
+                await ApplyOutcomeAsync(job.Id, outcome, running.Cancellation.Token).ConfigureAwait(false);
+            });
         }
         finally
         {
@@ -343,30 +348,35 @@ public sealed class DownloadEngine : IAsyncDisposable
 
             var finalUrl = new Uri(job.FinalUrl ?? job.Url, UriKind.Absolute);
             var options = BuildOptions(job, finalUrl) with { Secret = newSecret };
-            var outcome = await new HttpTransferRunner().RefreshAndResumeAsync(
-                finalUrl,
-                refreshedUrl,
-                job.Folder,
-                job.FileName,
-                total,
-                job.ETag,
-                job.LastModified,
-                segments,
-                options,
-                cancellationToken).ConfigureAwait(false);
-
-            if (outcome is TransferCompleted)
+            var running = BeginRunning(id);
+            TransferOutcome? outcome = null;
+            await ExecuteRunningAsync(id, running, async () =>
             {
                 await TransitionAsync(id, JobState.Paused, JobState.Downloading, cancellationToken: CancellationToken.None).ConfigureAwait(false);
-                await TransitionAsync(id, JobState.Downloading, JobState.Verifying, cancellationToken: CancellationToken.None).ConfigureAwait(false);
-                await TransitionAsync(id, JobState.Verifying, JobState.Completed, cancellationToken: CancellationToken.None).ConfigureAwait(false);
-            }
-            else if (outcome is TransferFailed failed)
-            {
-                await StorePausedErrorAsync(id, failed.Detail).ConfigureAwait(false);
-            }
+                outcome = await new HttpTransferRunner().RefreshAndResumeAsync(
+                    finalUrl,
+                    refreshedUrl,
+                    job.Folder,
+                    job.FileName,
+                    total,
+                    job.ETag,
+                    job.LastModified,
+                    segments,
+                    options,
+                    running.Cancellation.Token).ConfigureAwait(false);
 
-            return outcome;
+                if (outcome is TransferFailed { ErrorKind: TransferErrorKind.FileChanged } rejected)
+                {
+                    // the refreshed link serves another file: stay paused with the reason, never restart on the user's behalf
+                    await PauseFromCurrentAsync(id, job.PauseReason ?? PauseReason.AuthRequired, rejected.Detail).ConfigureAwait(false);
+                }
+                else
+                {
+                    await ApplyOutcomeAsync(id, outcome, running.Cancellation.Token).ConfigureAwait(false);
+                }
+            }).ConfigureAwait(false);
+
+            return outcome ?? new TransferFailed { ErrorKind = TransferErrorKind.Cancelled, Detail = "The link refresh did not run." };
         }
         finally
         {
@@ -396,10 +406,23 @@ public sealed class DownloadEngine : IAsyncDisposable
         return job;
     }
 
-    private RunningJob BeginRunning(JobId id, CancellationToken cancellationToken)
+    /// <summary>Completes when the job is no longer running (finished, paused, failed or stopped); returns at once if it is not running.</summary>
+    public async Task WaitForJobAsync(JobId id, CancellationToken cancellationToken = default)
+    {
+        if (_running.TryGetValue(id, out var running))
+        {
+#pragma warning disable VSTHRD003 // the running job is owned by this engine
+            await running.Completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+#pragma warning restore VSTHRD003
+        }
+    }
+
+    // The run belongs to the engine, not to the caller of Start/Resume: only the engine's lifecycle and the pause/cancel
+    // requests stop it, so a caller's short-lived token must not pause the job after the call returned.
+    private RunningJob BeginRunning(JobId id)
     {
 #pragma warning disable CA2000 // RunningJob owns the linked source until ExecuteRunningAsync disposes it
-        var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifecycle.Token, cancellationToken);
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifecycle.Token);
 #pragma warning restore CA2000
         var running = new RunningJob(linked);
         if (!_running.TryAdd(id, running))
@@ -410,6 +433,9 @@ public sealed class DownloadEngine : IAsyncDisposable
 
         return running;
     }
+
+    private void LaunchRunning(JobId id, RunningJob running, Func<Task> action) =>
+        _ = Task.Run(() => ExecuteRunningAsync(id, running, action), CancellationToken.None);
 
     private async Task ExecuteRunningAsync(JobId id, RunningJob running, Func<Task> action)
     {
@@ -439,7 +465,7 @@ public sealed class DownloadEngine : IAsyncDisposable
         Publish(new JobProgressed(job.Id, job.DoneBytes, job.TotalBytes, 0));
         await TransitionAsync(job.Id, JobState.Probing, JobState.Downloading, cancellationToken: CancellationToken.None).ConfigureAwait(false);
         var outcome = await RunTransferAsync(job, cancellationToken).ConfigureAwait(false);
-        await ApplyOutcomeAsync(job.Id, outcome).ConfigureAwait(false);
+        await ApplyOutcomeAsync(job.Id, outcome, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<TransferOutcome> RunTransferAsync(Job job, CancellationToken cancellationToken)
@@ -522,11 +548,57 @@ public sealed class DownloadEngine : IAsyncDisposable
             SecretRepository = _secrets,
             InitialUrl = url.Scheme is "http" or "https" ? url : null,
             ExpectedChecksum = expected,
+            SchedulerTick = ProgressPublisher(job),
+            BeforeVerifyAsync = () => EnterVerifyingAsync(job.Id),
         };
         return OptionsDecorator is { } decorator ? decorator(job, options) : options;
     }
 
-    private async Task ApplyOutcomeAsync(JobId id, TransferOutcome outcome)
+    // At most one sample per second per job, with the speed measured over that second.
+    private Action<SegmentScheduler> ProgressPublisher(Job job)
+    {
+        var last = _time.GetTimestamp();
+        long lastBytes = 0;
+        var seeded = false;
+        return scheduler =>
+        {
+            if (!seeded)
+            {
+                // A resumed or recovered job starts with its saved bytes already counted; they were not transferred in the
+                // first second, so the baseline is taken from the scheduler instead of zero.
+                lastBytes = scheduler.TotalWritten;
+                last = _time.GetTimestamp();
+                seeded = true;
+                return;
+            }
+
+            var now = _time.GetTimestamp();
+            var elapsed = _time.GetElapsedTime(last, now);
+            if (elapsed < TimeSpan.FromSeconds(1))
+            {
+                return;
+            }
+
+            var written = scheduler.TotalWritten;
+            Publish(new JobProgressed(job.Id, written, scheduler.TotalBytes, Math.Max(0, (long)((written - lastBytes) / elapsed.TotalSeconds))));
+            last = now;
+            lastBytes = written;
+        };
+    }
+
+    private async Task EnterVerifyingAsync(JobId id)
+    {
+        try
+        {
+            await TransitionAsync(id, JobState.Downloading, JobState.Verifying, cancellationToken: CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            // the job was paused or removed at this instant; the outcome handling copes with whatever state it finds
+        }
+    }
+
+    private async Task ApplyOutcomeAsync(JobId id, TransferOutcome outcome, CancellationToken cancellationToken)
     {
         switch (outcome)
         {
@@ -553,8 +625,14 @@ public sealed class DownloadEngine : IAsyncDisposable
                 await PauseFromCurrentAsync(id, PauseReason.NetworkOffline, message: failed.Detail).ConfigureAwait(false);
                 break;
 
-            case TransferFailed failed when failed.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden:
-                await PauseFromCurrentAsync(id, PauseReason.UserRequested, message: failed.Detail).ConfigureAwait(false);
+            case TransferFailed failed when failed.ErrorKind == TransferErrorKind.FileChanged:
+                await RestartAfterChangeAsync(id, failed, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case TransferFailed failed when failed.HttpStatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden
+                or System.Net.HttpStatusCode.ProxyAuthenticationRequired
+                || failed.ProbeFailure?.Kind == ProbeErrorKind.AuthRequired:
+                await PauseFromCurrentAsync(id, PauseReason.AuthRequired, message: failed.Detail).ConfigureAwait(false);
                 break;
 
             case TransferFailed failed:
@@ -563,7 +641,43 @@ public sealed class DownloadEngine : IAsyncDisposable
         }
     }
 
-    private async Task TransitionAsync(
+    private async Task RestartAfterChangeAsync(JobId id, TransferFailed failure, CancellationToken cancellationToken)
+    {
+        var job = await _jobs.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        if (job is null)
+        {
+            return;
+        }
+
+        if (job.RestartCount >= 2)
+        {
+            await FailFromCurrentAsync(id, "File changed repeatedly.").ConfigureAwait(false);
+            return;
+        }
+
+        var discarded = failure.BytesFlushed > 0
+            ? failure.BytesFlushed
+            : failure.SegmentsSnapshot.Sum(segment => segment.Written);
+        TryDelete(Path.Combine(job.Folder, job.FileName + PartFileWriter.PartExtension));
+        await _segments.ReplaceAsync(id, [], CancellationToken.None).ConfigureAwait(false);
+        await _jobs.ResetProgressAsync(id, CancellationToken.None).ConfigureAwait(false);
+        var count = await _jobs.IncrementRestartCountAsync(id, CancellationToken.None).ConfigureAwait(false) ?? job.RestartCount + 1;
+        Publish(new JobRestarted(id, "The remote file changed.", discarded));
+        Publish(new JobProgressed(id, 0, job.TotalBytes, 0));
+
+        var refreshed = job with
+        {
+            DoneBytes = 0,
+            RestartCount = count,
+            ETag = null,
+            LastModified = null,
+            TotalBytes = null,
+        };
+        var outcome = await RunTransferAsync(refreshed, cancellationToken).ConfigureAwait(false);
+        await ApplyOutcomeAsync(id, outcome, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task TransitionAsync(
         JobId id,
         JobState from,
         JobState to,
@@ -571,6 +685,12 @@ public sealed class DownloadEngine : IAsyncDisposable
         PauseReason? pauseReason = null,
         CancellationToken cancellationToken = default)
     {
+        // the engine handles HTTP and FTP jobs only, and the kind matters only for the media muxing edge
+        if (!JobStateMachine.CanTransition(JobKind.Http, from, to) && !JobStateMachine.CanRecover(from, to))
+        {
+            throw new InvalidOperationException($"Job {id}: {from} to {to} is not a legal transition.");
+        }
+
         var changed = await _jobs.TryChangeStateAsync(id, from, to, failureMessage, pauseReason, cancellationToken).ConfigureAwait(false);
         if (!changed)
         {
@@ -613,7 +733,7 @@ public sealed class DownloadEngine : IAsyncDisposable
         var job = await _jobs.GetAsync(id).ConfigureAwait(false);
         if (job?.State == JobState.Paused)
         {
-            await _jobs.TryChangeStateAsync(id, JobState.Paused, JobState.Paused, message, PauseReason.UserRequested).ConfigureAwait(false);
+            await _jobs.TryChangeStateAsync(id, JobState.Paused, JobState.Paused, message, job.PauseReason ?? PauseReason.UserRequested).ConfigureAwait(false);
         }
     }
 
@@ -702,6 +822,23 @@ public sealed class DownloadEngine : IAsyncDisposable
         var segments = await _segments.LoadAsync(job.Id, cancellationToken).ConfigureAwait(false);
         if (File.Exists(partPath) && segments.Count > 0 && PartMatches(job, partPath, segments))
         {
+            if (job.State == JobState.Verifying && segments.All(s => s.IsComplete))
+            {
+                var outcome = await RunResumeAsync(job, segments, cancellationToken).ConfigureAwait(false);
+                if (outcome is TransferCompleted)
+                {
+                    await TransitionAsync(job.Id, JobState.Verifying, JobState.Completed, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    Publish(new JobProgressed(job.Id, job.TotalBytes ?? segments.Sum(s => s.Written), job.TotalBytes, 0));
+                }
+                else
+                {
+                    var message = outcome is TransferFailed failed ? failed.Detail : "Verification failed.";
+                    await TransitionAsync(job.Id, JobState.Verifying, JobState.Failed, message, cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+
+                return;
+            }
+
             await _jobs.ReconcileProgressAsync(job.Id, segments.Sum(s => s.Written), cancellationToken).ConfigureAwait(false);
             await TransitionAsync(
                 job.Id,
@@ -754,7 +891,7 @@ public sealed class DownloadEngine : IAsyncDisposable
             return false;
         }
 
-        var ordered = segments.OrderBy(s => s.Index).ToArray();
+        var ordered = segments.OrderBy(s => s.Start).ToArray();
         if (ordered.Length == 0 || ordered[0].Start != 0 || ordered[^1].End != total)
         {
             return false;
@@ -785,7 +922,7 @@ public sealed class DownloadEngine : IAsyncDisposable
         await _networkGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (Volatile.Read(ref _stopped) != 0)
+            if (Volatile.Read(ref _stopped) != 0 || _network is null)
             {
                 return;
             }

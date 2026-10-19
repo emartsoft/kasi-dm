@@ -9,7 +9,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
 
     private const string Select =
         "SELECT id AS Id, kind AS Kind, url AS Url, final_url AS FinalUrl, referrer AS Referrer, file_name AS FileName, folder AS Folder, " +
-        "total_bytes AS TotalBytes, done_bytes AS DoneBytes, state AS State, error AS Error, pause_reason AS PauseReason, etag AS ETag, last_modified AS LastModified, " +
+        "total_bytes AS TotalBytes, done_bytes AS DoneBytes, state AS State, error AS Error, pause_reason AS PauseReason, restart_count AS RestartCount, etag AS ETag, last_modified AS LastModified, " +
         "resumable AS Resumable, connections AS Connections, speed_limit_bps AS SpeedLimitBps, checksum_algo AS ChecksumAlgo, checksum AS Checksum, " +
         "queue_id AS QueueId, queue_pos AS QueuePos, category_id AS CategoryId, created_utc AS CreatedUtc, completed_utc AS CompletedUtc FROM job";
 
@@ -17,9 +17,9 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
     {
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(
-            "INSERT INTO job (id, kind, url, final_url, referrer, file_name, folder, total_bytes, done_bytes, state, error, pause_reason, etag, last_modified, " +
+            "INSERT INTO job (id, kind, url, final_url, referrer, file_name, folder, total_bytes, done_bytes, state, error, pause_reason, restart_count, etag, last_modified, " +
             "resumable, connections, speed_limit_bps, checksum_algo, checksum, queue_id, queue_pos, category_id, created_utc, completed_utc) " +
-            "VALUES (@Id, @Kind, @Url, @FinalUrl, @Referrer, @FileName, @Folder, @TotalBytes, @DoneBytes, @State, @Error, @PauseReason, @ETag, @LastModified, " +
+            "VALUES (@Id, @Kind, @Url, @FinalUrl, @Referrer, @FileName, @Folder, @TotalBytes, @DoneBytes, @State, @Error, @PauseReason, @RestartCount, @ETag, @LastModified, " +
             "@Resumable, @Connections, @SpeedLimitBps, @ChecksumAlgo, @Checksum, @QueueId, @QueuePos, @CategoryId, @CreatedUtc, @CompletedUtc);",
             Parameters(job),
             cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -48,7 +48,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
         var changed = await connection.ExecuteAsync(new CommandDefinition(
             "UPDATE job SET url = @Url, final_url = @FinalUrl, referrer = @Referrer, file_name = @FileName, folder = @Folder, total_bytes = @TotalBytes, " +
-            "done_bytes = MAX(done_bytes, @DoneBytes), state = @State, error = @Error, pause_reason = @PauseReason, etag = @ETag, last_modified = @LastModified, resumable = @Resumable, " +
+            "done_bytes = MAX(done_bytes, @DoneBytes), state = @State, error = @Error, pause_reason = @PauseReason, restart_count = @RestartCount, etag = @ETag, last_modified = @LastModified, resumable = @Resumable, " +
             "connections = @Connections, speed_limit_bps = @SpeedLimitBps, checksum_algo = @ChecksumAlgo, checksum = @Checksum, queue_id = @QueueId, " +
             "queue_pos = @QueuePos, category_id = @CategoryId, completed_utc = @CompletedUtc WHERE id = @Id;",
             Parameters(job),
@@ -164,6 +164,16 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         return string.Equals(result, "ok", StringComparison.Ordinal);
     }
 
+    public async Task<int?> IncrementRestartCountAsync(JobId id, CancellationToken cancellationToken = default)
+    {
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await connection.QuerySingleOrDefaultAsync<int?>(
+            new CommandDefinition(
+                "UPDATE job SET restart_count = restart_count + 1 WHERE id = @id RETURNING restart_count;",
+                new { id = id.ToString() },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
     private static object Parameters(Job job) => new
     {
         Id = job.Id.ToString(),
@@ -178,6 +188,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         State = JobStateText.ToText(job.State),
         job.Error,
         PauseReason = job.PauseReason is { } reason ? PauseReasonText.ToText(reason) : null,
+        job.RestartCount,
         job.ETag,
         job.LastModified,
         Resumable = job.Resumable ? 1 : 0,
@@ -219,6 +230,8 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         public string? Error { get; set; }
 
         public string? PauseReason { get; set; }
+
+        public long RestartCount { get; set; }
 
         public string? ETag { get; set; }
 
@@ -262,6 +275,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
                 : PauseReasonText.TryParse(PauseReason, out var pauseReason)
                     ? pauseReason
                     : throw new InvalidDataException($"Unknown pause reason '{PauseReason}' in job {Id}."),
+            RestartCount = checked((int)RestartCount),
             ETag = ETag,
             LastModified = LastModified,
             Resumable = Resumable != 0,

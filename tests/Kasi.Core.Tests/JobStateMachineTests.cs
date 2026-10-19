@@ -114,8 +114,14 @@ public class JobStateMachineTests
         {
             (JobState.Probing, JobState.Queued),
             (JobState.Downloading, JobState.Paused),
+            (JobState.Downloading, JobState.Completed),
+            (JobState.Downloading, JobState.Failed),
             (JobState.Retrying, JobState.Paused),
+            (JobState.Retrying, JobState.Completed),
+            (JobState.Retrying, JobState.Failed),
             (JobState.Verifying, JobState.Paused),
+            (JobState.Verifying, JobState.Completed),
+            (JobState.Verifying, JobState.Failed),
         };
 
         foreach (var from in Enum.GetValues<JobState>())

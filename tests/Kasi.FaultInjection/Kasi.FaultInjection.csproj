@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kasi.Core/Kasi.Core.csproj" />
+    <ProjectReference Include="../../src/Kasi.Data/Kasi.Data.csproj" />
+    <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
+  </ItemGroup>
+
+</Project>
