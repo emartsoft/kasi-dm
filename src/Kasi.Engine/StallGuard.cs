@@ -15,7 +15,7 @@ internal sealed class StallGuard : IDisposable
     {
         _timeout = timeout;
         _outer = outer;
-        _stall = new CancellationTokenSource(timeout, time);
+        _stall = new CancellationTokenSource(Timeout.InfiniteTimeSpan, time);
         _linked = CancellationTokenSource.CreateLinkedTokenSource(outer, _stall.Token);
     }
 
@@ -30,6 +30,15 @@ internal sealed class StallGuard : IDisposable
         if (!_stall.IsCancellationRequested)
         {
             _stall.CancelAfter(_timeout);
+        }
+    }
+
+    /// <summary>Stops the read timer while a worker is intentionally waiting for bandwidth or writing to disk.</summary>
+    public void Pause()
+    {
+        if (!_stall.IsCancellationRequested)
+        {
+            _stall.CancelAfter(Timeout.InfiniteTimeSpan);
         }
     }
 
