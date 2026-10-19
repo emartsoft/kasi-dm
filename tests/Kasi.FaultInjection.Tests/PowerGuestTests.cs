@@ -84,19 +84,25 @@ public sealed class PowerGuestTests
         while (deadline.Elapsed < TimeSpan.FromSeconds(60))
         {
             var jobFile = Path.Combine(state, "job.id");
-            if (File.Exists(jobFile) && Kasi.Core.JobId.TryParse((await File.ReadAllTextAsync(jobFile, ct)).Trim(), out var id))
+            if (File.Exists(jobFile))
             {
                 try
                 {
+                    if (!Kasi.Core.JobId.TryParse((await File.ReadAllTextAsync(jobFile, ct)).Trim(), out var id))
+                    {
+                        await Task.Delay(100, ct);
+                        continue;
+                    }
+
                     var job = await new JobRepository(new SqliteConnectionFactory(Path.Combine(state, "fault.db"))).GetAsync(id, ct);
                     if (job is { DoneBytes: > 0 })
                     {
                         return;
                     }
                 }
-                catch (SqliteException)
+                catch (Exception ex) when (ex is SqliteException or IOException)
                 {
-                    // the guest is still creating the database
+                    // the guest is still writing the job id or creating the database
                 }
             }
 

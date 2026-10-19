@@ -127,6 +127,16 @@ internal static class PowerGuest
         return problem is null ? 0 : 1;
     }
 
-    private static async Task<JobId?> ReadJobIdAsync(string path, CancellationToken cancellationToken) =>
-        File.Exists(path) && JobId.TryParse((await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false)).Trim(), out var id) ? id : null;
+    /// <summary>The job id, or null when the file is missing, unfinished or still being written by the run phase.</summary>
+    private static async Task<JobId?> ReadJobIdAsync(string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return File.Exists(path) && JobId.TryParse((await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false)).Trim(), out var id) ? id : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
 }
