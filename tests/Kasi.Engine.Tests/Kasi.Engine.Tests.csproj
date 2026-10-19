@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
     <ProjectReference Include="../../src/Kasi.Data/Kasi.Data.csproj" />
+    <ProjectReference Include="../Kasi.FaultInjection/Kasi.FaultInjection.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
   </ItemGroup>
 

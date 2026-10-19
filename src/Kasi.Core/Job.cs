@@ -32,6 +32,9 @@ public sealed record Job
     /// <summary>Why the job was paused; null in every other state. Persisted so a restart can auto-resume only network pauses.</summary>
     public PauseReason? PauseReason { get; init; }
 
+    /// <summary>How many times a changed remote file forced a restart; capped by the facade (KASI-RES-003).</summary>
+    public int RestartCount { get; init; }
+
     public string? ETag { get; init; }
 
     /// <summary>The <c>Last-Modified</c> header exactly as the server sent it, so <c>If-Range</c> can send it back unchanged.</summary>

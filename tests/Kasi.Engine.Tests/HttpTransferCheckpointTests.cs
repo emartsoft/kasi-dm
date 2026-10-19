@@ -414,6 +414,9 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
         public Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default) =>
             inner.ReconcileProgressAsync(id, doneBytes, cancellationToken);
 
+        public Task<int?> IncrementRestartCountAsync(JobId id, CancellationToken cancellationToken = default) =>
+            inner.IncrementRestartCountAsync(id, cancellationToken);
+
         public Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default) => inner.QuickCheckAsync(cancellationToken);
     }
 

@@ -278,6 +278,72 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("TC", "TC-RES-006")]
+    public async Task A_changed_remote_file_restarts_the_job_and_keeps_no_mixed_content()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        const string id = "engine-mutable";
+        const int size = 8 * 1024 * 1024;
+        _host.Mutable.Change(id, size);
+        var job = harness.NewJob($"/mutable/{id}", "engine-mutable.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        var restarts = new ConcurrentQueue<JobRestarted>();
+        harness.Engine.EventRaised += engineEvent =>
+        {
+            if (engineEvent is JobRestarted restarted && restarted.Id == job.Id)
+            {
+                restarts.Enqueue(restarted);
+            }
+        };
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: > 0 }, ct);
+        _host.Mutable.Change(id);
+
+        await download;
+
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Completed);
+        stored.RestartCount.Should().Be(1);
+        restarts.Should().ContainSingle();
+        (await Sha256FileAsync(Path.Combine(job.Folder, job.FileName), ct))
+            .Should().Be(GeneratedContent.Sha256Hex($"{id}.v2", size));
+    }
+
+    [Fact]
+    [Trait("TC", "TC-RES-006")]
+    public async Task The_third_changed_file_fails_the_job_with_the_stored_restart_cap()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        const string id = "engine-mutable-cap";
+        const int size = 8 * 1024 * 1024;
+        _host.Mutable.Change(id, size);
+        var job = harness.NewJob($"/mutable/{id}", "engine-mutable-cap.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartJobAsync(job.Id, ct);
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            await EventuallyAsync(async () =>
+            {
+                var stored = await harness.Jobs.GetAsync(job.Id, ct);
+                return stored is { State: JobState.Downloading, DoneBytes: > 0, RestartCount: var count } && count == attempt;
+            }, ct);
+            _host.Mutable.Change(id);
+        }
+
+        await download;
+
+        var failed = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        failed.State.Should().Be(JobState.Failed);
+        failed.Error.Should().Contain("changed repeatedly");
+        failed.RestartCount.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Shutdown_pauses_a_running_job_with_its_checkpoint()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -553,6 +619,9 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 
         public Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default) =>
             inner.ReconcileProgressAsync(id, doneBytes, cancellationToken);
+
+        public Task<int?> IncrementRestartCountAsync(JobId id, CancellationToken cancellationToken = default) =>
+            inner.IncrementRestartCountAsync(id, cancellationToken);
 
         public Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
     }
