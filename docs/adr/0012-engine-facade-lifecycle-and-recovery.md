@@ -39,3 +39,17 @@ must persist a transition before notifying anyone, recover interrupted jobs at s
 - A database that fails `quick_check` stops the engine before any job is touched.
 - 13b adds pause/resume/cancel/offline/link refresh; 13c adds changed-file restart, the kill-loop smoke test and the headless
   end-to-end proof. The normal state machine remains closed until those explicit paths need a new edge.
+
+## 13b — pause, resume, offline and link refresh
+
+- Pause is a cancellation with a recorded intent: the facade asks the runner to stop, waits for its final checkpoint, then
+  commits `Paused` with `PauseReason.UserRequested`. Cancel does the same but removes the row; files are deleted only when the
+  caller asks for it. Shutdown pauses every running job.
+- Resume reloads the segment rows and dispatches `ResumeAsync` for HTTP or FTP. A job with no usable validator, no total or no
+  segments resets its progress and runs a fresh download instead.
+- `DiskNotEnoughSpace` pauses with `NotEnoughSpace`; `CheckpointError` pauses with `CheckpointFault`; `Offline` pauses with
+  `NetworkOffline`; a 401/403 pauses with a message instead of failing, so credentials or a fresh link can be supplied.
+- `INetworkStatus` is injected. The production `SystemNetworkStatus` debounces NetworkChange flaps; the facade pauses running
+  jobs offline and resumes only jobs whose stored reason is `NetworkOffline`, including after a restart. A user pause is never
+  auto-resumed.
+- `RefreshLinkAsync` reuses the validated HTTP refresh entry point and leaves a rejected refresh paused with its error.
