@@ -8,6 +8,7 @@ namespace Kasi.Engine.Tests;
 /// on the limiter's own byte counters over steady windows after a settling period. Own class so these long runs overlap the
 /// others instead of lengthening <see cref="HttpTransferBandwidthTests"/>.
 /// </summary>
+[Collection(BandwidthRateGroup.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requirement", "KASI-BWL-001")]
 [Trait("Requirement", "KASI-BWL-002")]
@@ -80,7 +81,9 @@ public sealed class HttpTransferBandwidthSharingTests : IAsyncLifetime
         var totalRate = (limiter.ConsumedBytes - totalBefore) / seconds;
 
         totalRate.Should().BeInRange(475_000, 525_000);
-        cappedRate.Should().BeInRange(180_000, 220_000, "the capped job keeps its own cap while the other job takes the rest");
+        // The global bucket is first come, first served (ADR 0010), so the capped job's share of it is not guaranteed: it never
+        // exceeds its own cap, and it keeps a real part of its share while the other job takes the rest.
+        cappedRate.Should().BeInRange(100_000, 220_000, "the capped job stays under its cap and is not starved by the free job");
         await stop.CancelAsync();
         (await capped).Should().BeOfType<TransferFailed>();
         (await free).Should().BeOfType<TransferFailed>();

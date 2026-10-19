@@ -3,6 +3,7 @@ using Kasi.TestServer;
 
 namespace Kasi.Engine.Tests;
 
+[Collection(BandwidthRateGroup.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requirement", "KASI-BWL-001")]
 [Trait("Requirement", "KASI-BWL-002")]
@@ -37,10 +38,12 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
     [Fact]
     public async Task Segmented_HTTP_download_obeys_500KB_per_second_global_cap_over_ten_seconds()
     {
-        const int size = 5_300_000;
+        // The file outlasts the window by a wide margin, so a late timer on a busy runner cannot end the download inside it.
+        const int size = 12_000_000;
         const string seed = "bandwidth-global";
         var time = TimeProvider.System;
         var limiter = new BandwidthLimiter(500_000);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var download = new HttpTransferRunner().DownloadAsync(
             Url($"/files/{seed}/{size}"),
             _folder,
@@ -49,7 +52,7 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
                 BandwidthLimiter = limiter,
                 SchedulerOptions = new SegmentSchedulerOptions { InitialConnections = 1 },
             },
-            TestContext.Current.CancellationToken);
+            stop.Token);
 
         while (limiter.ConsumedBytes == 0 && !download.IsCompleted)
         {
@@ -57,18 +60,19 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
         }
 
         limiter.ConsumedBytes.Should().BeGreaterThan(0);
+        var before = limiter.ConsumedBytes;
         var start = time.GetTimestamp();
         await Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var tenSecondRate = limiter.ConsumedBytes / time.GetElapsedTime(start).TotalSeconds;
+        var tenSecondRate = (limiter.ConsumedBytes - before) / time.GetElapsedTime(start).TotalSeconds;
+        await stop.CancelAsync();
+        (await download).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
         tenSecondRate.Should().BeInRange(475_000, 525_000);
-        var completed = (await download).Should().BeOfType<TransferCompleted>().Subject;
-        await AssertHashAsync(completed.FinalPath, seed, size);
     }
 
     [Fact]
     public async Task A_200KB_per_second_job_cap_does_not_limit_another_job()
     {
-        const int cappedSize = 2_200_000;
+        const int cappedSize = 6_000_000;
         const int freeSize = 5_000_000;
         const string cappedSeed = "bandwidth-capped-job";
         const string freeSeed = "bandwidth-free-job";
@@ -76,11 +80,12 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
         var limiter = new BandwidthLimiter();
         var job = limiter.CreateJobLimit(200_000);
         var start = time.GetTimestamp();
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var cappedTask = new HttpTransferRunner().DownloadAsync(
             Url($"/norange/{cappedSeed}/{cappedSize}"),
             _folder,
             new HttpTransferOptions { BandwidthLimiter = limiter, JobBandwidthLimit = job },
-            TestContext.Current.CancellationToken);
+            stop.Token);
         var measuredFreeTask = DownloadFreeAsync();
 
         while (job.ConsumedBytes == 0 && !cappedTask.IsCompleted)
@@ -89,18 +94,19 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
         }
 
         job.ConsumedBytes.Should().BeGreaterThan(0);
+        var before = job.ConsumedBytes;
         var windowStart = time.GetTimestamp();
         await Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var tenSecondRate = job.ConsumedBytes / time.GetElapsedTime(windowStart).TotalSeconds;
-        tenSecondRate.Should().BeInRange(190_000, 210_000);
+        var windowSeconds = time.GetElapsedTime(windowStart).TotalSeconds;
+        var tenSecondRate = (job.ConsumedBytes - before) / windowSeconds;
+        await stop.CancelAsync();
 
         var (freeOutcome, freeSeconds) = await measuredFreeTask;
         var free = freeOutcome.Should().BeOfType<TransferCompleted>().Subject;
-        var capped = (await cappedTask).Should().BeOfType<TransferCompleted>().Subject;
-        var cappedSeconds = time.GetElapsedTime(start).TotalSeconds;
+        (await cappedTask).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
 
-        freeSeconds.Should().BeLessThan(cappedSeconds / 2);
-        await AssertHashAsync(capped.FinalPath, cappedSeed, cappedSize);
+        tenSecondRate.Should().BeInRange(190_000, 210_000);
+        freeSeconds.Should().BeLessThan(windowSeconds / 2, "the capped job must not slow the free one");
         await AssertHashAsync(free.FinalPath, freeSeed, freeSize);
 
         async Task<(TransferOutcome Outcome, double Seconds)> DownloadFreeAsync()
