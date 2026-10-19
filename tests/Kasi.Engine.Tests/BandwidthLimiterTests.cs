@@ -8,11 +8,17 @@ namespace Kasi.Engine.Tests;
 public sealed class BandwidthLimiterTests
 {
     [Fact]
-    public async Task A_read_is_at_most_sixteen_kib_and_the_initial_burst_is_a_quarter_second()
+    public async Task A_bucket_starts_empty_and_an_idle_one_holds_a_quarter_second()
     {
-        var limiter = new BandwidthLimiter(500_000, new FakeTimeProvider());
-        (await limiter.AcquireGlobalAsync(1_000_000, TestContext.Current.CancellationToken)).Should().Be(16_384);
-        for (var read = 1; read < 7; read++)
+        var time = new FakeTimeProvider();
+        var limiter = new BandwidthLimiter(500_000, time);
+        var first = limiter.AcquireGlobalAsync(1_000_000, TestContext.Current.CancellationToken);
+        first.IsCompleted.Should().BeFalse("nothing is free before time has passed, or the first quarter second would be a burst");
+        time.Advance(TimeSpan.FromMilliseconds(40));
+        (await first.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Should().Be(16_384, "a read is at most 16 KiB");
+
+        time.Advance(TimeSpan.FromSeconds(1)); // idle: the bucket refills only to its quarter-second capacity
+        for (var read = 0; read < 7; read++)
         {
             (await limiter.AcquireGlobalAsync(16_384, TestContext.Current.CancellationToken)).Should().Be(16_384);
         }
@@ -52,6 +58,7 @@ public sealed class BandwidthLimiterTests
         var time = new FakeTimeProvider();
         var limiter = new BandwidthLimiter(500_000, time);
         var job = limiter.CreateJobLimit(65_536);
+        time.Advance(TimeSpan.FromMilliseconds(250));
         (await limiter.AcquireAsync(16_384, job, TestContext.Current.CancellationToken)).Should().Be(16_384);
 
         using var cancellation = new CancellationTokenSource();
@@ -65,8 +72,10 @@ public sealed class BandwidthLimiterTests
     [Fact]
     public async Task Unused_bytes_are_returned_to_both_buckets()
     {
-        var limiter = new BandwidthLimiter(65_536, new FakeTimeProvider());
+        var time = new FakeTimeProvider();
+        var limiter = new BandwidthLimiter(65_536, time);
         var job = limiter.CreateJobLimit(65_536);
+        time.Advance(TimeSpan.FromMilliseconds(250));
         (await limiter.AcquireAsync(16_384, job, TestContext.Current.CancellationToken)).Should().Be(16_384);
         limiter.ReturnUnused(8_192, job);
         (await limiter.AcquireAsync(8_192, job, TestContext.Current.CancellationToken)).Should().Be(8_192);
@@ -77,6 +86,7 @@ public sealed class BandwidthLimiterTests
     {
         var time = new FakeTimeProvider();
         var limiter = new BandwidthLimiter(1, time);
+        time.Advance(TimeSpan.FromSeconds(1));
         (await limiter.AcquireGlobalAsync(16_384, TestContext.Current.CancellationToken)).Should().Be(1);
         var waiting = limiter.AcquireGlobalAsync(16_384, TestContext.Current.CancellationToken);
         waiting.IsCompleted.Should().BeFalse();
@@ -86,11 +96,46 @@ public sealed class BandwidthLimiterTests
         limiter.GlobalBytesPerSecond.Should().BeNull();
 
         var job = limiter.CreateJobLimit(1);
+        time.Advance(TimeSpan.FromSeconds(1));
         (await limiter.AcquireAsync(16_384, job, TestContext.Current.CancellationToken)).Should().Be(1);
         var jobWaiting = limiter.AcquireAsync(16_384, job, TestContext.Current.CancellationToken);
         jobWaiting.IsCompleted.Should().BeFalse();
         job.SetRate(null);
         (await jobWaiting.AsTask().WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken)).Should().Be(16_384);
+    }
+
+    [Fact]
+    public void A_limiter_is_limited_only_while_the_global_or_the_job_cap_is_a_number()
+    {
+        var limiter = new BandwidthLimiter();
+        var job = limiter.CreateJobLimit();
+        limiter.IsLimited().Should().BeFalse();
+        limiter.IsLimited(job).Should().BeFalse();
+
+        job.SetRate(200_000);
+        limiter.IsLimited().Should().BeFalse("the job cap does not limit a worker that has no job budget");
+        limiter.IsLimited(job).Should().BeTrue();
+
+        job.SetRate(null);
+        limiter.SetGlobalRate(500_000);
+        limiter.IsLimited().Should().BeTrue();
+        limiter.IsLimited(job).Should().BeTrue();
+
+        limiter.SetGlobalRate(null);
+        limiter.IsLimited(job).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_cap_set_on_an_unlimited_limiter_also_starts_empty()
+    {
+        var time = new FakeTimeProvider();
+        var limiter = new BandwidthLimiter(null, time);
+        limiter.SetGlobalRate(500_000);
+
+        var first = limiter.AcquireGlobalAsync(16_384, TestContext.Current.CancellationToken);
+        first.IsCompleted.Should().BeFalse();
+        time.Advance(TimeSpan.FromMilliseconds(40));
+        await first.AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]

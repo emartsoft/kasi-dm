@@ -101,7 +101,16 @@ public sealed class BandwidthLimiter
             var now = _time.GetTimestamp();
             _global.Return(bytes, now, _time);
             jobLimit?.State.Return(bytes, now, _time);
-            SignalRateChanged();
+        }
+    }
+
+    /// <summary>True when the global cap or the job cap is a number; false means reads can use the whole buffer window.</summary>
+    public bool IsLimited(JobBandwidthLimit? jobLimit = null)
+    {
+        ValidateOwner(jobLimit);
+        lock (_sync)
+        {
+            return _global.Rate is not null || jobLimit?.State.Rate is not null;
         }
     }
 
@@ -261,7 +270,7 @@ public sealed class BandwidthLimiter
         {
             Rate = rate;
             _timestamp = timestamp;
-            _tokens = rate is { } value ? Capacity(value) : 0;
+            _tokens = 0;
         }
 
         public long? Rate { get; private set; }
@@ -315,7 +324,7 @@ public sealed class BandwidthLimiter
             Refill(now, time);
             var wasUnlimited = Rate is null;
             Rate = rate;
-            _tokens = rate is { } value ? (wasUnlimited ? Capacity(value) : Math.Min(_tokens, Capacity(value))) : 0;
+            _tokens = rate is { } value && !wasUnlimited ? Math.Min(_tokens, Capacity(value)) : 0;
         }
 
         private static double Capacity(long rate) => Math.Max(1, rate / 4d);

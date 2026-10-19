@@ -767,12 +767,16 @@ public sealed class HttpTransferRunner
         writer.FlushFaultInjector = options.FlushFaultInjector;
         await using var writerScope = writer.ConfigureAwait(false);
 
+        // A duplicated tail costs bandwidth that a cap makes scarce (2 MiB is 10 s at 200 KB/s), so a capped run has none.
+        var schedulerOptions = options.BandwidthLimiter is { } cap && cap.IsLimited(options.JobBandwidthLimit)
+            ? options.SchedulerOptions with { MaxEndgameDuplicateBytes = 0 }
+            : options.SchedulerOptions;
         SegmentScheduler scheduler;
         try
         {
             scheduler = existingSegments is null
-                ? new SegmentScheduler(totalBytes, rangesSupported: true, options.SchedulerOptions, time, firstLeaseIsProbeStream: probe is not null)
-                : new SegmentScheduler(totalBytes, existingSegments, rangesSupported: true, options.SchedulerOptions, time);
+                ? new SegmentScheduler(totalBytes, rangesSupported: true, schedulerOptions, time, firstLeaseIsProbeStream: probe is not null)
+                : new SegmentScheduler(totalBytes, existingSegments, rangesSupported: true, schedulerOptions, time);
         }
         catch (ArgumentException ex)
         {
@@ -1179,7 +1183,7 @@ public sealed class HttpTransferRunner
         }
     }
 
-    private static async Task ReadLeaseAsync(
+    internal static async Task ReadLeaseAsync(
         LeaseAssignment lease,
         Stream body,
         PooledPartWriteBuffer buffer,
@@ -1222,6 +1226,14 @@ public sealed class HttpTransferRunner
 
             received += read;
             var result = await buffer.AdvanceBufferedAsync(read, cancellationToken).ConfigureAwait(false);
+            if (result.IsSuccess && result.FlushedBytes == 0
+                && options.BandwidthLimiter is { } limiter && limiter.IsLimited(options.JobBandwidthLimit))
+            {
+                // A capped worker may wait seconds for its next tokens (many connections share a small cap). Write what it
+                // has now, so the wait never holds received bytes beyond the 2 s loss budget (KASI-NFR-007).
+                result = await buffer.FlushPendingAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             if (!result.IsSuccess)
             {
                 throw new TransferException(DiskFailure(result.Status));
@@ -1485,7 +1497,7 @@ public sealed class HttpTransferRunner
         }
     }
 
-    private static async ValueTask<int> ReadLimitedAsync(
+    internal static async ValueTask<int> ReadLimitedAsync(
         Stream body,
         Memory<byte> buffer,
         StallGuard? guard,
@@ -1493,8 +1505,21 @@ public sealed class HttpTransferRunner
         BandwidthLimiter.JobBandwidthLimit? jobLimit,
         CancellationToken cancellationToken)
     {
+        if (limiter is null || !limiter.IsLimited(jobLimit))
+        {
+            guard?.Reset();
+            try
+            {
+                return await body.ReadAsync(buffer, guard?.Token ?? cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                guard?.Pause();
+            }
+        }
+
         var requested = Math.Min(buffer.Length, BandwidthLimiter.MaximumReadBytes);
-        var reserved = limiter is null ? requested : await limiter.AcquireAsync(requested, jobLimit, cancellationToken).ConfigureAwait(false);
+        var reserved = await limiter.AcquireAsync(requested, jobLimit, cancellationToken).ConfigureAwait(false);
         var read = 0;
         try
         {
@@ -1505,7 +1530,7 @@ public sealed class HttpTransferRunner
         finally
         {
             guard?.Pause();
-            limiter?.ReturnUnused(reserved - read, jobLimit);
+            limiter.ReturnUnused(reserved - read, jobLimit);
         }
     }
 
@@ -1714,7 +1739,7 @@ public sealed class HttpTransferRunner
         public TransferFailure Failure { get; } = failure;
     }
 
-    private sealed class LeaseProgress
+    internal sealed class LeaseProgress
     {
         /// <summary>Bytes of this lease attempt that reached the part file and were counted by the scheduler.</summary>
         public long Flushed { get; set; }
