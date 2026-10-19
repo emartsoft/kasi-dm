@@ -149,7 +149,8 @@ public sealed class HttpTransferRunner
             }
 
             var segmented = await SegmentedAsync(
-                pool,
+                new HttpLeaseTransport(pool, probe.FinalUrl, probe.TotalBytes.Value, probe.ETag,
+                    probe.LastModified, settings.Scope!, time),
                 probe.FinalUrl,
                 probe,
                 destinationFolder,
@@ -246,7 +247,7 @@ public sealed class HttpTransferRunner
         try
         {
             outcome = await SegmentedAsync(
-                pool,
+                new HttpLeaseTransport(pool, finalUrl, totalBytes, eTag, lastModified, settings.Scope!, time),
                 finalUrl,
                 probe: null,
                 destinationFolder,
@@ -742,7 +743,7 @@ public sealed class HttpTransferRunner
     }
 
     private async Task<TransferOutcome> SegmentedAsync(
-        HttpHostPool pool,
+        ILeaseTransport transport,
         Uri finalUrl,
         ProbeResponse? probe,
         string destinationFolder,
@@ -870,7 +871,7 @@ public sealed class HttpTransferRunner
             var workerId = worker;
             var initial = worker == 0 ? probeLease : null;
             workers[worker] = Task.Run(
-                () => WorkerAsync(workerId, initial, probe, pool, finalUrl, fileName, writer, scheduler, totalBytes, eTag, lastModified, options, time, state, signal, throttleGate, linked),
+                () => WorkerAsync(workerId, initial, probe, transport, fileName, writer, scheduler, options, time, state, signal, throttleGate, linked),
                 CancellationToken.None);
         }
 
@@ -970,14 +971,10 @@ public sealed class HttpTransferRunner
         int workerId,
         LeaseAssignment? initialLease,
         ProbeResponse? probe,
-        HttpHostPool pool,
-        Uri finalUrl,
+        ILeaseTransport transport,
         string fileName,
         PartFileWriter writer,
         SegmentScheduler scheduler,
-        long totalBytes,
-        string? eTag,
-        string? lastModified,
         HttpTransferOptions options,
         TimeProvider time,
         FailureState state,
@@ -1036,7 +1033,7 @@ public sealed class HttpTransferRunner
             var progress = new LeaseProgress();
             try
             {
-                await TransferLeaseAsync(workerId, current, probe, pool, finalUrl, writer, scheduler, totalBytes, eTag, lastModified, options, time, progress, cancellationToken).ConfigureAwait(false);
+                await TransferLeaseAsync(workerId, current, probe, transport, writer, scheduler, options, time, progress, cancellationToken).ConfigureAwait(false);
                 failedAttempts = 0;
             }
             catch (TransferException failure)
@@ -1106,19 +1103,15 @@ public sealed class HttpTransferRunner
         int workerId,
         LeaseAssignment lease,
         ProbeResponse? probe,
-        HttpHostPool pool,
-        Uri finalUrl,
+        ILeaseTransport transport,
         PartFileWriter writer,
         SegmentScheduler scheduler,
-        long totalBytes,
-        string? eTag,
-        string? lastModified,
         HttpTransferOptions options,
         TimeProvider time,
         LeaseProgress progress,
         CancellationToken cancellationToken)
     {
-        HttpResponseMessage? response = null;
+        LeaseBody? opened = null;
         var completed = false;
         try
         {
@@ -1129,28 +1122,8 @@ public sealed class HttpTransferRunner
             }
             else
             {
-#pragma warning disable CA2000 // the pool owns and disposes every invoker it returns
-                var invoker = pool.GetInvoker(finalUrl, workerId);
-                using var request = CreateLeaseRequest(finalUrl, lease, eTag, lastModified, options.Scope!);
-#pragma warning restore CA2000
-                try
-                {
-                    response = await invoker.SendAsync(request, cancellationToken).ConfigureAwait(false);
-                }
-                catch (HttpRequestException ex)
-                {
-                    throw new TransferException(NetworkFailure(ex));
-                }
-
-                ValidateLeaseResponse(response, lease, totalBytes, eTag, lastModified, time);
-                try
-                {
-                    body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                }
-                catch (HttpRequestException ex)
-                {
-                    throw new TransferException(NetworkFailure(ex));
-                }
+                opened = await transport.OpenAsync(workerId, lease, cancellationToken).ConfigureAwait(false);
+                body = opened.Body;
             }
 
             using var buffer = new PooledPartWriteBuffer(writer, options.WriteBufferMaxAge, time);
@@ -1177,7 +1150,54 @@ public sealed class HttpTransferRunner
         }
         finally
         {
-            response?.Dispose();
+            if (opened is not null)
+            {
+                await opened.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private sealed class HttpLeaseTransport(
+        HttpHostPool pool,
+        Uri finalUrl,
+        long totalBytes,
+        string? eTag,
+        string? lastModified,
+        RequestScope scope,
+        TimeProvider time) : ILeaseTransport
+    {
+        public async Task<LeaseBody> OpenAsync(int workerId, LeaseAssignment lease, CancellationToken cancellationToken)
+        {
+#pragma warning disable CA2000 // the pool owns and disposes every invoker it returns
+            var invoker = pool.GetInvoker(finalUrl, workerId);
+#pragma warning restore CA2000
+            using var request = CreateLeaseRequest(finalUrl, lease, eTag, lastModified, scope);
+            HttpResponseMessage response;
+            try
+            {
+                response = await invoker.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new TransferException(NetworkFailure(ex));
+            }
+
+            try
+            {
+                ValidateLeaseResponse(response, lease, totalBytes, eTag, lastModified, time);
+                var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                return new LeaseBody(body, response);
+            }
+            catch (HttpRequestException ex)
+            {
+                response.Dispose();
+                throw new TransferException(NetworkFailure(ex));
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
         }
     }
 
