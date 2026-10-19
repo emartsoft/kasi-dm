@@ -72,7 +72,7 @@ public sealed class DefaultDataTests : IDisposable
         await _db.ExecAsync("INSERT INTO job (id, kind, url, file_name, folder, state, queue_id, queue_pos, created_utc) VALUES ('j', 'http', 'u', 'f', 'd', 'Queued', 5, 1.0, 't');");
         var runner = new MigrationRunner(_db.Factory);
 
-        (await runner.MigrateAsync(TempDatabase.Ct)).Should().Be(1);
+        (await runner.MigrateAsync(TempDatabase.Ct)).Should().Be(2);
 
         File.Exists(runner.BackupPath).Should().BeTrue();
         (await _db.ScalarAsync("SELECT COUNT(*) FROM job;")).Should().Be(1L);

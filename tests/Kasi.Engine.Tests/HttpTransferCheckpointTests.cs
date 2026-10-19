@@ -401,6 +401,20 @@ public sealed class HttpTransferCheckpointTests : IAsyncLifetime
         public Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default) => inner.ResetProgressAsync(id, cancellationToken);
 
         public Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default) => inner.DeleteAsync(id, cancellationToken);
+
+        public Task<bool> TryChangeStateAsync(
+            JobId id,
+            JobState fromState,
+            JobState toState,
+            string? failureMessage = null,
+            PauseReason? pauseReason = null,
+            CancellationToken cancellationToken = default) =>
+            inner.TryChangeStateAsync(id, fromState, toState, failureMessage, pauseReason, cancellationToken);
+
+        public Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default) =>
+            inner.ReconcileProgressAsync(id, doneBytes, cancellationToken);
+
+        public Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default) => inner.QuickCheckAsync(cancellationToken);
     }
 
     /// <summary>Fails the first commits to simulate a database that is briefly unavailable, then delegates.</summary>

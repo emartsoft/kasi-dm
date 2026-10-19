@@ -182,5 +182,17 @@ public sealed class DuplicateDetectorTests : IDisposable
         public Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<bool> TryChangeStateAsync(
+            JobId id,
+            JobState fromState,
+            JobState toState,
+            string? failureMessage = null,
+            PauseReason? pauseReason = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<bool> ReconcileProgressAsync(JobId id, long doneBytes, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<bool> QuickCheckAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     }
 }

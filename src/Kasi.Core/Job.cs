@@ -29,6 +29,9 @@ public sealed record Job
 
     public string? Error { get; init; }
 
+    /// <summary>Why the job was paused; null in every other state. Persisted so a restart can auto-resume only network pauses.</summary>
+    public PauseReason? PauseReason { get; init; }
+
     public string? ETag { get; init; }
 
     /// <summary>The <c>Last-Modified</c> header exactly as the server sent it, so <c>If-Range</c> can send it back unchanged.</summary>
