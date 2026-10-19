@@ -100,6 +100,8 @@ internal static class NetworkSoakSuite
             var listen = await client.CreateProxyAsync(proxy, "127.0.0.1:0", $"127.0.0.1:{harness.Host.BaseAddress.Port}", cancellationToken).ConfigureAwait(false);
             using var disturbance = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var trouble = DisturbAsync(client, proxy, plan, disturbance.Token);
+            FaultIterationResult result;
+            string? troubleError;
             try
             {
                 var seed = $"fault-soak-{options.Seed}-{plan.Index}";
@@ -126,14 +128,28 @@ internal static class NetworkSoakSuite
                 }
 
                 File.Delete(path);
-                return new FaultIterationResult(plan.Index, problem is null, problem, 0, 0, relaunches);
+                result = new FaultIterationResult(plan.Index, problem is null, problem, 0, 0, relaunches);
             }
             finally
             {
                 await disturbance.CancelAsync().ConfigureAwait(false);
-                await trouble.ConfigureAwait(false);
-                await client.DeleteProxyAsync(proxy, CancellationToken.None).ConfigureAwait(false);
+                troubleError = await trouble.ConfigureAwait(false);
+                try
+                {
+                    await client.DeleteProxyAsync(proxy, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+                {
+                    // a proxy that cannot be deleted must not hide the job's own result
+                }
             }
+
+            return troubleError is null || !result.Success ? result : result with { Success = false, Error = troubleError };
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+        {
+            // Toxiproxy refused or dropped a call: this job fails, the others carry on
+            return new FaultIterationResult(plan.Index, false, $"Toxiproxy: {ex.Message}", 0, 0, relaunches);
         }
         finally
         {
@@ -168,8 +184,8 @@ internal static class NetworkSoakSuite
     private static async Task<bool> IsCompletedAsync(FaultHarness harness, JobId jobId, CancellationToken cancellationToken) =>
         (await harness.Jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false))?.State == JobState.Completed;
 
-    /// <summary>A throttled window, a reset and a partition, one after the other, until the job is over.</summary>
-    private static async Task DisturbAsync(ToxiproxyClient client, string proxy, JobPlan plan, CancellationToken cancellationToken)
+    /// <summary>A throttled window, a reset and a partition, one after the other, until the job is over; returns why it stopped early, if it did.</summary>
+    private static async Task<string?> DisturbAsync(ToxiproxyClient client, string proxy, JobPlan plan, CancellationToken cancellationToken)
     {
         try
         {
@@ -189,10 +205,16 @@ internal static class NetworkSoakSuite
             await client.AddToxicAsync(proxy, Toxic.Timeout("partition", 0), cancellationToken).ConfigureAwait(false);
             await Task.Delay(_partitionFor, cancellationToken).ConfigureAwait(false);
             await client.RemoveToxicAsync(proxy, "partition", cancellationToken).ConfigureAwait(false);
+            return null;
         }
         catch (OperationCanceledException)
         {
             // the job ended before the schedule did
+            return null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+        {
+            return $"Toxiproxy refused a trouble step: {ex.Message}";
         }
     }
 }
