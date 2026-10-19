@@ -69,12 +69,12 @@ public sealed class ProxyTestServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _stop.CancelAsync().ConfigureAwait(false);
+        await _stop.CancelAsync();
         _listener.Stop();
 #pragma warning disable VSTHRD003 // the accept loop is started by this instance in its constructor
-        await _acceptLoop.ConfigureAwait(false);
+        await _acceptLoop;
 #pragma warning restore VSTHRD003
-        await Task.WhenAll(_clients.Values).ConfigureAwait(false);
+        await Task.WhenAll(_clients.Values);
         _certificates?.Dispose();
         _stop.Dispose();
     }
@@ -86,7 +86,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
             TcpClient client;
             try
             {
-                client = await _listener.AcceptTcpClientAsync(_stop.Token).ConfigureAwait(false);
+                client = await _listener.AcceptTcpClientAsync(_stop.Token);
             }
             catch (OperationCanceledException)
             {
@@ -113,15 +113,15 @@ public sealed class ProxyTestServer : IAsyncDisposable
             {
                 using var network = client.GetStream();
                 using Stream stream = _certificates is { ServerCertificate: { } certificate }
-                    ? await AuthenticateProxyTlsAsync(network, certificate, _stop.Token).ConfigureAwait(false)
+                    ? await AuthenticateProxyTlsAsync(network, certificate, _stop.Token)
                     : network;
                 if (IsSocks5)
                 {
-                    await ServeSocksAsync(stream, _stop.Token).ConfigureAwait(false);
+                    await ServeSocksAsync(stream, _stop.Token);
                 }
                 else
                 {
-                    await ServeHttpAsync(stream, _stop.Token).ConfigureAwait(false);
+                    await ServeHttpAsync(stream, _stop.Token);
                 }
             }
             catch (Exception ex) when (ex is IOException or SocketException or EndOfStreamException or OperationCanceledException)
@@ -138,19 +138,19 @@ public sealed class ProxyTestServer : IAsyncDisposable
         try
         {
             await tls.AuthenticateAsServerAsync(certificate, clientCertificateRequired: false,
-                checkCertificateRevocation: false).WaitAsync(ct).ConfigureAwait(false);
+                checkCertificateRevocation: false).WaitAsync(ct);
             return tls;
         }
         catch
         {
-            await tls.DisposeAsync().ConfigureAwait(false);
+            await tls.DisposeAsync();
             throw;
         }
     }
 
     private async Task ServeHttpAsync(Stream client, CancellationToken ct)
     {
-        var requestLine = await ReadLineAsync(client, ct).ConfigureAwait(false);
+        var requestLine = await ReadLineAsync(client, ct);
         if (requestLine is null)
         {
             return;
@@ -158,7 +158,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
 
         var headers = new List<string>();
         string? line;
-        while (!string.IsNullOrEmpty(line = await ReadLineAsync(client, ct).ConfigureAwait(false)))
+        while (!string.IsNullOrEmpty(line = await ReadLineAsync(client, ct)))
         {
             headers.Add(line);
         }
@@ -167,7 +167,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
         {
             Interlocked.Increment(ref _authFailures);
             await WriteAsciiAsync(client,
-                "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"Kasi Test Proxy\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", ct).ConfigureAwait(false);
+                "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"Kasi Test Proxy\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", ct);
             return;
         }
 
@@ -178,13 +178,13 @@ public sealed class ProxyTestServer : IAsyncDisposable
         }
 
         using var origin = new TcpClient();
-        await origin.ConnectAsync(IPAddress.Loopback, _originPort, ct).ConfigureAwait(false);
+        await origin.ConnectAsync(IPAddress.Loopback, _originPort, ct);
         using var upstream = origin.GetStream();
         if (parts[0].Equals("CONNECT", StringComparison.OrdinalIgnoreCase))
         {
             Interlocked.Increment(ref _connects);
-            await WriteAsciiAsync(client, "HTTP/1.1 200 Connection Established\r\n\r\n", ct).ConfigureAwait(false);
-            await RelayBothAsync(client, upstream, ct).ConfigureAwait(false);
+            await WriteAsciiAsync(client, "HTTP/1.1 200 Connection Established\r\n\r\n", ct);
+            await RelayBothAsync(client, upstream, ct);
             return;
         }
 
@@ -193,7 +193,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
             return;
         }
 
-        await WriteAsciiAsync(upstream, $"{parts[0]} {uri.PathAndQuery} {parts[2]}\r\n", ct).ConfigureAwait(false);
+        await WriteAsciiAsync(upstream, $"{parts[0]} {uri.PathAndQuery} {parts[2]}\r\n", ct);
         foreach (var header in headers)
         {
             if (header.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase)
@@ -203,27 +203,27 @@ public sealed class ProxyTestServer : IAsyncDisposable
                 continue;
             }
 
-            await WriteAsciiAsync(upstream, header + "\r\n", ct).ConfigureAwait(false);
+            await WriteAsciiAsync(upstream, header + "\r\n", ct);
         }
 
-        await WriteAsciiAsync(upstream, "Connection: close\r\n\r\n", ct).ConfigureAwait(false);
-        await RelayAsync(upstream, client, ct).ConfigureAwait(false);
+        await WriteAsciiAsync(upstream, "Connection: close\r\n\r\n", ct);
+        await RelayAsync(upstream, client, ct);
     }
 
     private async Task ServeSocksAsync(Stream client, CancellationToken ct)
     {
         var hello = new byte[2];
-        await client.ReadExactlyAsync(hello, ct).ConfigureAwait(false);
+        await client.ReadExactlyAsync(hello, ct);
         if (hello[0] != 5)
         {
             return;
         }
 
         var methods = new byte[hello[1]];
-        await client.ReadExactlyAsync(methods, ct).ConfigureAwait(false);
+        await client.ReadExactlyAsync(methods, ct);
         var neededMethod = _user is null ? (byte)0 : (byte)2;
         var method = methods.Contains(neededMethod) ? neededMethod : (byte)255;
-        await client.WriteAsync(new byte[] { 5, method }, ct).ConfigureAwait(false);
+        await client.WriteAsync(new byte[] { 5, method }, ct);
         if (method == 255)
         {
             Interlocked.Increment(ref _authFailures);
@@ -233,16 +233,16 @@ public sealed class ProxyTestServer : IAsyncDisposable
         if (method == 2)
         {
             var authHeader = new byte[2];
-            await client.ReadExactlyAsync(authHeader, ct).ConfigureAwait(false);
+            await client.ReadExactlyAsync(authHeader, ct);
             var user = new byte[authHeader[1]];
-            await client.ReadExactlyAsync(user, ct).ConfigureAwait(false);
+            await client.ReadExactlyAsync(user, ct);
             var length = new byte[1];
-            await client.ReadExactlyAsync(length, ct).ConfigureAwait(false);
+            await client.ReadExactlyAsync(length, ct);
             var password = new byte[length[0]];
-            await client.ReadExactlyAsync(password, ct).ConfigureAwait(false);
+            await client.ReadExactlyAsync(password, ct);
             var valid = authHeader[0] == 1 && Encoding.UTF8.GetString(user) == _user
                 && Encoding.UTF8.GetString(password) == _password;
-            await client.WriteAsync(new byte[] { 1, valid ? (byte)0 : (byte)1 }, ct).ConfigureAwait(false);
+            await client.WriteAsync(new byte[] { 1, valid ? (byte)0 : (byte)1 }, ct);
             if (!valid)
             {
                 Interlocked.Increment(ref _authFailures);
@@ -251,7 +251,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
         }
 
         var request = new byte[4];
-        await client.ReadExactlyAsync(request, ct).ConfigureAwait(false);
+        await client.ReadExactlyAsync(request, ct);
         if (request[0] != 5 || request[1] != 1)
         {
             return;
@@ -261,7 +261,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
         {
             1 => 4,
             4 => 16,
-            3 => await ReadByteAsync(client, ct).ConfigureAwait(false),
+            3 => await ReadByteAsync(client, ct),
             _ => 0,
         };
         if (addressLength == 0)
@@ -270,13 +270,13 @@ public sealed class ProxyTestServer : IAsyncDisposable
         }
 
         var destination = new byte[addressLength + 2];
-        await client.ReadExactlyAsync(destination, ct).ConfigureAwait(false);
+        await client.ReadExactlyAsync(destination, ct);
         using var origin = new TcpClient();
-        await origin.ConnectAsync(IPAddress.Loopback, _originPort, ct).ConfigureAwait(false);
+        await origin.ConnectAsync(IPAddress.Loopback, _originPort, ct);
         Interlocked.Increment(ref _socksHandshakes);
-        await client.WriteAsync(new byte[] { 5, 0, 0, 1, 127, 0, 0, 1, 0, 0 }, ct).ConfigureAwait(false);
+        await client.WriteAsync(new byte[] { 5, 0, 0, 1, 127, 0, 0, 1, 0, 0 }, ct);
         using var upstream = origin.GetStream();
-        await RelayBothAsync(client, upstream, ct).ConfigureAwait(false);
+        await RelayBothAsync(client, upstream, ct);
     }
 
     private async Task RelayBothAsync(Stream first, Stream second, CancellationToken ct)
@@ -284,11 +284,11 @@ public sealed class ProxyTestServer : IAsyncDisposable
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var forward = RelayAsync(first, second, linked.Token);
         var backward = RelayAsync(second, first, linked.Token);
-        await Task.WhenAny(forward, backward).ConfigureAwait(false);
-        await linked.CancelAsync().ConfigureAwait(false);
+        await Task.WhenAny(forward, backward);
+        await linked.CancelAsync();
         try
         {
-            await Task.WhenAll(forward, backward).ConfigureAwait(false);
+            await Task.WhenAll(forward, backward);
         }
         catch (OperationCanceledException)
         {
@@ -300,13 +300,13 @@ public sealed class ProxyTestServer : IAsyncDisposable
         var buffer = new byte[32 * 1024];
         while (true)
         {
-            var read = await source.ReadAsync(buffer, ct).ConfigureAwait(false);
+            var read = await source.ReadAsync(buffer, ct);
             if (read == 0)
             {
                 return;
             }
 
-            await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+            await destination.WriteAsync(buffer.AsMemory(0, read), ct);
             Interlocked.Add(ref _bytesRelayed, read);
         }
     }
@@ -323,7 +323,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
         var buffer = new List<byte>(128);
         while (buffer.Count < 16 * 1024)
         {
-            var value = await ReadByteAsync(stream, ct).ConfigureAwait(false);
+            var value = await ReadByteAsync(stream, ct);
             if (value < 0)
             {
                 return null;
@@ -348,7 +348,7 @@ public sealed class ProxyTestServer : IAsyncDisposable
     private static async Task<int> ReadByteAsync(Stream stream, CancellationToken ct)
     {
         var one = new byte[1];
-        return await stream.ReadAsync(one, ct).ConfigureAwait(false) == 0 ? -1 : one[0];
+        return await stream.ReadAsync(one, ct) == 0 ? -1 : one[0];
     }
 
     private static Task WriteAsciiAsync(Stream stream, string value, CancellationToken ct) =>
