@@ -10,6 +10,9 @@ public sealed record TestServerOptions
     /// <summary>Null means HTTP/1.1 for plaintext and HTTP/1.1 and HTTP/2 when TLS is on.</summary>
     public TestServerProtocolMode? ProtocolMode { get; init; }
 
+    /// <summary>The loopback port to listen on; 0 picks a free one. A fixed port lets a job's URL survive a restart of the host (power-cut runs).</summary>
+    public int Port { get; init; }
+
     internal TestServerProtocolMode EffectiveProtocolMode =>
         ProtocolMode ?? (TlsMode == TestServerTlsMode.None ? TestServerProtocolMode.Http1 : TestServerProtocolMode.Http1AndHttp2);
 }

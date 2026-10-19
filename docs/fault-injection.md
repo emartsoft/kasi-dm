@@ -50,6 +50,36 @@ segments' `written` bytes. The data the next run had to fetch again stays within
 
 Toxiproxy (MIT) is a separate server, not a dependency of the solution. Download the release for your platform from the project's GitHub releases, check its SHA-256 against the release's checksum file, and start it (`toxiproxy-server`, REST API on `127.0.0.1:8474`). The nightly workflow does the same with a pinned version. `ToxiproxyClient` is plain `HttpClient` calls and its unit tests need no daemon.
 
+## Power cut (Hyper-V host, owner evidence)
+
+`scripts/fault-injection/Invoke-HyperVPowerCut.ps1` pulls the plug on a guest 20 times (TC-RES-003). Per iteration it restores a
+checkpoint, starts the guest, copies the harness in, starts `--scenario power-guest --phase run` (a test server on a fixed port plus
+the engine, state in `C:\kasi\state`), waits until the job has checkpointed a seeded 10 to 70 percent (or, with `-CutAtCommit`, until
+the child is stuck inside a checkpoint commit), runs `Stop-VM -TurnOff`, starts the guest and runs `--phase verify`: `PRAGMA
+integrity_check`, the database agreeing with itself, then the download finished with the right SHA-256.
+
+One-time set-up of the host and the guest:
+
+1. Hyper-V on a dedicated Windows host; run the script and the runner elevated.
+2. A Windows guest with the .NET 10 runtime (the harness is copied in per iteration) and a local account for PowerShell Direct. Its password is given
+   to the script only through `KASI_FAULT_GUEST_PASSWORD` (a repository secret for the workflow).
+3. A **standard checkpoint** of the powered-off guest named `kasi-fault-base` (or `-Checkpoint`). Every iteration starts from it, so the run is independent of the previous cut.
+4. For the workflow: a self-hosted runner labelled `self-hosted, kasi-hyperv`, the repository variables `KASI_FAULT_VM` and
+   `KASI_FAULT_GUEST_USER`, and the secret `KASI_FAULT_GUEST_PASSWORD`. `power-cut.yml` runs on `main` by hand or weekly and never on a pull request.
+
+`TC-RES-002` (a clean pause, exit and reboot, then resume) is covered by the engine's pause/resume tests and is part of the weekly checklist below, not scripted.
+
+### Sleep and hibernate (manual, weekly, 5 iterations)
+
+Start a download of a few GiB, let it reach about 40 percent, sleep the machine for two minutes, wake it and watch the job continue (or be resumed). Repeat with hibernate and with
+a restart. Afterwards check that the finished file matches its published SHA-256 and that the job list shows no error. Record the date, the Windows build and the result in the weekly log.
+
+## Nightly workflow
+
+`.github/workflows/nightly-faults.yml` runs at 01:00 UTC and on demand, one matrix leg per suite (kill, commit-kill, server-mutation,
+storage-stall, disk-pressure, network-soak), each with `--seed` set to the run number, and publishes `fault-report.json` and `summary.md` as the artifact
+`fault-<suite>` and in the job summary. The engine gate asks for three green nights in a row (M1.16).
+
 ## Fast versions in pull requests
 
 `Kasi.FaultInjection.Tests` runs the same code with three kills on 16 MiB downloads (`KillLoopSmokeTests`) and small runs of the other suites (`FaultSuiteSmokeTests`); the disk-pressure test skips itself unless the process is elevated, and the soak test unless `KASI_TOXIPROXY` points at a daemon.

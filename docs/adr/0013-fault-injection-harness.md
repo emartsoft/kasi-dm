@@ -1,6 +1,6 @@
 # 0013. Fault-injection harness and nightly reporting
 
-- Status: Accepted incrementally for M1.14 (14a to 14c landed; 14d extends it)
+- Status: Accepted incrementally for M1.14 (landed in four steps: 14a to 14d)
 - Date: 2026-10-19
 - Requirements: KASI-RES-001 to KASI-RES-006, KASI-NFR-007, KASI-NFR-009
 - Related: ADR 0012, TPL 7
@@ -70,6 +70,21 @@ schedule (start offset, latency, slow window, reset, partition) is drawn from th
 **A stuck job is a failure.** The harness samples each job's `done_bytes` every two seconds; a job in `Downloading` with no
 progress for two minutes fails the run (the longest toxic is 30 s). A child that exits without a finished job is started again,
 up to five times; needing a restart is reported, not hidden.
+
+## Decision (14d)
+
+**The guest half is part of the harness.** `--scenario power-guest` has three phases (`run`, `progress`, `verify`). Its test server uses a
+fixed port and the content is generated, so after a power cut the state folder is all a restarted guest needs. `verify` writes
+`power-report.json`. The phases run on a developer machine too: a unit test kills the guest process instead of the power.
+
+**The host half is one script.** `Invoke-HyperVPowerCut.ps1` restores a checkpoint for every iteration, so no cut depends on the previous one, and
+cuts with `Stop-VM -TurnOff`. It cuts at a seeded percentage or, with `-CutAtCommit`, while the guest is stuck inside a checkpoint
+commit (the hook of 14a, armed by the same environment variables).
+
+**Where each suite runs.** The hosted nightly workflow has one matrix leg per suite, so no job nears the six-hour limit.
+Toxiproxy is downloaded at a pinned version and checked by SHA-256 before it starts. The Hyper-V run is a separate workflow for a
+self-hosted runner, restricted to `main`, `schedule` and `workflow_dispatch`; a self-hosted runner on a public repository must never run
+a pull request's code. Those runs, and the weekly sleep/hibernate checklist, are owner evidence.
 
 ## Consequences
 

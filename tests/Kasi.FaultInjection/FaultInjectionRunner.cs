@@ -30,6 +30,11 @@ public static class FaultInjectionRunner
         }
 
         var options = requested.Validate();
+        if (options.Scenario == "power-guest")
+        {
+            return await PowerGuest.RunAsync(options, cancellationToken).ConfigureAwait(false);
+        }
+
         var report = await RunToReportAsync(options, cancellationToken).ConfigureAwait(false);
         await report.WriteAsync(options.ReportPath, cancellationToken).ConfigureAwait(false);
         await Console.Out.WriteLineAsync(

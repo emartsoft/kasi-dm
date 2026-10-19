@@ -1,0 +1,78 @@
+name: Nightly fault injection
+
+# TPL 7: the long fault suites, one matrix leg per suite so no job nears the 6 h limit. Runs on main only (a schedule always
+# does) and by hand; never on pull_request. Pull requests run the short versions in CI (Kasi.FaultInjection.Tests).
+# The Hyper-V power-cut suite needs the dedicated host and has its own workflow (power-cut.yml).
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Toxiproxy (MIT) is a separate server, pinned here and checked by hash before it runs.
+  TOXIPROXY_VERSION: v2.13.0
+  TOXIPROXY_SHA256: 04b710eefd7690c89f7cc67289e3e14618f1ff3c26e4a5f752a34a879b895bab
+
+jobs:
+  faults:
+    name: ${{ matrix.suite }}
+    runs-on: windows-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [kill, commit-kill, server-mutation, storage-stall, disk-pressure, network-soak]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build the harness
+        run: dotnet build tests/Kasi.FaultInjection/Kasi.FaultInjection.csproj -c Release
+
+      - name: Start Toxiproxy
+        if: matrix.suite == 'network-soak'
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'toxiproxy-server.exe'
+          Invoke-WebRequest "https://github.com/Shopify/toxiproxy/releases/download/$env:TOXIPROXY_VERSION/toxiproxy-server-windows-amd64.exe" -OutFile $exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          if ($hash -ne $env:TOXIPROXY_SHA256.ToUpperInvariant()) { throw "Toxiproxy hash mismatch: $hash" }
+          Start-Process $exe -ArgumentList '-host', '127.0.0.1', '-port', '8474' -WindowStyle Hidden
+          for ($i = 0; $i -lt 30; $i++) {
+            try { Invoke-RestMethod http://127.0.0.1:8474/version | Out-Null; break } catch { Start-Sleep -Seconds 1 }
+          }
+          "KASI_TOXIPROXY=127.0.0.1:8474" >> $env:GITHUB_ENV
+
+      - name: Run the suite
+        shell: pwsh
+        run: >
+          dotnet tests/Kasi.FaultInjection/bin/Release/net10.0/Kasi.FaultInjection.dll
+          --scenario ${{ matrix.suite }}
+          --seed ${{ github.run_number }}
+          --report artifacts/${{ matrix.suite }}/fault-report.json
+
+      - name: Summary
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $summary = 'artifacts/${{ matrix.suite }}/summary.md'
+          if (Test-Path $summary) { Get-Content $summary >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fault-${{ matrix.suite }}
+          path: artifacts/${{ matrix.suite }}/
+          if-no-files-found: warn
