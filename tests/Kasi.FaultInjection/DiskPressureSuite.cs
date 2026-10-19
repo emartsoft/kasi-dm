@@ -32,37 +32,39 @@ internal static class DiskPressureSuite
         string? error = null;
         string? lastSha = null;
 
-        var (exitCode, output) = await DiskPartAsync(
-            [
-                $"create vdisk file=\"{vhd}\" maximum={options.VhdMebibytes} type=expandable",
+        try
+        {
+            var (exitCode, output) = await DiskPartAsync(
+                [
+                    $"create vdisk file=\"{vhd}\" maximum={options.VhdMebibytes} type=expandable",
                 $"select vdisk file=\"{vhd}\"",
                 "attach vdisk",
                 "create partition primary",
                 "format fs=ntfs label=\"KasiPressure\" quick",
                 $"assign mount=\"{mount}\"",
             ],
-            cancellationToken).ConfigureAwait(false);
-        if (exitCode != 0)
-        {
-            return new FaultInjectionReport(options.Scenario, options.Seed, 0, 0, 0, 1, 0, 0, false, null, started.Elapsed, $"diskpart could not mount the volume (exit {exitCode}): {Tail(output)}", []);
-        }
-
-        try
-        {
-            var folder = Path.Combine(mount, "downloads");
-            var filler = Path.Combine(mount, "filler.bin");
-            for (var i = 0; i < options.IterationCount && error is null; i++)
+                cancellationToken).ConfigureAwait(false);
+            if (exitCode != 0)
             {
-                var seed = $"fault-pressure-{options.Seed}-{i}";
-                var problem = await RunOneAsync(harness, options, seed, folder, filler, cancellationToken).ConfigureAwait(false);
-                if (problem.Error is null)
-                {
-                    verified++;
-                    lastSha = problem.Sha;
-                }
+                return new FaultInjectionReport(options.Scenario, options.Seed, 0, 0, 0, 1, 0, 0, false, null, started.Elapsed, $"diskpart could not mount the volume (exit {exitCode}): {Tail(output)}", []);
+            }
 
-                results.Add(new FaultIterationResult(i, problem.Error is null, problem.Error, 0, 0, 0));
-                error ??= problem.Error;
+            {
+                var folder = Path.Combine(mount, "downloads");
+                var filler = Path.Combine(mount, "filler.bin");
+                for (var i = 0; i < options.IterationCount && error is null; i++)
+                {
+                    var seed = $"fault-pressure-{options.Seed}-{i}";
+                    var problem = await RunOneAsync(harness, options, seed, folder, filler, cancellationToken).ConfigureAwait(false);
+                    if (problem.Error is null)
+                    {
+                        verified++;
+                        lastSha = problem.Sha;
+                    }
+
+                    results.Add(new FaultIterationResult(i, problem.Error is null, problem.Error, 0, 0, 0));
+                    error ??= problem.Error;
+                }
             }
         }
         finally

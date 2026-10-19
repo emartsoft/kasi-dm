@@ -34,6 +34,7 @@ public sealed class FaultSuiteSmokeTests
     }
 
     [Trait("TC", "TC-ENG-015")]
+    [Trait("Requirement", "KASI-ENG-008")]
     [Fact]
     public async Task A_full_volume_pauses_the_job_and_freeing_space_lets_it_finish()
     {
