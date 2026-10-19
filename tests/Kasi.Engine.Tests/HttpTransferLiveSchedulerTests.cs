@@ -5,6 +5,7 @@ using Kasi.TestServer.Chaos;
 
 namespace Kasi.Engine.Tests;
 
+[Collection(BandwidthRateGroup.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requirement", "KASI-ENG-005")]
 [Trait("Requirement", "KASI-ENG-004")]
