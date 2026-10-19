@@ -559,8 +559,19 @@ public sealed class DownloadEngine : IAsyncDisposable
     {
         var last = _time.GetTimestamp();
         long lastBytes = 0;
+        var seeded = false;
         return scheduler =>
         {
+            if (!seeded)
+            {
+                // A resumed or recovered job starts with its saved bytes already counted; they were not transferred in the
+                // first second, so the baseline is taken from the scheduler instead of zero.
+                lastBytes = scheduler.TotalWritten;
+                last = _time.GetTimestamp();
+                seeded = true;
+                return;
+            }
+
             var now = _time.GetTimestamp();
             var elapsed = _time.GetElapsedTime(last, now);
             if (elapsed < TimeSpan.FromSeconds(1))

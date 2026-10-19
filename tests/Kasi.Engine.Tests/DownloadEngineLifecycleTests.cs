@@ -579,6 +579,43 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_first_speed_sample_after_a_resume_does_not_count_the_bytes_saved_before()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/resume-speed/6291456", "resume-speed.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        var chaos = new Dictionary<string, string>
+        {
+            [ChaosRegistry.HeaderName] = harness.Host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 128 * 1024 }),
+        };
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = chaos };
+        await harness.Engine.StartJobAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { DoneBytes: >= 1_500_000 }, ct);
+        await harness.Engine.PauseJobAsync(job.Id, ct);
+        var samples = new ConcurrentQueue<JobProgressed>();
+        harness.Engine.EventRaised += engineEvent =>
+        {
+            if (engineEvent is JobProgressed progressed && progressed.Id == job.Id)
+            {
+                samples.Enqueue(progressed);
+            }
+        };
+
+        await harness.Engine.ResumeJobAsync(job.Id, ct);
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (samples.Count < 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, ct);
+        }
+
+        await harness.Engine.PauseJobAsync(job.Id, ct);
+        samples.Should().NotBeEmpty();
+        // four connections at 128 KiB/s cannot exceed about 0.5 MiB/s; counting the 1.5 MiB saved earlier would show 1.5 MiB/s or more
+        samples.Select(sample => sample.BytesPerSecond).Should().OnlyContain(speed => speed < 1_000_000);
+    }
+
+    [Fact]
     public async Task Start_up_does_not_wait_for_a_network_paused_job_to_finish()
     {
         var ct = TestContext.Current.CancellationToken;
