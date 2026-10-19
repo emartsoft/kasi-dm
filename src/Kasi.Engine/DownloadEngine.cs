@@ -842,7 +842,7 @@ public sealed class DownloadEngine : IAsyncDisposable
         await _networkGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (Volatile.Read(ref _stopped) != 0)
+            if (Volatile.Read(ref _stopped) != 0 || _network is null)
             {
                 return;
             }
