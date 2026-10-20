@@ -16,6 +16,22 @@ public sealed class FaultInjectionOptionsTests
         FaultInjectionOptions.Parse(["--size", "1024", "--rate", "2048"]).Validate().DownloadSize.Should().Be(1024);
     }
 
+    [Theory]
+    [InlineData("kill", 200, 4096L * 1024 * 1024, 16)]
+    [InlineData("commit-kill", 100, 4096L * 1024 * 1024, 16)]
+    [InlineData("server-mutation", 50, 24L * 1024 * 1024, 4)]
+    [InlineData("disk-pressure", 20, 512L * 1024 * 1024, 4)]
+    [InlineData("storage-stall", 10, 32L * 1024 * 1024, 1)]
+    public void Every_suite_has_the_count_of_the_test_plan_and_its_own_size_and_connections(string scenario, int iterations, long size, int connections)
+    {
+        var options = FaultInjectionOptions.Parse(["--scenario", scenario]).Validate();
+
+        options.IterationCount.Should().Be(iterations);
+        options.DownloadSize.Should().Be(size);
+        options.ConnectionCount.Should().Be(connections);
+        FaultInjectionOptions.Parse(["--scenario", scenario, "--size", "1024", "--connections", "2"]).DownloadSize.Should().Be(1024);
+    }
+
     [Fact]
     public void The_replay_command_carries_every_option_that_shapes_the_schedule()
     {
@@ -32,7 +48,7 @@ public sealed class FaultInjectionOptionsTests
         var options = FaultInjectionOptions.Parse([]).Validate();
 
         options.Scenario.Should().Be("kill");
-        options.Connections.Should().Be(16);
+        options.ConnectionCount.Should().Be(16);
         options.DownloadSize.Should().Be(4L * 1024 * 1024 * 1024);
         options.BytesPerSecond.Should().Be(16L * 1024 * 1024);
         options.MaxKillSeconds.Should().Be(30);

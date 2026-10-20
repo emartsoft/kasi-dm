@@ -35,20 +35,30 @@ public static class FaultInjectionRunner
         await Console.Out.WriteLineAsync(
             $"{report.Scenario}: seed={report.Seed} kills={report.Kills} downloads-verified={report.Completed} " +
             $"failed={report.Failed} max-refetch={report.MaxRefetchedBytes} duration={report.Duration:g}").ConfigureAwait(false);
-        if (!report.Passed)
+        if (report.Skipped)
+        {
+            await Console.Out.WriteLineAsync($"SKIPPED {report.Scenario}: {report.SkipReason}").ConfigureAwait(false);
+        }
+        else if (!report.Passed)
         {
             await Console.Error.WriteLineAsync($"FAILED: {report.Error ?? "see the report"}").ConfigureAwait(false);
             await Console.Error.WriteLineAsync($"Re-run: {report.ToCommandLine()}").ConfigureAwait(false);
         }
 
-        return report.Passed ? 0 : 1;
+        return report.Passed || report.Skipped ? 0 : 1;
     }
 
     public static async Task<FaultInjectionReport> RunToReportAsync(FaultInjectionOptions options, CancellationToken cancellationToken = default)
     {
-        await using var harness = await Harness.CreateAsync(cancellationToken).ConfigureAwait(false);
+        await using var harness = await FaultHarness.CreateAsync(cancellationToken).ConfigureAwait(false);
         options = options.Validate();
-        var report = await RunKillLoopAsync(harness, options, cancellationToken).ConfigureAwait(false);
+        var report = options.Scenario switch
+        {
+            "server-mutation" => await ServerMutationSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
+            "storage-stall" => await StorageStallSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
+            "disk-pressure" => await DiskPressureSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
+            _ => await RunKillLoopAsync(harness, options, cancellationToken).ConfigureAwait(false),
+        };
         return report with { Replay = options.ToCommandLine() };
     }
 
@@ -57,10 +67,10 @@ public static class FaultInjectionRunner
     /// that starts over instead fails this by gigabytes once the download is past its first seconds.
     /// </summary>
     public static long RefetchBound(FaultInjectionOptions options) =>
-        (2 * options.BytesPerSecond) + (options.Connections * SocketBufferBytesPerConnection);
+        (2 * options.BytesPerSecond) + (options.ConnectionCount * SocketBufferBytesPerConnection);
 
     private static async Task<FaultInjectionReport> RunKillLoopAsync(
-        Harness harness,
+        FaultHarness harness,
         FaultInjectionOptions options,
         CancellationToken cancellationToken)
     {
@@ -90,14 +100,14 @@ public static class FaultInjectionRunner
         {
             // the child ended on its own: the file must be the generated content, then make room for the next download
             var path = Path.Combine(job!.Folder, job.FileName);
-            var state = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!.State;
+            var state = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!.State;
             if (state != JobState.Completed)
             {
                 Fail($"download {downloads} ended in state {state}, not Completed");
                 return false;
             }
 
-            lastSha = await Sha256Async(path, cancellationToken).ConfigureAwait(false);
+            lastSha = await FaultHarness.Sha256Async(path, cancellationToken).ConfigureAwait(false);
             if (lastSha != GeneratedContent.Sha256Hex(contentSeed!, options.DownloadSize))
             {
                 Fail($"download {downloads} finished with a SHA-256 that does not match the generated content");
@@ -116,17 +126,17 @@ public static class FaultInjectionRunner
             {
                 downloads++;
                 contentSeed = $"fault-{options.Scenario}-{options.Seed}-{downloads}";
-                job = harness.NewJob($"/files/{contentSeed}/{options.DownloadSize}", $"{contentSeed}.bin", options.Connections);
+                job = harness.NewJob($"/files/{contentSeed}/{options.DownloadSize}", $"{contentSeed}.bin", options.ConnectionCount);
                 await harness.Jobs.AddAsync(job, cancellationToken).ConfigureAwait(false);
             }
 
-            var before = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
+            var before = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
             var servedBefore = harness.Host.Metrics.BytesServed;
-            File.Delete(marker);
-            using var child = StartChild(harness, options, job.Id, commitKill ? new CommitKill(marker, random.Next(1, 6)) : null);
+            await DeleteWithRetryAsync(marker, cancellationToken).ConfigureAwait(false);
+            using var child = harness.StartChild(job.Id, options.BytesPerSecond, commitKill ? ChildEnvironment.CommitKill(marker, random.Next(1, 6)) : null);
             var hit = commitKill
                 ? await WaitForMarkerOrExitAsync(child, marker, _commitWait, cancellationToken).ConfigureAwait(false)
-                : !await WaitOrTimeoutAsync(child, TimeSpan.FromSeconds(random.Next(1, options.MaxKillSeconds + 1)), cancellationToken).ConfigureAwait(false);
+                : !await FaultHarness.WaitOrTimeoutAsync(child, TimeSpan.FromSeconds(random.Next(1, options.MaxKillSeconds + 1)), cancellationToken).ConfigureAwait(false);
 
             if (!hit)
             {
@@ -149,16 +159,16 @@ public static class FaultInjectionRunner
             }
 
             endedWithoutKill = 0;
-            KillIfRunning(child);
+            FaultHarness.KillIfRunning(child);
             await child.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             kills++;
             SqliteConnection.ClearAllPools();
 
-            var after = (await harness.Jobs.GetAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
+            var after = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
             var served = harness.Host.Metrics.BytesServed - servedBefore;
             var refetched = Math.Max(0, served - Math.Max(0, after.DoneBytes - before.DoneBytes));
             maxRefetch = Math.Max(maxRefetch, refetched);
-            var problem = await CheckDatabaseAsync(harness.DatabasePath, job.Id, cancellationToken).ConfigureAwait(false);
+            var problem = await FaultHarness.RetryAsync(() => CheckDatabaseAsync(harness.DatabasePath, job.Id, cancellationToken), cancellationToken).ConfigureAwait(false);
             if (problem is null && commitKill && !File.Exists(marker))
             {
                 problem = "the commit hook never fired, so the kill did not land inside a commit";
@@ -176,12 +186,12 @@ public static class FaultInjectionRunner
         if (error is null && job is not null)
         {
             // the budget of kills is spent: let the last child run to the end and verify what it wrote
-            using var last = StartChild(harness, options, job.Id, commit: null);
+            using var last = harness.StartChild(job.Id, options.BytesPerSecond);
             var limit = TimeSpan.FromSeconds((options.DownloadSize / options.BytesPerSecond * 2) + 120);
-            if (!await WaitOrTimeoutAsync(last, limit, cancellationToken).ConfigureAwait(false) || last.ExitCode != 0)
+            if (!await FaultHarness.WaitOrTimeoutAsync(last, limit, cancellationToken).ConfigureAwait(false) || last.ExitCode != 0)
             {
                 var exit = last.HasExited ? last.ExitCode : -1;
-                KillIfRunning(last);
+                FaultHarness.KillIfRunning(last);
                 Fail($"the final child did not complete (exit {exit})");
             }
             else
@@ -207,7 +217,7 @@ public static class FaultInjectionRunner
     }
 
     /// <summary>After a kill the database must open, pass SQLite's own check and still agree with itself about the job's bytes.</summary>
-    private static async Task<string?> CheckDatabaseAsync(string path, JobId jobId, CancellationToken cancellationToken)
+    internal static async Task<string?> CheckDatabaseAsync(string path, JobId jobId, CancellationToken cancellationToken)
     {
         var connection = new SqliteConnection($"Data Source={path};Pooling=False");
         await using (connection.ConfigureAwait(false))
@@ -240,55 +250,21 @@ public static class FaultInjectionRunner
         }
     }
 
-    private sealed record CommitKill(string Marker, int CommitsBefore);
 
-    private static Process StartChild(Harness harness, FaultInjectionOptions options, JobId jobId, CommitKill? commit)
+    /// <summary>The killed child may still hold the marker for a moment while Windows closes its handles.</summary>
+    private static async Task DeleteWithRetryAsync(string path, CancellationToken cancellationToken)
     {
-        var start = new ProcessStartInfo("dotnet")
+        for (var attempt = 0; ; attempt++)
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = harness.Root,
-        };
-        start.ArgumentList.Add(FindChildDll());
-        start.ArgumentList.Add(harness.DatabasePath);
-        start.ArgumentList.Add(jobId.ToString());
-        start.ArgumentList.Add(options.BytesPerSecond.ToString(CultureInfo.InvariantCulture));
-        if (commit is not null)
-        {
-            start.Environment[ChildEnvironment.CommitMarker] = commit.Marker;
-            start.Environment[ChildEnvironment.CommitsBefore] = commit.CommitsBefore.ToString(CultureInfo.InvariantCulture);
-        }
-
-        return Process.Start(start) ?? throw new InvalidOperationException("The fault child did not start.");
-    }
-
-    /// <summary>The child sits next to this assembly when the harness runs itself, and in the child project's output when a test project runs it.</summary>
-    private static string FindChildDll()
-    {
-        var here = Path.Combine(AppContext.BaseDirectory, "Kasi.FaultInjection.dll");
-        if (File.Exists(Path.ChangeExtension(here, ".runtimeconfig.json")))
-        {
-            return here;
-        }
-
-        var testsRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-        return Directory
-            .GetFiles(Path.Combine(testsRoot, "Kasi.FaultInjection", "bin"), "Kasi.FaultInjection.dll", SearchOption.AllDirectories)
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .First();
-    }
-
-    private static async Task<bool> WaitOrTimeoutAsync(Process child, TimeSpan timeout, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await child.WaitForExitAsync(cancellationToken).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
-            return true;
-        }
-        catch (TimeoutException)
-        {
-            return false;
+            try
+            {
+                File.Delete(path);
+                return;
+            }
+            catch (IOException) when (attempt < 100)
+            {
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
@@ -317,110 +293,4 @@ public static class FaultInjectionRunner
         // never reached a commit: kill it so the iteration reports the missing hook instead of hanging
         return true;
     }
-
-    private static void KillIfRunning(Process child)
-    {
-        if (child.HasExited)
-        {
-            return;
-        }
-
-        try
-        {
-            child.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException)
-        {
-            // it exited between the check and the kill
-        }
-    }
-
-    private static async Task<string> Sha256Async(string path, CancellationToken cancellationToken)
-    {
-        var stream = File.OpenRead(path);
-        await using (stream.ConfigureAwait(false))
-        {
-            using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            var buffer = new byte[256 * 1024];
-            int read;
-            while ((read = await stream.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
-            {
-                hasher.AppendData(buffer, 0, read);
-            }
-
-            return Convert.ToHexStringLower(hasher.GetHashAndReset());
-        }
-    }
-
-    private sealed class Harness : IAsyncDisposable
-    {
-        private Harness(string root, string databasePath, TestServerHost host, JobRepository jobs)
-        {
-            Root = root;
-            DatabasePath = databasePath;
-            Host = host;
-            Jobs = jobs;
-        }
-
-        public string Root { get; }
-
-        public string DatabasePath { get; }
-
-        public TestServerHost Host { get; }
-
-        public JobRepository Jobs { get; }
-
-        public static async Task<Harness> CreateAsync(CancellationToken cancellationToken)
-        {
-            var root = Path.Combine(Path.GetTempPath(), "kasi-fault-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(root);
-            var host = await TestServerHost.StartAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-            var database = Path.Combine(root, "fault.db");
-            var factory = new SqliteConnectionFactory(database);
-            await new MigrationRunner(factory).MigrateAsync(cancellationToken).ConfigureAwait(false);
-            return new Harness(root, database, host, new JobRepository(factory));
-        }
-
-        public Job NewJob(string path, string fileName, int connections)
-        {
-            var folder = Path.Combine(Root, "downloads");
-            Directory.CreateDirectory(folder);
-            return new Job
-            {
-                Id = JobId.New(TimeProvider.System),
-                Kind = JobKind.Http,
-                Url = new Uri(Host.BaseAddress, path).AbsoluteUri,
-                FileName = fileName,
-                Folder = folder,
-                QueueId = 1,
-                QueuePos = 1,
-                CreatedUtc = DateTimeOffset.UtcNow,
-                Connections = connections,
-            };
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            SqliteConnection.ClearAllPools();
-            await Host.DisposeAsync().ConfigureAwait(false);
-            try
-            {
-                if (Directory.Exists(Root))
-                {
-                    Directory.Delete(Root, recursive: true);
-                }
-            }
-            catch (IOException)
-            {
-                // a pooled SQLite handle can outlive the process by a moment
-            }
-        }
-    }
-}
-
-/// <summary>Environment variables the harness sets on the child to arm the commit-kill hook.</summary>
-internal static class ChildEnvironment
-{
-    public const string CommitMarker = "KASI_FAULT_COMMIT_MARKER";
-    public const string CommitsBefore = "KASI_FAULT_COMMITS_BEFORE";
 }

@@ -28,9 +28,16 @@ public sealed record FaultInjectionReport(
     TimeSpan Duration,
     string? Error,
     IReadOnlyList<FaultIterationResult> Results,
+    string? SkipReason = null,
     string? Replay = null)
 {
-    public bool Passed => Failed == 0 && Error is null && ChecksumVerified;
+    /// <summary>A suite that could not run here (for example no Administrator rights to mount a volume) is neither a pass nor a failure.</summary>
+    public bool Skipped => SkipReason is not null;
+
+    public bool Passed => !Skipped && Failed == 0 && Error is null && ChecksumVerified;
+
+    public static FaultInjectionReport NotRun(string scenario, int seed, string reason) =>
+        new(scenario, seed, 0, 0, 0, 0, 0, 0, false, null, TimeSpan.Zero, null, [], reason);
 
     /// <summary>The arguments that replay this schedule: every option that shapes it, not only the seed.</summary>
     public string ToCommandLine() =>
@@ -40,11 +47,16 @@ public sealed record FaultInjectionReport(
     public string ToMarkdown()
     {
         var text = new StringBuilder();
-        text.AppendLine(CultureInfo.InvariantCulture, $"# Fault injection: {Scenario} ({(Passed ? "PASS" : "FAIL")})");
+        text.AppendLine(CultureInfo.InvariantCulture, $"# Fault injection: {Scenario} ({(Skipped ? "SKIPPED" : Passed ? "PASS" : "FAIL")})");
         text.AppendLine();
         text.AppendLine("| Seed | Iterations | Kills | Downloads verified | Failed | Max refetch (B) | Duration |");
         text.AppendLine("| --- | --- | --- | --- | --- | --- | --- |");
         text.AppendLine(CultureInfo.InvariantCulture, $"| {Seed} | {Iterations} | {Kills} | {Completed} | {Failed} | {MaxRefetchedBytes} | {Duration:g} |");
+        if (SkipReason is not null)
+        {
+            text.AppendLine().AppendLine(CultureInfo.InvariantCulture, $"**Not run:** {SkipReason}");
+        }
+
         if (Error is not null)
         {
             text.AppendLine().AppendLine(CultureInfo.InvariantCulture, $"**Error:** {Error}");
