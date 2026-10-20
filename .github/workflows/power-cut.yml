@@ -1,0 +1,67 @@
+name: Power cut (Hyper-V host)
+
+# TC-RES-003: pull the plug on a Hyper-V guest in the middle of a download, 20 times. Runs on the dedicated host only, by hand or
+# weekly on main. It must NEVER run on pull_request: a self-hosted runner on a public repository must not run code from a fork's
+# pull request. The runner has the labels self-hosted and kasi-hyperv, runs elevated, and the guest is described in
+# docs/fault-injection.md ("Power cut").
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      cut_at_commit:
+        description: Cut inside a checkpoint commit instead of at a percentage
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  power-cut:
+    if: github.repository == 'emartsoft/kasi-dm' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, kasi-hyperv]
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish the harness
+        run: dotnet publish tests/Kasi.FaultInjection/Kasi.FaultInjection.csproj -c Release -o harness
+
+      - name: Cut the power
+        shell: pwsh
+        env:
+          KASI_FAULT_GUEST_PASSWORD: ${{ secrets.KASI_FAULT_GUEST_PASSWORD }}
+        run: >
+          ./scripts/fault-injection/Invoke-HyperVPowerCut.ps1
+          -VMName '${{ vars.KASI_FAULT_VM }}'
+          -GuestUser '${{ vars.KASI_FAULT_GUEST_USER }}'
+          -Seed ${{ github.run_number }}
+          -HarnessSource harness
+          -OutputDir artifacts/power-cut
+          ${{ inputs.cut_at_commit && '-CutAtCommit' || '' }}
+
+      - name: Summary
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          if (Test-Path artifacts/power-cut/summary.md) { Get-Content artifacts/power-cut/summary.md >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fault-power-cut
+          path: artifacts/power-cut/
+          if-no-files-found: warn

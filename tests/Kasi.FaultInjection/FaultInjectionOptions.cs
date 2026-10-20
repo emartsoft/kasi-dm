@@ -30,6 +30,21 @@ public sealed record FaultInjectionOptions
     /// <summary>How long a paused download waits before the disk-pressure suite frees space (TPL 7.1: 30 s).</summary>
     public int FreeAfterSeconds { get; init; } = 30;
 
+    /// <summary>Toxiproxy's REST address (<c>host:port</c>) for the network soak; falls back to the KASI_TOXIPROXY environment variable.</summary>
+    public string? Toxiproxy { get; init; }
+
+    /// <summary>The window the soak spreads its jobs over (TPL 7.1: up to 2 h).</summary>
+    public int DurationSeconds { get; init; } = 7200;
+
+    /// <summary>The folder that holds the guest's database, downloads and report for the power-cut suite (power-guest).</summary>
+    public string? State { get; init; }
+
+    /// <summary><c>run</c>, <c>progress</c> or <c>verify</c> for power-guest.</summary>
+    public string Phase { get; init; } = "run";
+
+    /// <summary>How many soak jobs may run at the same time.</summary>
+    public int Parallel { get; init; } = 10;
+
     public string ReportPath { get; init; } = "fault-report.json";
 
     public bool Help { get; init; }
@@ -41,6 +56,7 @@ public sealed record FaultInjectionOptions
         "server-mutation" => 50,
         "disk-pressure" => 20,
         "storage-stall" => 10,
+        "network-soak" => 50,
         _ => 200,
     };
 
@@ -49,6 +65,8 @@ public sealed record FaultInjectionOptions
         "server-mutation" => 24 * MiB,
         "storage-stall" => 32 * MiB,
         "disk-pressure" => 512 * MiB,
+        "network-soak" => 64 * MiB,
+        "power-guest" => 2048 * MiB,
         _ => 4096 * MiB,
     };
 
@@ -57,6 +75,7 @@ public sealed record FaultInjectionOptions
         "server-mutation" => 4 * MiB,
         "storage-stall" => 8 * MiB,
         "disk-pressure" => 64 * MiB,
+        "network-soak" => 4 * MiB,
         _ => 16 * MiB,
     };
 
@@ -66,6 +85,7 @@ public sealed record FaultInjectionOptions
         "server-mutation" => 4,
         "storage-stall" => 1,
         "disk-pressure" => 4,
+        "network-soak" => 4,
         _ => 16,
     };
 
@@ -103,6 +123,11 @@ public sealed record FaultInjectionOptions
                 "--max-kill-seconds" => options with { MaxKillSeconds = Int(value) },
                 "--vhd-mib" => options with { VhdMebibytes = Int(value) },
                 "--free-after-seconds" => options with { FreeAfterSeconds = Int(value) },
+                "--toxiproxy" => options with { Toxiproxy = value },
+                "--duration-seconds" => options with { DurationSeconds = Int(value) },
+                "--parallel" => options with { Parallel = Int(value) },
+                "--state" => options with { State = value },
+                "--phase" => options with { Phase = value },
                 "--report" => options with { ReportPath = value },
                 _ => throw new ArgumentException($"Unknown option '{name}'."),
             };
@@ -113,7 +138,7 @@ public sealed record FaultInjectionOptions
 
     public FaultInjectionOptions Validate()
     {
-        if (Scenario is not ("kill" or "commit-kill" or "server-mutation" or "storage-stall" or "disk-pressure"))
+        if (Scenario is not ("kill" or "commit-kill" or "server-mutation" or "storage-stall" or "disk-pressure" or "network-soak" or "power-guest"))
         {
             throw new ArgumentException($"Unknown scenario '{Scenario}'.");
         }
@@ -124,8 +149,15 @@ public sealed record FaultInjectionOptions
         ArgumentOutOfRangeException.ThrowIfLessThan(ConnectionCount, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(VhdMebibytes, 64);
         ArgumentOutOfRangeException.ThrowIfLessThan(FreeAfterSeconds, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThan(DurationSeconds, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(Parallel, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(BytesPerSecond, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxKillSeconds, 1);
+        if (Scenario == "power-guest" && (string.IsNullOrWhiteSpace(State) || Phase is not ("run" or "progress" or "verify")))
+        {
+            throw new ArgumentException("power-guest needs --state <folder> and --phase run|progress|verify.");
+        }
+
         if (string.IsNullOrWhiteSpace(ReportPath))
         {
             throw new ArgumentException("A report path is required.");
@@ -137,8 +169,8 @@ public sealed record FaultInjectionOptions
     public static string Usage => """
         Kasi fault-injection harness
 
-          --scenario <kill|commit-kill|server-mutation|storage-stall|disk-pressure>
-          --iterations <n>          kills, mutated jobs or rounds; default 200, 100, 50, 10 and 20 for the suites in that order
+          --scenario <kill|commit-kill|server-mutation|storage-stall|disk-pressure|network-soak|power-guest>
+          --iterations <n>          kills, mutated jobs or rounds; default 200, 100, 50, 10, 20 and 50 for the suites in that order
           --seed <n>                default random; printed and stored in the report
           --size <bytes>            size of each download (default depends on the suite; 4 GiB for the kill suites)
           --connections <n>         scheduler connections (default depends on the suite; 16 for the kill suites)
@@ -146,6 +178,11 @@ public sealed record FaultInjectionOptions
           --max-kill-seconds <n>    upper bound for a seeded kill delay (default 30)
           --vhd-mib <n>             disk-pressure volume size (default 2048; needs Administrator)
           --free-after-seconds <n>  disk-pressure wait before space is freed (default 30)
+          --toxiproxy <host:port>   Toxiproxy REST address for network-soak (or KASI_TOXIPROXY)
+          --duration-seconds <n>    network-soak window the jobs are spread over (default 7200)
+          --parallel <n>            network-soak jobs at the same time (default 10)
+          --state <folder>          power-guest: the guest's database, downloads and power-report.json
+          --phase <run|progress|verify>  power-guest: download, print the percent done, or check what a power cut left and finish
           --report <path>           JSON report; summary.md is written beside it
           --help
 
