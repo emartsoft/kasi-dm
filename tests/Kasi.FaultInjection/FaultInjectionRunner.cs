@@ -30,6 +30,11 @@ public static class FaultInjectionRunner
         }
 
         var options = requested.Validate();
+        if (options.Scenario == "power-guest")
+        {
+            return await PowerGuest.RunAsync(options, cancellationToken).ConfigureAwait(false);
+        }
+
         var report = await RunToReportAsync(options, cancellationToken).ConfigureAwait(false);
         await report.WriteAsync(options.ReportPath, cancellationToken).ConfigureAwait(false);
         await Console.Out.WriteLineAsync(
@@ -57,6 +62,7 @@ public static class FaultInjectionRunner
             "server-mutation" => await ServerMutationSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
             "storage-stall" => await StorageStallSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
             "disk-pressure" => await DiskPressureSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
+            "network-soak" => await NetworkSoakSuite.RunAsync(harness, options, cancellationToken).ConfigureAwait(false),
             _ => await RunKillLoopAsync(harness, options, cancellationToken).ConfigureAwait(false),
         };
         return report with { Replay = options.ToCommandLine() };
@@ -218,6 +224,19 @@ public static class FaultInjectionRunner
 
     /// <summary>After a kill the database must open, pass SQLite's own check and still agree with itself about the job's bytes.</summary>
     internal static async Task<string?> CheckDatabaseAsync(string path, JobId jobId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await CheckCoreAsync(path, jobId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException ex)
+        {
+            // a file SQLite cannot open at all is the clearest damage there is
+            return $"the database cannot be read: {ex.Message}";
+        }
+    }
+
+    private static async Task<string?> CheckCoreAsync(string path, JobId jobId, CancellationToken cancellationToken)
     {
         var connection = new SqliteConnection($"Data Source={path};Pooling=False");
         await using (connection.ConfigureAwait(false))
