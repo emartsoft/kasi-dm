@@ -64,8 +64,10 @@ public sealed class HttpTransferLinkRefreshTests : IAsyncLifetime
         saved!.Url.Should().Be(refreshedUrl.AbsoluteUri);
         saved.FinalUrl.Should().Be(completed.FinalUrl.AbsoluteUri);
         host.Metrics.RequestsServed.Should().BeGreaterThan(1);
+        // one write chunk (128 KiB) of slack: the server counts a chunk as served when it sends it, before the cursor that saved it moves
+        const long oneChunk = 128 * 1024;
         host.Metrics.BytesServed.Should().BeLessThanOrEqualTo(
-            FileSize - paused.SavedBytes + paused.Options.SchedulerOptions.MaxEndgameDuplicateBytes + 1);
+            FileSize - paused.SavedBytes + paused.Options.SchedulerOptions.MaxEndgameDuplicateBytes + oneChunk);
     }
 
     [Fact]
