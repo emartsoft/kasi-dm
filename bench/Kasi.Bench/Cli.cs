@@ -7,7 +7,7 @@ namespace Kasi.Bench;
 /// <summary>The macro modes of <c>Kasi.Bench</c>; anything else goes to BenchmarkDotNet.</summary>
 public static class Cli
 {
-    public static readonly string[] Modes = ["throughput", "local-1gbit", "resources", "compare"];
+    public static readonly string[] Modes = ["throughput", "local-1gbit", "resources", "compare", "fetch", "scorecard"];
 
     public const string Usage = """
         Kasi.Bench macro modes (anything else runs the BenchmarkDotNet micro-benchmarks)
@@ -16,6 +16,8 @@ public static class Cli
           local-1gbit [--size 4294967296] [--connections 16] [--runs 3] [--out file.json]
           resources   --scenario baseline|idle|jobs20|load100 [--idle-seconds 600]
           compare     <previous.json> <current.json>
+          fetch       --url <url> --folder <dir> --name <file> [--connections 8]   (one timed download; Compare-Idm.ps1 uses it)
+          scorecard   <idm-comparison.json> [--out scorecard.md] [--release]   (median Kasi/IDM ratio against the gate)
         """;
 
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
@@ -48,6 +50,10 @@ public static class Cli
                         options.Required("scenario"),
                         int.Parse(options.GetValueOrDefault("idle-seconds", "600"), CultureInfo.InvariantCulture),
                         cancellationToken).ConfigureAwait(false);
+                case "fetch":
+                    return await FetchAsync(options, cancellationToken).ConfigureAwait(false);
+                case "scorecard":
+                    return await ScorecardAsync(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)).FirstOrDefault(), options, cancellationToken).ConfigureAwait(false);
                 case "compare":
                     return await CompareAsync(args.Skip(1).Where(a => !a.StartsWith("--", StringComparison.Ordinal)).ToArray(), cancellationToken).ConfigureAwait(false);
                 default:
@@ -60,6 +66,38 @@ public static class Cli
             await Console.Error.WriteLineAsync(Usage).ConfigureAwait(false);
             return 2;
         }
+    }
+
+    private static async Task<int> FetchAsync(Dictionary<string, string> options, CancellationToken cancellationToken)
+    {
+        var timing = await EngineDownload.RunAsync(
+            options.Required("url"),
+            options.Required("folder"),
+            options.Required("name"),
+            int.Parse(options.GetValueOrDefault("connections", "8"), CultureInfo.InvariantCulture),
+            null,
+            cancellationToken).ConfigureAwait(false);
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{(timing.Completed ? "OK" : "FAILED")} {timing.Bytes} bytes in {timing.Seconds:0.000} s"));
+        return timing.Completed ? 0 : 1;
+    }
+
+    private static async Task<int> ScorecardAsync(string? file, Dictionary<string, string> options, CancellationToken cancellationToken)
+    {
+        if (file is null)
+        {
+            throw new ArgumentException("scorecard needs a comparison session file.");
+        }
+
+        var session = await BenchmarkSession.LoadAsync(file, cancellationToken).ConfigureAwait(false);
+        var result = Scorecard.Build(session, options.ContainsKey("release") ? Scorecard.ReleaseMedianLimit : Scorecard.GateMedianLimit);
+        var markdown = Scorecard.ToMarkdown(result, session);
+        Console.WriteLine(markdown);
+        if (options.TryGetValue("out", out var path) && path.Length > 0)
+        {
+            await File.WriteAllTextAsync(path, markdown, cancellationToken).ConfigureAwait(false);
+        }
+
+        return result.Passed ? 0 : 1;
     }
 
     private static async Task<int> CompareAsync(string[] files, CancellationToken cancellationToken)
