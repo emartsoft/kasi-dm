@@ -4,8 +4,4 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="../Kasi.Core/Kasi.Core.csproj" />
-  </ItemGroup>
-
 </Project>

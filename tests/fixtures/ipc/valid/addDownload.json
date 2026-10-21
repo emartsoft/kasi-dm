@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "id": "8f1c2a",
+  "type": "addDownload",
+  "url": "https://mirror.example.com/files/setup.exe",
+  "finalUrl": "https://cdn.example.com/a1b2/setup.exe",
+  "referrer": "https://example.com/download",
+  "filename": "setup.exe",
+  "mime": "application/x-msdownload",
+  "userAgent": "Mozilla/5.0 (test)",
+  "cookies": [
+    {
+      "name": "session",
+      "value": "s3cr3t-value",
+      "domain": ".example.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    }
+  ]
+}

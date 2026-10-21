@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "hello",
+  "client": "chrome",
+  "extensionVersion": "1.0.0",
+  "protocolMin": 1,
+  "protocolMax": 1
+}

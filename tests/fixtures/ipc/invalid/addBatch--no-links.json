@@ -1,0 +1,18 @@
+{
+  "v": 1,
+  "id": "b1",
+  "type": "addBatch",
+  "referrer": "https://example.com/list",
+  "links": [],
+  "cookies": [
+    {
+      "name": "session",
+      "value": "s3cr3t-value",
+      "domain": ".example.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    }
+  ],
+  "userAgent": "Mozilla/5.0 (test)"
+}

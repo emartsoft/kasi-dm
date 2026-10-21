@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "id": "c1",
+  "type": "captureMedia",
+  "tabId": 12,
+  "url": "https://cdn.example.com/stream/manifest.mpd",
+  "kind": "dash",
+  "cookies": [
+    {
+      "name": "session",
+      "value": "s3cr3t-value",
+      "domain": ".example.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    }
+  ],
+  "referrer": "https://example.com/watch",
+  "userAgent": "Mozilla/5.0 (test)"
+}

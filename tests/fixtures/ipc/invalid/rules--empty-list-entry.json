@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "id": "r1",
+  "type": "rules",
+  "enabled": true,
+  "extensions": [
+    ""
+  ],
+  "mimeTypes": [
+    "application/zip"
+  ],
+  "excludedSites": [
+    "bank.example.com"
+  ],
+  "bypassKey": "alt",
+  "ackTimeoutMs": 2000
+}

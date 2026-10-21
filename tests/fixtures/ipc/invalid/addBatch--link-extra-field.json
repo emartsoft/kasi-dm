@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "id": "b1",
+  "type": "addBatch",
+  "referrer": "https://example.com/list",
+  "links": [
+    {
+      "url": "https://example.com/a.zip",
+      "size": 5
+    },
+    {
+      "url": "https://example.com/b",
+      "filename": "b.bin"
+    }
+  ],
+  "cookies": [
+    {
+      "name": "session",
+      "value": "s3cr3t-value",
+      "domain": ".example.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    }
+  ],
+  "userAgent": "Mozilla/5.0 (test)"
+}

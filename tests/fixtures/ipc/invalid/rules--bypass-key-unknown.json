@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "id": "r1",
+  "type": "rules",
+  "enabled": true,
+  "extensions": [
+    "zip",
+    "iso",
+    "exe"
+  ],
+  "mimeTypes": [
+    "application/zip"
+  ],
+  "excludedSites": [
+    "bank.example.com"
+  ],
+  "bypassKey": "meta",
+  "ackTimeoutMs": 2000
+}
