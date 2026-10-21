@@ -13,7 +13,9 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 ## Status
 
-Under construction, in milestone **M1 (download engine)**; see [plan.md](plan.md) for the task list and what is done. Today the repository has the domain model and job lifecycle, the SQLite data layer with the checkpoint writer, filename handling, the HTTP probe, the segment scheduler, the part-file disk writer and the HTTP transfer loop with a per-worker TLS/HTTP2 connection pool, transient-error retry and live checkpoint/resume, plus `Kasi.TestServer` and the CI pipeline. **End-to-end HTTP downloads work**, including the live slow-lane, endgame and split scenarios and SQLite-backed pause/resume; M1.8 and M1.9 are merged. M1.10 (merged) adds DPAPI-backed job secrets, Basic/Digest and cookie-authenticated downloads, scoped headers, cross-origin redirects and validated signed-link refresh. M1.11 bandwidth limiting (merged) shares one global cap with optional per-job caps and a global acquisition method for future torrents. M1.12a adds checksum verification (MD5, SHA-1, SHA-256) before a download is committed and duplicate-download detection; M1.12b adds per-transfer HTTP, HTTPS (CONNECT) and SOCKS5 proxies with proxy credentials kept in the job secret; M1.12c adds FTP and FTPS downloads with `REST` resume through the same transfer loop. M1.13a adds the headless `DownloadEngine` core: atomic job state changes, start-up crash recovery and a duplicate-aware add. M1.13b adds pause, resume, cancel, disk-full and offline handling, and link refresh. M1.13c restarts a job when the remote file changed and adds a kill-loop smoke test. M1.14a adds the fault-injection harness: seeded process kills and kills inside a checkpoint commit, with database and refetch checks and a JSON report. M1.14b adds the server-mutation, storage-stall and disk-pressure suites. M1.14c adds the Toxiproxy network soak. M1.14d adds the Hyper-V power-cut script and the nightly fault workflow. M1.16a turns on the 80% `Kasi.Engine` line-coverage gate in CI. M1.16b adds an Ubuntu CI leg that runs the engine against real vsftpd, Squid and Dante in containers. M1.16c adds nightly fuzzing of the filename parser and a gate-check script that reports where the M1 engine gate stands. M1.15a adds the benchmark harness: `Kasi.Bench` macro modes, a sources catalogue and a regression-tracking result schema. M1.15 adds the benchmark harness: `Kasi.Bench` macro modes, a sources catalogue, a regression-tracking result schema, and `bench/Compare-Idm.ps1` with a scorecard for the head-to-head IDM comparison. M1.15 adds the benchmark harness: `Kasi.Bench` macro modes, a sources catalogue, a regression-tracking result schema, and `bench/Compare-Idm.ps1` with a scorecard for the head-to-head IDM comparison. The desktop app is still an empty shell. M2.1a adds `Kasi.Ipc`'s strict message contracts for the browser protocol (eleven message types, size caps, a source-generated serializer), their JSON Schema in `docs/protocol/` and sample messages shared with the extension; M2.1b adds the per-user named pipe: current-user-only access with the network denied, a server that refuses a squatted name, a client that checks who serves the pipe before sending, and a registry of connected hosts. M2.2a adds `Kasi.NativeHost`, the Native AOT native messaging host: browser frames on stdin and stdout, a two-way relay to the pipe that answers invalid messages with an `error` and exits on a broken frame, a launcher that starts `Kasi.exe --tray` and retries the pipe for 5 s, a manifest template and a developer registration script (fuzzing and the AOT publish check follow in M2.2b). `Kasi.Media`, `Kasi.Torrent` and `Kasi.Scheduling` are placeholders, and the browser extension, FFmpeg fetch and packaging scripts arrive in later milestones. Items in the layout below marked *(planned)* do not exist yet.
+Under construction in **M2 (browser integration)**; see [plan.md](plan.md) for task status. The M1 download engine supports segmented HTTP and FTP/FTPS downloads, durable resume, authentication, proxies, checksums, duplicate detection and shared bandwidth limits. The engine gate still needs the owner's benchmark and fault-injection evidence.
+
+M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). Browser behaviour and the desktop UI follow in later M2 tasks.
 
 ## Repository layout
 
@@ -29,7 +31,7 @@ kasi-dm/
 │   ├── Kasi.Ipc/             Strict message contracts and serializer, hardened named-pipe client/server (M2.1)
 │   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray (empty shell)
 │   └── Kasi.NativeHost/      Native AOT browser native-messaging host: frame reader/writer, two-way relay, Kasi launcher (M2.2a)
-├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox builds) (planned, M2)
+├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox scaffold, M2.3a)
 ├── tests/
 │   ├── Kasi.Engine.Tests/    Unit + property tests (FsCheck)
 │   ├── Kasi.*.Tests/         One test project per src project
@@ -77,7 +79,7 @@ dotnet run --project src/Kasi.App
 
 ### Browser extension (development, from M2)
 
-The extension, the dev host registration script and the commands below do not exist yet.
+The extension build exists; native host registration arrives with M2.6.
 
 ```powershell
 cd extension
@@ -108,7 +110,7 @@ dotnet test --filter "Category!=Integration"
 dotnet test --filter "TC=TC-ENG-008"
 
 # Extension tests
-cd extension; npm test; npm run test:e2e
+cd extension; npm run check:types; npm run lint; npm run format:check; npm test; npm run build
 
 # Coverage report (engine gate requires 80% line coverage)
 dotnet test --collect:"XPlat Code Coverage"

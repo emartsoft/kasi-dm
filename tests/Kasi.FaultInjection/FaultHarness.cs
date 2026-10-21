@@ -159,9 +159,11 @@ internal sealed class FaultHarness : IAsyncDisposable
     public async Task<bool> WaitForProgressAsync(Process child, JobId jobId, long size, double belowFraction, int restarts, CancellationToken cancellationToken)
     {
         var deadline = Stopwatch.StartNew();
+        Job? last = null;
         while (deadline.Elapsed < TimeSpan.FromSeconds(60) && !child.HasExited)
         {
             var job = await GetJobAsync(jobId, cancellationToken).ConfigureAwait(false);
+            last = job ?? last;
             if (job is { DoneBytes: > 0 } && job.RestartCount >= restarts && job.DoneBytes < size * belowFraction)
             {
                 return true;
@@ -170,8 +172,14 @@ internal sealed class FaultHarness : IAsyncDisposable
             await Task.Delay(25, cancellationToken).ConfigureAwait(false);
         }
 
+        // a miss has to say why: the child finished before the window, or the window never opened
+        LastProgressNote = $"waited {deadline.Elapsed.TotalSeconds:0.0} s, child {(child.HasExited ? $"exited with {child.ExitCode}" : "still running")}, "
+            + $"last seen {(last is null ? "no job" : $"{last.DoneBytes} of {size} bytes, {last.RestartCount} restart(s), state {last.State}")}";
         return false;
     }
+
+    /// <summary>What <see cref="WaitForProgressAsync"/> saw when it returned false (for the failure message).</summary>
+    public string LastProgressNote { get; private set; } = string.Empty;
 
     public static async Task<string> Sha256Async(string path, CancellationToken cancellationToken)
     {
