@@ -52,8 +52,10 @@ jobs:
       - name: Integration tests
         env:
           KASI_REQUIRE_VHD: '1'
+        # -m:1 runs one test assembly at a time: the integration tests assert on timing (throttles, restart windows, kill loops),
+        # and several assemblies at once on a 4-core runner made them flaky
         run: >
-          dotnet test Kasi.slnx -c Release --no-build
+          dotnet test Kasi.slnx -c Release --no-build -m:1
           --filter "Category=Integration&Category!=ContainerIntegration"
           --collect:"XPlat Code Coverage" --results-directory TestResults/integration --logger trx
 
