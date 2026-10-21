@@ -13,7 +13,7 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 ## Status
 
-Under construction, in milestone **M1 (download engine)**; see [plan.md](plan.md) for the task list and what is done. Today the repository has the domain model and job lifecycle, the SQLite data layer with the checkpoint writer, filename handling, the HTTP probe, the segment scheduler, the part-file disk writer and the HTTP transfer loop with a per-worker TLS/HTTP2 connection pool, transient-error retry and live checkpoint/resume, plus `Kasi.TestServer` and the CI pipeline. **End-to-end HTTP downloads work**, including the live slow-lane, endgame and split scenarios and SQLite-backed pause/resume; M1.8 and M1.9 are merged. M1.10 (merged) adds DPAPI-backed job secrets, Basic/Digest and cookie-authenticated downloads, scoped headers, cross-origin redirects and validated signed-link refresh. M1.11 bandwidth limiting (merged) shares one global cap with optional per-job caps and a global acquisition method for future torrents. M1.12a adds checksum verification (MD5, SHA-1, SHA-256) before a download is committed and duplicate-download detection; M1.12b adds per-transfer HTTP, HTTPS (CONNECT) and SOCKS5 proxies with proxy credentials kept in the job secret; M1.12c adds FTP and FTPS downloads with `REST` resume through the same transfer loop. M1.13a adds the headless `DownloadEngine` core: atomic job state changes, start-up crash recovery and a duplicate-aware add. M1.13b adds pause, resume, cancel, disk-full and offline handling, and link refresh. M1.13c restarts a job when the remote file changed and adds a kill-loop smoke test. M1.14a adds the fault-injection harness: seeded process kills and kills inside a checkpoint commit, with database and refetch checks and a JSON report. M1.14b adds the server-mutation, storage-stall and disk-pressure suites. M1.14c adds the Toxiproxy network soak. M1.14d adds the Hyper-V power-cut script and the nightly fault workflow. M1.16a turns on the 80% `Kasi.Engine` line-coverage gate in CI. The desktop app is still an empty shell. `Kasi.Media`, `Kasi.Torrent`, `Kasi.Scheduling` and `Kasi.Ipc` are placeholders, and the browser extension, native host, FFmpeg fetch and packaging scripts arrive in later milestones. Items in the layout below marked *(planned)* do not exist yet.
+Under construction, in milestone **M1 (download engine)**; see [plan.md](plan.md) for the task list and what is done. Today the repository has the domain model and job lifecycle, the SQLite data layer with the checkpoint writer, filename handling, the HTTP probe, the segment scheduler, the part-file disk writer and the HTTP transfer loop with a per-worker TLS/HTTP2 connection pool, transient-error retry and live checkpoint/resume, plus `Kasi.TestServer` and the CI pipeline. **End-to-end HTTP downloads work**, including the live slow-lane, endgame and split scenarios and SQLite-backed pause/resume; M1.8 and M1.9 are merged. M1.10 (merged) adds DPAPI-backed job secrets, Basic/Digest and cookie-authenticated downloads, scoped headers, cross-origin redirects and validated signed-link refresh. M1.11 bandwidth limiting (merged) shares one global cap with optional per-job caps and a global acquisition method for future torrents. M1.12a adds checksum verification (MD5, SHA-1, SHA-256) before a download is committed and duplicate-download detection; M1.12b adds per-transfer HTTP, HTTPS (CONNECT) and SOCKS5 proxies with proxy credentials kept in the job secret; M1.12c adds FTP and FTPS downloads with `REST` resume through the same transfer loop. M1.13a adds the headless `DownloadEngine` core: atomic job state changes, start-up crash recovery and a duplicate-aware add. M1.13b adds pause, resume, cancel, disk-full and offline handling, and link refresh. M1.13c restarts a job when the remote file changed and adds a kill-loop smoke test. M1.14a adds the fault-injection harness: seeded process kills and kills inside a checkpoint commit, with database and refetch checks and a JSON report. M1.14b adds the server-mutation, storage-stall and disk-pressure suites. M1.14c adds the Toxiproxy network soak. M1.14d adds the Hyper-V power-cut script and the nightly fault workflow. M1.16a turns on the 80% `Kasi.Engine` line-coverage gate in CI. M1.15a adds the benchmark harness: `Kasi.Bench` macro modes, a sources catalogue and a regression-tracking result schema. The desktop app is still an empty shell. `Kasi.Media`, `Kasi.Torrent`, `Kasi.Scheduling` and `Kasi.Ipc` are placeholders, and the browser extension, native host, FFmpeg fetch and packaging scripts arrive in later milestones. Items in the layout below marked *(planned)* do not exist yet.
 
 ## Repository layout
 
@@ -36,7 +36,7 @@ kasi-dm/
 │   ├── Kasi.TestServer/      Controllable HTTP test server with chaos middleware
 │   ├── Kasi.FaultInjection/  Kill-loop, power-cut and soak harnesses (planned, M1.14)
 │   └── fixtures/             Content-Disposition corpus (HLS/DASH manifests and torrent files planned, M3/M4)
-├── bench/                    Kasi.Bench BenchmarkDotNet micro-benchmarks (sources.json and weekly results planned, M1.15)
+├── bench/                    Kasi.Bench micro-benchmarks and macro modes, sources.json, results/
 ├── build/                    Packaging (Velopack), signing, FFmpeg fetch script (planned, M3/M4)
 ├── docs/                     Architecture decision records (ADRs), specs, per-milestone plans, runbooks
 ├── Directory.Build.props     Shared MSBuild settings (nullable, warnings as errors, analyzers)
@@ -121,6 +121,13 @@ Micro-benchmarks (BenchmarkDotNet) live in `bench/Kasi.Bench`:
 
 ```powershell
 dotnet run -c Release --project bench/Kasi.Bench -- --filter "*SegmentScheduler*"
+```
+
+Macro modes (see [docs/benchmarks.md](docs/benchmarks.md)): `throughput`, `local-1gbit`, `resources` and `compare`.
+
+```powershell
+dotnet build -c Release
+dotnet bench/Kasi.Bench/bin/Release/net10.0/Kasi.Bench.dll local-1gbit --size 4294967296 --connections 16
 ```
 
 Tests never reach the public internet; they run against `Kasi.TestServer`. Fault-injection and benchmark suites run on dedicated machines; see `KASI-TPL-2026-001`, sections 6 and 7.

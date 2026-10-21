@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../bench/Kasi.Bench/Kasi.Bench.csproj" />
+  </ItemGroup>
+
+</Project>
