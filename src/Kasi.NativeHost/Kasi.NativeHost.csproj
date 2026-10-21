@@ -14,6 +14,8 @@
   <ItemGroup>
     <!-- The tests drive the relay, the writer and the launcher directly, without a browser. -->
     <InternalsVisibleTo Include="Kasi.NativeHost.Tests" />
+    <!-- The nightly fuzz target runs the relay in process (TC-BRW-006). -->
+    <InternalsVisibleTo Include="Kasi.Fuzz" />
   </ItemGroup>
 
 </Project>

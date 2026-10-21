@@ -299,9 +299,9 @@ internal sealed class HostRelay(Stream stdin, NativeFrameWriter output, IHostPip
                 reader.Skip();
             }
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
-            // not even JSON: no id
+            // not even JSON, or a string that is not UTF-8: no id
         }
 
         return null;
