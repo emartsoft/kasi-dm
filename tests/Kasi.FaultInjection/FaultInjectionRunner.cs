@@ -225,14 +225,23 @@ public static class FaultInjectionRunner
     /// <summary>After a kill the database must open, pass SQLite's own check and still agree with itself about the job's bytes.</summary>
     internal static async Task<string?> CheckDatabaseAsync(string path, JobId jobId, CancellationToken cancellationToken)
     {
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            return await CheckCoreAsync(path, jobId, cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            // a file SQLite cannot open at all is the clearest damage there is
-            return $"the database cannot be read: {ex.Message}";
+            try
+            {
+                return await CheckCoreAsync(path, jobId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (SqliteException ex) when (ex.SqliteErrorCode is 5 or 6 or 10 && attempt < 50)
+            {
+                // busy, locked or an I/O error right after a kill: Windows may still be releasing the dead process's lock files, so
+                // this is retried for a few seconds; damage persists, a lock does not
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            }
+            catch (SqliteException ex)
+            {
+                // a file SQLite cannot open at all is the clearest damage there is
+                return $"the database cannot be read: {ex.Message}";
+            }
         }
     }
 

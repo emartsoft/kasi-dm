@@ -19,7 +19,7 @@ public sealed class FaultInjectionOptionsTests
     [Theory]
     [InlineData("kill", 200, 4096L * 1024 * 1024, 16)]
     [InlineData("commit-kill", 100, 4096L * 1024 * 1024, 16)]
-    [InlineData("server-mutation", 50, 24L * 1024 * 1024, 4)]
+    [InlineData("server-mutation", 50, 64L * 1024 * 1024, 4)]
     [InlineData("disk-pressure", 20, 512L * 1024 * 1024, 4)]
     [InlineData("storage-stall", 10, 32L * 1024 * 1024, 1)]
     [InlineData("network-soak", 50, 64L * 1024 * 1024, 4)]

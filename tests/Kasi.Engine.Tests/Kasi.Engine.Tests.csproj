@@ -5,6 +5,7 @@
     <ProjectReference Include="../../src/Kasi.Data/Kasi.Data.csproj" />
     <ProjectReference Include="../Kasi.FaultInjection/Kasi.FaultInjection.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
+    <ProjectReference Include="../Kasi.Fuzz/Kasi.Fuzz.csproj" />
   </ItemGroup>
 
   <ItemGroup>

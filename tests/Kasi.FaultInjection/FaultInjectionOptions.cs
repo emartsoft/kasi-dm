@@ -62,7 +62,7 @@ public sealed record FaultInjectionOptions
 
     public long DownloadSize => Size ?? Scenario switch
     {
-        "server-mutation" => 24 * MiB,
+        "server-mutation" => 64 * MiB,
         "storage-stall" => 32 * MiB,
         "disk-pressure" => 512 * MiB,
         "network-soak" => 64 * MiB,

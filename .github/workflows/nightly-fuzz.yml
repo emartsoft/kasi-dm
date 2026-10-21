@@ -1,0 +1,61 @@
+name: Nightly fuzzing
+
+# TPL 7.2: the Content-Disposition and URL filename parser (KASI-ENG-003), 3 minutes a night with SharpFuzz and libFuzzer. libFuzzer
+# runs natively on Windows, the platform Kasi ships on. Runs on main only (a schedule always does) and by hand, never on
+# pull_request: PRs replay the saved crash corpus as ordinary unit tests instead.
+# A finding fails the run, is minimised, and is uploaded as an artifact; add it to tests/fixtures/fuzz/crashes with the fix and
+# file a High defect.
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Fuzzing time in seconds (default 180, the TPL budget)
+        default: '180'
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # libfuzzer-dotnet (MIT) is a separate binary, pinned here and checked by hash before it runs.
+  LIBFUZZER_DOTNET_TAG: v2025.05.02.0904
+  LIBFUZZER_DOTNET_SHA256: 17af5b3f6ff4d2c57b44b9a35c13051b570eb66f0557d00015df3832709050bf
+
+jobs:
+  fuzz:
+    name: Filename parser
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Get libfuzzer-dotnet
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'libfuzzer-dotnet-windows.exe'
+          Invoke-WebRequest "https://github.com/Metalnem/libfuzzer-dotnet/releases/download/$env:LIBFUZZER_DOTNET_TAG/libfuzzer-dotnet-windows.exe" -OutFile $exe
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          if ($hash -ne $env:LIBFUZZER_DOTNET_SHA256.ToUpperInvariant()) { throw "libfuzzer-dotnet hash mismatch: $hash" }
+          "LIBFUZZER=$exe" >> $env:GITHUB_ENV
+
+      - name: Fuzz
+        shell: pwsh
+        run: ./build/Run-Fuzz.ps1 -LibFuzzer $env:LIBFUZZER -Seconds ${{ inputs.seconds || '180' }}
+
+      - name: Upload findings
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-findings
+          path: artifacts/fuzz/findings/
+          if-no-files-found: warn

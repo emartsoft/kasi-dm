@@ -6,13 +6,13 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
-  <!-- Kasi.TestServer is a runnable server and Kasi.FaultInjection is a child executable, not test assemblies. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer' and '$(MSBuildProjectName)' != 'Kasi.FaultInjection'">
+  <!-- Kasi.TestServer is a runnable server and Kasi.FaultInjection and Kasi.Fuzz are executables, not test assemblies. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer' and '$(MSBuildProjectName)' != 'Kasi.FaultInjection' and '$(MSBuildProjectName)' != 'Kasi.Fuzz'">
     <IsTestProject>true</IsTestProject>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer' and '$(MSBuildProjectName)' != 'Kasi.FaultInjection'">
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer' and '$(MSBuildProjectName)' != 'Kasi.FaultInjection' and '$(MSBuildProjectName)' != 'Kasi.Fuzz'">
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
@@ -20,7 +20,7 @@
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer' and '$(MSBuildProjectName)' != 'Kasi.FaultInjection'">
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kasi.TestServer' and '$(MSBuildProjectName)' != 'Kasi.FaultInjection' and '$(MSBuildProjectName)' != 'Kasi.Fuzz'">
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
   </ItemGroup>

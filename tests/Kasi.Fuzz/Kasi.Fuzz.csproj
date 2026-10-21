@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
+    <PackageReference Include="SharpFuzz" />
+  </ItemGroup>
+
+</Project>

@@ -80,6 +80,16 @@ a restart. Afterwards check that the finished file matches its published SHA-256
 storage-stall, disk-pressure, network-soak), each with `--seed` set to the run number, and publishes `fault-report.json` and `summary.md` as the artifact
 `fault-<suite>` and in the job summary. The engine gate asks for three green nights in a row (M1.16).
 
+## Fuzzing and the gate check
+
+`build/Run-Fuzz.ps1 -LibFuzzer <libfuzzer-dotnet-windows.exe>` fuzzes the filename parser for 3 minutes (`-Seconds`); the nightly
+workflow `nightly-fuzz.yml` does the same on `main`. A finding is minimised into `artifacts/fuzz/findings`; reproduce it with
+`dotnet artifacts/fuzz/bin/Kasi.Fuzz.dll --replay <file>`, fix the parser, and commit the file to `tests/fixtures/fuzz/crashes`.
+
+`build/Check-M1Gate.ps1` (or the manual `m1-gate.yml` workflow) reports where the M1 engine gate stands: tagged P1 cases and a green
+CI run, three scheduled nights with every suite PASS (a SKIPPED suite fails the night), the IDM scorecard, engine coverage, open
+Critical or High defects, and the evidence only people can produce (the Hyper-V power cut) in `docs/m1-gate-evidence.json`.
+
 ## Fast versions in pull requests
 
 `Kasi.FaultInjection.Tests` runs the same code with three kills on 16 MiB downloads (`KillLoopSmokeTests`) and small runs of the other suites (`FaultSuiteSmokeTests`); the disk-pressure test skips itself unless the process is elevated, and the soak test unless `KASI_TOXIPROXY` points at a daemon.
