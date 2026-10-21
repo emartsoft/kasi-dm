@@ -70,9 +70,7 @@ public sealed class FtpContainerTests(ConformanceImage image) : IAsyncLifetime
             "ssl_enable=YES",
             "force_local_logins_ssl=NO",
             "force_local_data_ssl=NO",
-            "ssl_tlsv1_2=YES",
-            "ssl_sslv2=NO",
-            "ssl_sslv3=NO",
+            "require_ssl_reuse=NO", // .NET cannot reuse the control connection's TLS session on the data connection
             "rsa_cert_file=/etc/ssl/ftp-cert.pem",
             "rsa_private_key_file=/etc/ssl/ftp-key.pem",
             string.Empty);
@@ -84,15 +82,16 @@ public sealed class FtpContainerTests(ConformanceImage image) : IAsyncLifetime
             .WithResourceMapping(System.Text.Encoding.ASCII.GetBytes(certificatePem), "/etc/ssl/ftp-cert.pem")
             .WithResourceMapping(System.Text.Encoding.ASCII.GetBytes(keyPem), "/etc/ssl/ftp-key.pem")
             .WithResourceMapping(GeneratedContent.Bytes(Seed, Size), "/srv/payload.bin")
-            .WithPortBinding(ControlPort, ControlPort)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(ControlPort));
+            // vsftpd as process 1 of a container dies (exit 139) when a .NET client opens a second FTPS session; with an init process in front it
+            // is an ordinary child and the transfers work, so the daemon never runs as PID 1
+            .WithCreateParameterModifier(parameters => parameters.HostConfig!.Init = true)
+            .WithPortBinding(ControlPort, ControlPort);
         for (var port = FirstPassivePort; port <= LastPassivePort; port++)
         {
             builder = builder.WithPortBinding(port, port);
         }
 
-        _vsftpd = builder.Build();
-        await _vsftpd.StartAsync(TestContext.Current.CancellationToken);
+        _vsftpd = await ConformanceImage.StartAsync(builder, ControlPort, TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -118,7 +117,7 @@ public sealed class FtpContainerTests(ConformanceImage image) : IAsyncLifetime
             var runner = ftps ? new FtpTransferRunner(new X509Certificate2Collection(_certificate!)) : new FtpTransferRunner();
             var outcome = await runner.DownloadAsync(Url(ftps), folder, Options(), ct);
 
-            var completed = outcome.Should().BeOfType<TransferCompleted>().Subject;
+            var completed = outcome.Should().BeOfType<TransferCompleted>(await WhyAsync(outcome)).Subject;
             completed.TotalBytes.Should().Be(Size);
             completed.Resumable.Should().BeTrue();
             (await File.ReadAllBytesAsync(completed.FinalPath, ct)).Should().Equal(GeneratedContent.Bytes(Seed, Size));
@@ -192,6 +191,18 @@ public sealed class FtpContainerTests(ConformanceImage image) : IAsyncLifetime
         {
             Directory.Delete(folder, recursive: true);
         }
+    }
+
+    /// <summary>What went wrong, with the daemon's own output, so a failure on a CI runner can be read without a second run.</summary>
+    private async Task<string> WhyAsync(TransferOutcome outcome)
+    {
+        if (outcome is not TransferFailed failure)
+        {
+            return string.Empty;
+        }
+
+        var (stdout, stderr) = await _vsftpd!.GetLogsAsync(ct: CancellationToken.None);
+        return $"{failure.ErrorKind}: {failure.Detail}{Environment.NewLine}--- vsftpd output ---{Environment.NewLine}{stdout}{stderr}";
     }
 
     private static Uri Url(bool ftps) => new($"{(ftps ? "ftps" : "ftp")}://127.0.0.1:{ControlPort.ToString(CultureInfo.InvariantCulture)}/payload.bin");

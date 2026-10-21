@@ -55,8 +55,15 @@ resolves that name.
 engine's detailed behaviour (dropped data connections, retries, bandwidth caps); the containers prove the same transfers against
 the software users run.
 
-**Known limit.** Docker would not start on the development machine, so the first execution of these tests is the Ubuntu CI leg.
-The daemon configurations are the likeliest place for a first-run fix.
+**What running them against the real daemons found** (all in the test setup, none in the engine):
+- vsftpd 3.0.5 rejects `ssl_tlsv1_2` and exits with code 2, so the option is not set.
+- vsftpd run as process 1 of a container dies with exit code 139 when a .NET client opens a second FTPS session; with Docker's init
+  process in front it is an ordinary child and the transfers work, so the container is created with `Init = true`.
+- Squid tried the IPv6 address Docker's host gateway also has, and failed with "network unreachable" from inside the container,
+  so the containers keep the IPv4 address of `kasi-origin.test` only.
+
+A container that does not start fails with its own log in the message. Breaking the `REST` offset in the FTP transfer makes the
+vsftpd resume test fail.
 
 ## Consequences
 

@@ -18,54 +18,21 @@ namespace Kasi.Engine.Tests.Containers;
 [Trait("Category", "ContainerIntegration")]
 [Trait("Requirement", "KASI-ENG-011")]
 [Trait("TC", "TC-ENG-019")]
-public sealed class ProxyContainerTests(ConformanceImage image) : IAsyncLifetime
+public sealed class ProxyContainerTests(ConformanceImage image)
 {
     private const string ProxyUser = "proxy-user";
     private const string ProxyPassword = "proxy-password";
     private const int Size = 16 * 1024 * 1024;
 
-    private TestServerHost? _http;
-    private TestServerHost? _https;
-    private IContainer? _squid;
-    private IContainer? _squidWithAuth;
-    private IContainer? _dante;
+    /// <summary>
+    /// The Docker host gateway has an IPv6 address as well as an IPv4 one, and Squid tries the IPv6 address and fails with "network
+    /// unreachable" inside the container, so the name is left with its IPv4 address only.
+    /// </summary>
+    private const string Ipv4Only = "grep -v ':.*kasi-origin.test' /etc/hosts > /tmp/hosts && cat /tmp/hosts > /etc/hosts";
 
-    public async ValueTask InitializeAsync()
-    {
-        if (image.Unavailable is not null)
-        {
-            return;
-        }
-
-        var ct = TestContext.Current.CancellationToken;
-        _http = await TestServerHost.StartAsync(new TestServerOptions { BindAny = true }, cancellationToken: ct);
-        _https = await TestServerHost.StartAsync(new TestServerOptions { BindAny = true, TlsMode = TestServerTlsMode.Valid }, cancellationToken: ct);
-
-        _squid = await StartAsync(Squid(authenticated: false), 3128, ct);
-        _squidWithAuth = await StartAsync(Squid(authenticated: true), 3128, ct);
-        _dante = await StartAsync(Dante(), 1080, ct);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var container in new[] { _squid, _squidWithAuth, _dante })
-        {
-            if (container is not null)
-            {
-                await container.DisposeAsync();
-            }
-        }
-
-        if (_http is not null)
-        {
-            await _http.DisposeAsync();
-        }
-
-        if (_https is not null)
-        {
-            await _https.DisposeAsync();
-        }
-    }
+    /// <summary>Each test starts only the origin and the proxy it uses and disposes them, so a case does not pay for the others.</summary>
+    private static Task<TestServerHost> OriginAsync(bool tls, CancellationToken cancellationToken) =>
+        TestServerHost.StartAsync(new TestServerOptions { BindAny = true, TlsMode = tls ? TestServerTlsMode.Valid : TestServerTlsMode.None }, cancellationToken: cancellationToken);
 
     [Theory]
     [InlineData(false)]
@@ -74,18 +41,20 @@ public sealed class ProxyContainerTests(ConformanceImage image) : IAsyncLifetime
     {
         image.SkipWithoutDocker();
         var ct = TestContext.Current.CancellationToken;
+        await using var origin = await OriginAsync(tls, ct);
+        var squid = await ConformanceImage.StartAsync(Squid(authenticated: false), 3128, ct);
+        await using var squidScope = squid;
         var folder = MakeFolder();
         try
         {
-            var origin = tls ? _https! : _http!;
             var runner = new HttpTransferRunner(new HttpHostPoolOptions
             {
                 CustomTrustRoots = tls ? new X509Certificate2Collection(origin.RootCertificate!) : null,
             });
 
-            var outcome = await runner.DownloadAsync(OriginUrl(origin, "squid"), folder, Options(ProxyOf(_squid!, 3128), "squid"), ct);
+            var outcome = await runner.DownloadAsync(OriginUrl(origin, "squid"), folder, Options(ProxyOf(squid, 3128), "squid"), ct);
 
-            outcome.Should().BeOfType<TransferCompleted>();
+            outcome.Should().BeOfType<TransferCompleted>(Why(outcome));
             origin.Metrics.BytesServed.Should().BeGreaterThanOrEqualTo(Size, "the bytes came from the origin through Squid");
         }
         finally
@@ -99,15 +68,18 @@ public sealed class ProxyContainerTests(ConformanceImage image) : IAsyncLifetime
     {
         image.SkipWithoutDocker();
         var ct = TestContext.Current.CancellationToken;
+        await using var origin = await OriginAsync(tls: false, ct);
+        var squid = await ConformanceImage.StartAsync(Squid(authenticated: true), 3128, ct);
+        await using var squidScope = squid;
         var folder = MakeFolder();
         try
         {
-            var proxy = ProxyOf(_squidWithAuth!, 3128);
+            var proxy = ProxyOf(squid, 3128);
             var good = Options(proxy, "squid-auth") with { Secret = Credentials(ProxyUser, ProxyPassword) };
-            (await new HttpTransferRunner().DownloadAsync(OriginUrl(_http!, "squid-auth"), folder, good, ct)).Should().BeOfType<TransferCompleted>();
+            (await new HttpTransferRunner().DownloadAsync(OriginUrl(origin, "squid-auth"), folder, good, ct)).Should().BeOfType<TransferCompleted>();
 
             var bad = Options(proxy, "squid-auth") with { OverrideFileName = "bad.bin", Secret = Credentials(ProxyUser, "wrong-password") };
-            var failed = (await new HttpTransferRunner().DownloadAsync(OriginUrl(_http!, "squid-auth"), folder, bad, ct)).Should().BeOfType<TransferFailed>().Subject;
+            var failed = (await new HttpTransferRunner().DownloadAsync(OriginUrl(origin, "squid-auth"), folder, bad, ct)).Should().BeOfType<TransferFailed>().Subject;
             failed.Detail.Should().NotContain("wrong-password").And.NotContain(ProxyUser);
         }
         finally
@@ -121,15 +93,18 @@ public sealed class ProxyContainerTests(ConformanceImage image) : IAsyncLifetime
     {
         image.SkipWithoutDocker();
         var ct = TestContext.Current.CancellationToken;
+        await using var origin = await OriginAsync(tls: false, ct);
+        var dante = await ConformanceImage.StartAsync(Dante(), 1080, ct);
+        await using var danteScope = dante;
         var folder = MakeFolder();
         try
         {
-            var proxy = new Uri($"socks5://127.0.0.1:{_dante!.GetMappedPublicPort(1080).ToString(CultureInfo.InvariantCulture)}");
+            var proxy = new Uri($"socks5://127.0.0.1:{dante.GetMappedPublicPort(1080).ToString(CultureInfo.InvariantCulture)}");
             var good = Options(proxy, "dante") with { Secret = Credentials(ProxyUser, ProxyPassword) };
-            (await new HttpTransferRunner().DownloadAsync(OriginUrl(_http!, "dante"), folder, good, ct)).Should().BeOfType<TransferCompleted>();
+            (await new HttpTransferRunner().DownloadAsync(OriginUrl(origin, "dante"), folder, good, ct)).Should().BeOfType<TransferCompleted>();
 
             var bad = Options(proxy, "dante") with { OverrideFileName = "bad.bin", Secret = Credentials(ProxyUser, "wrong-password") };
-            var failed = (await new HttpTransferRunner().DownloadAsync(OriginUrl(_http!, "dante"), folder, bad, ct)).Should().BeOfType<TransferFailed>().Subject;
+            var failed = (await new HttpTransferRunner().DownloadAsync(OriginUrl(origin, "dante"), folder, bad, ct)).Should().BeOfType<TransferFailed>().Subject;
             failed.Detail.Should().NotContain("wrong-password");
         }
         finally
@@ -152,7 +127,7 @@ public sealed class ProxyContainerTests(ConformanceImage image) : IAsyncLifetime
             "http_access deny all",
             string.Empty);
         return ConformanceImage.Role(
-                $"echo \"{ProxyUser}:$(openssl passwd -apr1 {ProxyPassword})\" > /etc/squid/passwd && chmod 644 /etc/squid/passwd && exec squid -N -f /etc/squid/squid.conf")
+                $"{Ipv4Only} && echo \"{ProxyUser}:$(openssl passwd -apr1 {ProxyPassword})\" > /etc/squid/passwd && chmod 644 /etc/squid/passwd && exec squid -N -f /etc/squid/squid.conf")
             .WithResourceMapping(System.Text.Encoding.ASCII.GetBytes(config), "/etc/squid/squid.conf")
             .WithExtraHost("kasi-origin.test", "host-gateway")
             .WithPortBinding(3128, true);
@@ -170,18 +145,13 @@ public sealed class ProxyContainerTests(ConformanceImage image) : IAsyncLifetime
             "client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }",
             "socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }",
             string.Empty);
-        return ConformanceImage.Role($"useradd -M -s /usr/sbin/nologin {ProxyUser} && echo '{ProxyUser}:{ProxyPassword}' | chpasswd && exec danted -f /etc/danted.conf")
+        return ConformanceImage.Role($"{Ipv4Only} && useradd -M -s /usr/sbin/nologin {ProxyUser} && echo '{ProxyUser}:{ProxyPassword}' | chpasswd && exec danted -f /etc/danted.conf")
             .WithResourceMapping(System.Text.Encoding.ASCII.GetBytes(config), "/etc/danted.conf")
             .WithExtraHost("kasi-origin.test", "host-gateway")
             .WithPortBinding(1080, true);
     }
 
-    private static async Task<IContainer> StartAsync(ContainerBuilder builder, int port, CancellationToken cancellationToken)
-    {
-        var container = builder.WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(port)).Build();
-        await container.StartAsync(cancellationToken);
-        return container;
-    }
+    private static string Why(TransferOutcome outcome) => outcome is TransferFailed failed ? $"{failed.ErrorKind}: {failed.Detail}" : string.Empty;
 
     private static Uri ProxyOf(IContainer container, int port) =>
         new($"http://127.0.0.1:{container.GetMappedPublicPort(port).ToString(CultureInfo.InvariantCulture)}");

@@ -42,6 +42,36 @@ public sealed class ConformanceImage : IAsyncLifetime
     /// <summary>Skips the calling test when Docker is not available.</summary>
     public void SkipWithoutDocker() => Assert.SkipWhen(Unavailable is not null, Unavailable ?? string.Empty);
 
+    /// <summary>
+    /// Starts the container and waits for <paramref name="port"/>. When it does not come up, the failure carries the container's own
+    /// log, which is the only way to see why a daemon refused its configuration on a CI runner.
+    /// </summary>
+    public static async Task<IContainer> StartAsync(ContainerBuilder builder, int port, CancellationToken cancellationToken)
+    {
+        var container = builder.WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(port)).Build();
+        try
+        {
+            await container.StartAsync(cancellationToken);
+            return container;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var log = string.Empty;
+            try
+            {
+                var (stdout, stderr) = await container.GetLogsAsync(ct: CancellationToken.None);
+                log = stdout + stderr;
+            }
+            catch (Exception logEx) when (logEx is not OperationCanceledException)
+            {
+                log = $"(the log could not be read: {logEx.Message})";
+            }
+
+            await container.DisposeAsync();
+            throw new InvalidOperationException($"A conformance container did not start: {ex.Message}\n--- container log ---\n{log}", ex);
+        }
+    }
+
     /// <summary>A container of the conformance image that runs <paramref name="shellCommand"/>.</summary>
     public static ContainerBuilder Role(string shellCommand) =>
         new ContainerBuilder(Name).WithEntrypoint("sh", "-c").WithCommand(shellCommand);
