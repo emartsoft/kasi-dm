@@ -23,7 +23,7 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 Under construction in **M2 (browser integration)**; see [plan.md](plan.md) for task status. The M1 download engine supports segmented HTTP and FTP/FTPS downloads, durable resume, authentication, proxies, checksums, duplicate detection and shared bandwidth limits. The engine gate still needs the owner's benchmark and fault-injection evidence.
 
-M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types; M2.3b adds its native port manager, rules cache, redacting logger, Ajv fixture tests, CI job and nightly browser smoke. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). Browser interception and the desktop UI follow in later M2 tasks.
+M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types; M2.3b adds its native port manager, rules cache, redacting logger, Ajv fixture tests, CI job and nightly browser smoke. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). M2.4a adds the rule semantics (extension, MIME type, excluded sites, minimum size, bypass key) as pure, tested extension code and the optional `minSizeBytes` on `rules`. The interception logic, the end-to-end harness and the desktop UI follow in later M2 tasks.
 
 ## Repository layout
 
