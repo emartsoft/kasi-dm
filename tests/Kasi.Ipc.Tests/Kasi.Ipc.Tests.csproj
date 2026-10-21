@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.Ipc/Kasi.Ipc.csproj" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
 </Project>

@@ -6,6 +6,7 @@ The messages between the Kasi browser extension (through `Kasi.NativeHost`) and 
 | --- | --- |
 | `kasi-messages.schema.json` | The single definition: JSON Schema draft-07, one `oneOf` over the eleven message types, discriminated by `type`. |
 | `src/Kasi.Ipc/` | The C# contracts (`IpcMessage` and its records), `IpcSerializer` and the checks the schema also states. |
+| `src/Kasi.Ipc/Transport/` | The transport: `\\.\pipe\kasi-<SID>`, 4-byte little-endian length frames, `KasiPipeServer` and `KasiPipeClient` (see ADR 0016). |
 | `tests/fixtures/ipc/valid`, `invalid` | Sample messages read by both test suites. |
 
 ## Rules

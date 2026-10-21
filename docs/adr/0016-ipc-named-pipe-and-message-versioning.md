@@ -1,6 +1,6 @@
-# 0016. IPC: strict message contracts, the schema, and (2.1b) the named pipe
+# 0016. IPC: strict message contracts, the schema and the named pipe
 
-- Status: Accepted for the contracts (M2.1a); the pipe section is added in M2.1b
+- Status: Accepted (contracts M2.1a, pipe M2.1b)
 - Date: 2026-10-21
 - Requirements: KASI-NFR-010, KASI-BRW-006
 - Related: TRD 5.1, 5.2, 9.3, 9.4; `docs/plans/m2-1.md`
@@ -37,4 +37,29 @@ input comes from a browser, so it has to be treated as untrusted.
 - The three consumers cannot drift unnoticed: changing the schema, the records or a sample file without the others fails a test.
 - The schema checks URLs less strictly than `System.Uri`; the C# side is the authority, and the extension may be stricter.
 - Each field cap is a number to keep in two places (the schema and `IpcLimits`), guarded by a test.
-- The pipe's access control, framing and host registry are decided and recorded in M2.1b.
+
+## The pipe (M2.1b)
+
+- **Name and access (TRD 5.1, 9.3).** `\\.\pipe\kasi-<user SID>`. The server creates it with an explicit access list of exactly two entries:
+  allow the current user read, write and create-new-instance (the server opens one instance per host), and deny the NETWORK SID. Nothing
+  for Everyone, Users, Administrators or SYSTEM. The pipe is owned by the user. `PipeOptions.CurrentUserOnly` is not used, because it
+  cannot be combined with an explicit list.
+- **No squatting.** The first instance is created with `FirstPipeInstance`, so if another process already holds the name `Start()` throws
+  instead of Kasi serving a pipe someone else can read. The client checks, before it sends a byte, that the process serving the pipe
+  belongs to the same Windows user (process token owner, via `GetNamedPipeServerProcessId`); if the owner differs or cannot be read
+  (for example an elevated server read from a normal client) it refuses. It also connects with the Identification impersonation
+  level, so the server cannot act as the client.
+- **Frames.** A 4-byte little-endian length and UTF-8 JSON, as in the browser's native messaging. Length 0 or over 64 MiB closes the
+  connection. The receive buffer grows with the bytes that arrive, so a peer that claims 64 MiB and sends nothing costs a small buffer.
+- **Many hosts.** Any number of hosts (one per browser profile) may connect, up to a cap of 64. A connection must open with an acceptable
+  `hello` within 10 s (versions must include 1), else it is closed; after that it is registered. `SendAsync` pushes to one host,
+  `BroadcastAsync` to all at the same time, dropping a host that does not take the message within 5 s. `RequestAsync` waits for the
+  `ack` or `error` that carries the request's id.
+- **Failure policy.** A malformed or unexpected message gets an `error` with a code and no input, and the connection closes; the server
+  keeps serving others. A handler that throws costs that message an `INTERNAL` error, not the connection.
+- **Buffers.** 64 KiB each way. A zero-size buffer makes a write wait for the reader, which would stall a broadcast on one slow host.
+- **Windows only.** `Kasi.Ipc` is marked `SupportedOSPlatform("windows")`; the host and the app are Windows programs (TRD 5.1).
+- **Verified by** tests of the access list read back from a live pipe, the second-instance failure, a client refusing a server owned by
+  another SID or by none, the limits above, and (elevated, run on CI) a process of a temporary local user that cannot open the pipe
+  while it can open a control pipe that allows everyone. Dropping the NETWORK deny, allowing Everyone, or accepting `v` 2 each fails a
+  named test.
