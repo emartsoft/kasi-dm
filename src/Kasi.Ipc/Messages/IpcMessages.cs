@@ -80,6 +80,9 @@ public sealed record Rules : IpcMessage
     public required BypassKey BypassKey { get; init; }
 
     public required int AckTimeoutMs { get; init; }
+
+    /// <summary>Optional minimum size in bytes (TRD 9.2); send it only to an extension whose <c>hello</c> reports <see cref="IpcProtocol.MinSizeExtensionVersion"/> or later.</summary>
+    public long? MinSizeBytes { get; init; }
 }
 
 /// <summary>Extension to Kasi: one intercepted or context-menu download.</summary>

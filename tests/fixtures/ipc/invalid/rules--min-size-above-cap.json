@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "id": "r1",
+  "type": "rules",
+  "enabled": true,
+  "extensions": [
+    "zip",
+    "iso",
+    "exe"
+  ],
+  "mimeTypes": [
+    "application/zip"
+  ],
+  "excludedSites": [
+    "bank.example.com"
+  ],
+  "bypassKey": "alt",
+  "ackTimeoutMs": 2000,
+  "minSizeBytes": 9007199254740992
+}
