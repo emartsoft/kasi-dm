@@ -12,7 +12,7 @@ public sealed class FaultSuiteSmokeTests
     [Fact]
     public async Task A_file_that_changes_between_or_during_sessions_is_restarted_and_finishes_as_one_whole_version()
     {
-        var options = new FaultInjectionOptions { Scenario = "server-mutation", Seed = 21, Iterations = 4, Size = 16L * 1024 * 1024, Rate = 4L * 1024 * 1024 };
+        var options = new FaultInjectionOptions { Scenario = "server-mutation", Seed = 21, Iterations = 4, Size = 32L * 1024 * 1024, Rate = 4L * 1024 * 1024 };
 
         var report = await FaultInjectionRunner.RunToReportAsync(options, TestContext.Current.CancellationToken);
 
