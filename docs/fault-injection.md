@@ -82,9 +82,12 @@ storage-stall, disk-pressure, network-soak), each with `--seed` set to the run n
 
 ## Fuzzing and the gate check
 
-`build/Run-Fuzz.ps1 -LibFuzzer <libfuzzer-dotnet-windows.exe>` fuzzes the filename parser for 3 minutes (`-Seconds`); the nightly
-workflow `nightly-fuzz.yml` does the same on `main`. A finding is minimised into `artifacts/fuzz/findings`; reproduce it with
-`dotnet artifacts/fuzz/bin/Kasi.Fuzz.dll --replay <file>`, fix the parser, and commit the file to `tests/fixtures/fuzz/crashes`.
+`build/Run-Fuzz.ps1 -LibFuzzer <libfuzzer-dotnet-windows.exe>` fuzzes the filename parser for 3 minutes (`-Seconds`); with
+`-Target host` it fuzzes the native messaging host's frame reader, strict parser and error replies (TC-BRW-006) for 5 minutes. The
+nightly workflow `nightly-fuzz.yml` runs both on `main`. A finding is minimised into `artifacts/fuzz/findings` (host:
+`artifacts/fuzz-host/findings`); reproduce it with `dotnet artifacts/fuzz/bin/Kasi.Fuzz.dll --replay <file>` (host: set
+`KASI_FUZZ_TARGET=host` first), fix the code, and commit the file to `tests/fixtures/fuzz/crashes` (host:
+`tests/fixtures/fuzz/host-crashes`).
 
 `build/Check-M1Gate.ps1` (or the manual `m1-gate.yml` workflow) reports where the M1 engine gate stands: tagged P1 cases and a green
 CI run, three scheduled nights with every suite PASS (a SKIPPED suite fails the night), the IDM scorecard, engine coverage, open
