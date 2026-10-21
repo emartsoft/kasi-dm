@@ -39,9 +39,18 @@ public sealed class CompareIdmScriptTests
 
             // like IDMan /d <url> /p <folder> /f <name> /n /q: queue the download in the background and return at once
             var fakeIdm = Path.Combine(folder, "IDMan.cmd");
+            // the download runs from a script that logs what goes wrong, so a stalled run can say why
+            var fakeLog = Path.Combine(folder, "fake-idm.log");
+            var fakeScript = Path.Combine(folder, "fake-idm.ps1");
+            await File.WriteAllTextAsync(
+                fakeScript,
+                "param($Url, $Folder, $Name, $Log)\r\n" +
+                "try { Start-Sleep -Milliseconds 700; Invoke-WebRequest -Uri $Url -OutFile (Join-Path $Folder $Name) -UseBasicParsing; Add-Content $Log \"ok $Name\" }\r\n" +
+                "catch { Add-Content $Log \"failed $Name : $_\" }\r\n",
+                ct);
             await File.WriteAllTextAsync(
                 fakeIdm,
-                "@echo off\r\nstart \"\" /b powershell -NoProfile -Command \"Start-Sleep -Milliseconds 700; Invoke-WebRequest -Uri '%~2' -OutFile '%~4\\%~6' -UseBasicParsing\"\r\nexit /b 0\r\n",
+                $"@echo off\r\nstart \"\" /b powershell -NoProfile -File \"{fakeScript}\" \"%~2\" \"%~4\" \"%~6\" \"{fakeLog}\"\r\nexit /b 0\r\n",
                 ct);
 
             var start = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -63,10 +72,10 @@ public sealed class CompareIdmScriptTests
             if (!await WaitAsync(process, TimeSpan.FromMinutes(8), ct))
             {
                 process.Kill(entireProcessTree: true);
-                Assert.Fail("The dry run did not finish in 8 minutes. Output so far:" + Environment.NewLine + await output + await error);
+                Assert.Fail("The dry run did not finish in 8 minutes. Output so far:" + Environment.NewLine + await output + await error + FakeLog(fakeLog));
             }
 
-            var log = await output + await error;
+            var log = await output + await error + FakeLog(fakeLog);
 
             // the fake is slower than the engine, so the gate passes; what matters is that every row is there and verified
             process.ExitCode.Should().Be(0, log);
@@ -121,6 +130,9 @@ public sealed class CompareIdmScriptTests
             File.Delete(fake);
         }
     }
+
+    private static string FakeLog(string path) =>
+        Environment.NewLine + "fake IDM log:" + Environment.NewLine + (File.Exists(path) ? File.ReadAllText(path) : "none (the fake never ran to its end)");
 
     private static async Task<bool> WaitAsync(Process process, TimeSpan timeout, CancellationToken cancellationToken)
     {
