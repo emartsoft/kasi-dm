@@ -12,7 +12,7 @@ Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5
 | Phase | Weeks | Theme | Gate at the end | Status |
 | --- | --- | --- | --- | --- |
 | M0 | 1 to 2 | Foundations: solution, data layer, test server, CI | End of M0 | ✅ closed for engineering; owner items open (code signing, Native AOT check) |
-| M1 | 3 to 8 | Download engine, resume, bandwidth | **Engine gate** | 🔶 14 of 16 tasks done (M1.1 to M1.14) |
+| M1 | 3 to 8 | Download engine, resume, bandwidth | **Engine gate** | 🔶 15 of 16 tasks done (M1.1 to M1.15) |
 | M2 | 9 to 13 | Browser extension, host, queues, categories, main UI flows | **Internal alpha** | ⬜ not started |
 | M3 | 14 to 17 | Media capture, FFmpeg, scheduler wake and quotas | none (plan v0.4) | ⬜ not started |
 | M4 | 18 to 21 | BitTorrent, installer, portable, updates, signing | **Public beta** | ⬜ not started |
