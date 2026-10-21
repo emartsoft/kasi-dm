@@ -1,6 +1,6 @@
 # 0014. Benchmark protocol and the IDM comparison
 
-- Status: Accepted incrementally for M1.15 (15a landed first; 15b extends it)
+- Status: Accepted for M1.15 (15a and 15b)
 - Date: 2026-10-20
 - Requirements: KASI-NFR-001, KASI-NFR-002; engine-only early signals for KASI-NFR-004 and KASI-NFR-005
 - Related: TPL 6, ADR 0010, ADR 0013
@@ -44,6 +44,23 @@ unit tests and a small local smoke run in CI, and the smoke checks the pipeline 
 **The tool measures itself.** The first sampler read the process through `Process.Refresh` and `WorkingSet64`, which enumerate
 every process on the machine, and cost a third of a core on its own. It reads `Environment.WorkingSet` and the process handle
 now, and the `baseline` scenario (sampler alone) stays as a check on the instrument.
+
+## Decision (15b)
+
+**One timing rule for both tools, taken outside them.** `Compare-Idm.ps1` times IDM from the call to the full-size file, because
+`IDMan.exe` only queues a download and returns, so completion is detected by polling for the expected size and an exclusive open.
+Kasi runs as `Kasi.Bench fetch` and is timed from process start to exit; the 0.3 s of start-up counts against Kasi. Verification is
+afterwards and untimed.
+
+**Never count a failed download as fast.** The first verified hash of a source is the reference for every later run of both tools.
+A source and connection count with no verified run for one tool is excluded from the scorecard and listed in it.
+
+**The scorecard is C#, not PowerShell.** `Scorecard` computes median-over-median per source and connection count, the median of
+those ratios per connection count and the worst source, against 1.10 (gate) or 1.05 (release, `--release`) and 1.25. It is unit
+tested on canned sessions, and a dry run of the script against a local server and a fake `IDMan` runs in CI.
+
+**IDM's connection count stays manual.** IDM takes it from its own settings, and no supported command-line switch is documented,
+so the script asks before each pass instead of writing registry values it cannot verify.
 
 ## Consequences
 
