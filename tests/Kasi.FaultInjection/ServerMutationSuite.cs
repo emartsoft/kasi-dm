@@ -79,7 +79,7 @@ internal static class ServerMutationSuite
             if (!await harness.WaitForProgressAsync(first, job.Id, options.DownloadSize, 0.7, 0, cancellationToken).ConfigureAwait(false))
             {
                 FaultHarness.KillIfRunning(first);
-                return "the child ended or checkpointed nothing before the file could be changed";
+                return "the child ended or checkpointed nothing before the file could be changed (" + harness.LastProgressNote + ")";
             }
 
             FaultHarness.KillIfRunning(first);
@@ -95,7 +95,7 @@ internal static class ServerMutationSuite
             if (!await harness.WaitForProgressAsync(second, job.Id, options.DownloadSize, 0.7, version - 1, cancellationToken).ConfigureAwait(false))
             {
                 FaultHarness.KillIfRunning(second);
-                return "the child ended or checkpointed nothing before the file could be changed";
+                return "the child ended or checkpointed nothing before the file could be changed (" + harness.LastProgressNote + ")";
             }
 
             harness.Host.Mutable.Change(id);
