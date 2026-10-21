@@ -1,6 +1,6 @@
 # 0017. Native messaging host and process lifecycle
 
-- Status: Proposed (host relay, launcher and registration M2.2a; fuzzing and the AOT publish check follow in M2.2b)
+- Status: Accepted (host relay, launcher and registration M2.2a; fuzzing and the AOT publish check M2.2b)
 - Date: 2026-10-21
 - Requirements: KASI-BRW-006, KASI-NFR-010
 - Related: TRD 5.1, 5.2, 9.3, 9.4; ADR 0016; `docs/plans/m2-2.md`
@@ -40,6 +40,24 @@ extension and must treat them as untrusted.
 8. **Registration.** `src/Kasi.NativeHost/Registration/com.martsoft.kasi.json` is the manifest template and
    `scripts/native-host/Register-NativeHost.ps1` registers it per user (HKCU) for Chrome, Edge and Firefox for development. The installer
    takes over in M4; allow-listing a non-listed extension is refused by the browser (TC-BRW-007 belongs to that work).
+
+9. **Fuzzing (TC-BRW-006).** `NativeHostFuzzTests` feeds 100,000 seeded malformed frames (`MalformedFrames`: broken JSON and UTF-8,
+   wrong types, unknown types and fields, duplicate properties, deep nesting, huge strings, control characters, bad `v`, values over
+   their caps, messages only Kasi may send) through one `HostRelay` session: each gets an `error` with a fixed detail, nothing reaches
+   Kasi, the log stays empty, memory does not grow, and the host still relays a valid message at the end. A table-driven test breaks
+   the framing 1,000 ways (zero length, over 64 MiB up to 4 GiB, cut header, cut payload): exit code 2, the frames before the break
+   answered, never a partial frame. The nightly SharpFuzz target `HostMessageFuzz` (`tests/Kasi.Fuzz`, 5 minutes in `nightly-fuzz.yml`,
+   `Run-Fuzz.ps1 -Target host`) instruments `Kasi.Ipc` and `Kasi.NativeHost` and holds the invariants in one place, with an oracle: the
+   strict parse alone decides the reply. Its seeds are one valid message of each type, and its findings are replayed as a unit test from
+   `tests/fixtures/fuzz/host-crashes`. The first run found a real defect in the 2.2a relay: `TryReadId` threw on invalid UTF-8 in an
+   `id` string and would have ended the host; it now treats that as "no id" (saved as `invalid-utf8-in-id`).
+10. **Native AOT in CI.** The `native-host-aot` job in `ci.yml` publishes `Kasi.NativeHost` for `win-x64` (single file; trimming and AOT
+    warnings are errors), fails when the executable is over 5 MB, records the cold start (median of 20 launches) in the job summary
+    without gating on it, and runs `AotExecutableTests` against the published executable over real stdin and stdout pipes: 1,000 of
+    the malformed frames come back as errors with exit code 0, and a broken frame gives exit code 2, nothing on stdout and the fixed
+    line on stderr. The measured numbers on the development machine: 3.48 MB and a 22 to 24 ms cold start (TRD target 50 ms, judged
+    on the benchmark machine). The managed fuzz target runs the same relay code the AOT build compiles, which is why the process
+    sample exists: it is the only place the trimmed build is exercised.
 
 ## Consequences
 
