@@ -81,7 +81,7 @@ internal static class PowerGuest
         var exit = 3;
         if (problem is null)
         {
-            var host = await TestServerHost.StartAsync(new TestServerOptions { Port = Port }, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var host = await StartServerAsync(cancellationToken).ConfigureAwait(false);
             await using (host.ConfigureAwait(false))
             {
                 exit = await ChildRunner.RunAsync(database, jobId, options.BytesPerSecond).ConfigureAwait(false);
@@ -125,6 +125,25 @@ internal static class PowerGuest
         await report.WriteAsync(Path.Combine(state, "power-report.json"), cancellationToken).ConfigureAwait(false);
         await Console.Out.WriteLineAsync(problem is null ? "PASS" : $"FAIL: {problem}").ConfigureAwait(false);
         return problem is null ? 0 : 1;
+    }
+
+    /// <summary>
+    /// The fixed port may still be held for a moment by the process that was just killed (or by its socket in the OS), so a bind failure is
+    /// retried for a few seconds before it is reported.
+    /// </summary>
+    private static async Task<TestServerHost> StartServerAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await TestServerHost.StartAsync(new TestServerOptions { Port = Port }, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException) when (attempt < 40)
+            {
+                await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     /// <summary>The job id, or null when the file is missing, unfinished or still being written by the run phase.</summary>

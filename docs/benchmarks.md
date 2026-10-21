@@ -39,12 +39,38 @@ sprint before M2. Hashing the result is done after the clock stops and is not pa
 skipped with a message and never fetched. The file is reviewed monthly. A signed cloud URL carries a query string, so it is never
 stored in the file. The `local` section is served by `Kasi.TestServer` and runs without any of that.
 
+## Comparing with IDM (`bench/Compare-Idm.ps1`)
+
+Run this on the dedicated benchmark machine (TPL 3.4): wired, nothing else on the line, elevated (the DNS flush needs it), IDM
+installed. Build Release first, put the real sources in `bench/sources.json` (or set `KASI_BENCH_URL_<ID>`, id upper-cased with `-`
+turned into `_`, for a source such as a signed URL that must not be stored in the file), note the line speed from a reference speed
+test, and run it twice, in business hours and at night:
+
+```powershell
+dotnet build -c Release
+./bench/Compare-Idm.ps1 -Window night -LineSpeedMbps 940
+```
+
+For every source and for 8, then 16 connections, it runs IDM then Kasi, five times each, flushing the DNS cache before each run.
+
+- **IDM's connection count is its own setting.** `IDMan.exe` has no per-download switch, so before each pass the script asks you to
+  set IDM's maximum connections to 8, then 16 (`-NoPrompt` skips the question for unattended or dry runs).
+- **Timing is the same for both tools and is taken outside them.** IDM's command line only queues a download, so the script polls
+  the target until it has the expected size and can be opened exclusively. Kasi is timed from process start to exit, which includes
+  about 0.3 s of start-up: a conservative bias against Kasi that is negligible on a multi-gigabyte file. Hashing is done afterwards.
+- **Every run is verified.** The first verified file of a source sets the reference SHA-256; a run with another hash or size is
+  marked unverified, and a source with no verified run for one of the tools is excluded and listed, never counted as fast.
+- **Output:** `bench/results/idm-comparison-<date>.json` (a session file) and a Markdown scorecard beside it. The exit code is the
+  scorecard's: 0 when the median ratio is at most 1.10 and no source is above 1.25 at every connection count.
+
+`Kasi.Bench scorecard <session.json> [--release]` rebuilds the scorecard from a session at any time; `--release` judges against
+the release limit of 1.05. A dry run of the whole script against a local server and a fake `IDMan` is part of the test suite.
+
 ## Results
 
 `bench/results/*.json` (schema version 1): machine, line speed, `window` (`business` or `night`), whether the DNS cache was flushed,
 and one row per timed download with its SHA-256 result. Record the line speed from a reference speed test before each session and
-run each source at both times of day (TPL 6.1). The IDM comparison and the scorecard arrive in M1.15b; those sessions are owner
-evidence.
+run each source at both times of day (TPL 6.1). The IDM sessions are owner evidence.
 
 ## First readings (15a, developer machine, loopback)
 
