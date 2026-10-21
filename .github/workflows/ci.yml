@@ -1,7 +1,7 @@
 name: CI
 
 # TRD 14.5 step 1: build, unit tests, integration tests against local test servers, coverage.
-# Extension lint/tests are added in M2 together with the extension itself.
+# The extension job (lint, format, type drift, Vitest, dual build) is a separate Windows job; no browsers are installed in it.
 # The engine coverage gate (80% of Kasi.Engine lines, KASI-NFR-018) is on since M1.16a: build/Test-CoverageGate.ps1 reads the merged Cobertura report.
 
 on:
@@ -115,3 +115,27 @@ jobs:
       # the ARM64 build exercises the native SQLite and the checkpoint writer.
       - name: Persistence tests (SQLite)
         run: dotnet test tests/Kasi.Data.Tests -c Release --no-build
+
+  # M2.3 (plan docs/plans/m2-3.md section 3): the TypeScript extension. Browser smoke runs nightly in nightly-extension-smoke.yml.
+  extension:
+    name: Extension (lint, tests, build)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: extension/.nvmrc
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npx prettier --check .
+      - run: npm run check:types
+      - run: npm test
+      - run: npm run build

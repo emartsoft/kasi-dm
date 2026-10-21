@@ -1,0 +1,37 @@
+name: Nightly extension smoke
+
+# M2.3b: loads the built extension in real browsers. Not part of PR CI (needs browser downloads). No test touches the public internet
+# beyond the browser and npm downloads; no native host is registered, so the popup must show the not-connected state.
+# Chromium: Playwright persistent context. Firefox: Playwright cannot load extensions, so this job runs web-ext lint on dist/firefox
+# (the AMO validator); driving the Firefox popup needs geckodriver and arrives with the registered host in M2.4.
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Chromium popup and Firefox package
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: extension/.nvmrc
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install chromium
+      - run: npm run smoke:chromium
+      - run: npm run smoke:firefox

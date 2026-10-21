@@ -1,29 +1,24 @@
 import browser from 'webextension-polyfill';
-import type { Ack, OpenSettings } from '../types/protocol';
-
-function isMatchingAck(value: unknown, id: string): value is Ack {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'v' in value &&
-    value.v === 1 &&
-    'type' in value &&
-    value.type === 'ack' &&
-    'id' in value &&
-    value.id === id &&
-    'ok' in value &&
-    value.ok === true
-  );
-}
+import { parseAck } from '../shared/messages';
+import { ALL_SITES, renderStatus } from '../shared/connection-view';
+import type { OpenSettings } from '../types/protocol';
 
 const title = document.querySelector<HTMLHeadingElement>('#title');
 const button = document.querySelector<HTMLButtonElement>('#open-settings');
 const status = document.querySelector<HTMLParagraphElement>('#status');
+const allow = document.querySelector<HTMLButtonElement>('#allow-sites');
 
-if (title && button && status) {
+if (title && button && status && allow) {
   title.textContent = browser.i18n.getMessage('extensionName');
   button.textContent = browser.i18n.getMessage('openSettings');
-  status.textContent = browser.i18n.getMessage('connectionUnavailable');
+  allow.textContent = browser.i18n.getMessage('allowAllSites');
+  const render = () => renderStatus(status, allow);
+  void render();
+
+  allow.addEventListener('click', () => {
+    // permissions.request needs this user gesture.
+    void browser.permissions.request(ALL_SITES).then(render, render);
+  });
 
   button.addEventListener('click', () => {
     const request = {
@@ -33,15 +28,17 @@ if (title && button && status) {
       section: 'browser',
     } satisfies OpenSettings;
 
-    // M2.3b supplies the background listener and native port manager.
     void browser.runtime.sendMessage(request).then(
       (response: unknown) => {
-        status.textContent = browser.i18n.getMessage(
-          isMatchingAck(response, request.id) ? 'settingsRequestSent' : 'connectionUnavailable',
-        );
+        const ack = parseAck(response);
+        if (ack?.id === request.id) {
+          status.textContent = browser.i18n.getMessage('settingsRequestSent');
+        } else {
+          void render();
+        }
       },
       () => {
-        status.textContent = browser.i18n.getMessage('connectionUnavailable');
+        void render();
       },
     );
   });
