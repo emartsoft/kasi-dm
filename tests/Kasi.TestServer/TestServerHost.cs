@@ -51,7 +51,7 @@ public sealed class TestServerHost : IAsyncDisposable
         WebApplication? app = null;
         try
         {
-            app = TestServerApp.Create(IPAddress.Loopback, options.Port, time, options, metrics, certificates.ServerCertificate);
+            app = TestServerApp.Create(options.BindAny ? IPAddress.Any : IPAddress.Loopback, options.Port, time, options, metrics, certificates.ServerCertificate);
             await app.StartAsync(cancellationToken);
             var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
             return new TestServerHost(app, new Uri(address), metrics, certificates);

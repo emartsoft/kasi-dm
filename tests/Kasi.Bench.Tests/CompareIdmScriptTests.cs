@@ -50,7 +50,7 @@ public sealed class CompareIdmScriptTests
                 "-NoProfile", "-File", Path.Combine(root, "bench", "Compare-Idm.ps1"),
                 "-Sources", sources, "-Connections", "4", "-Runs", "2", "-Window", "night", "-LineSpeedMbps", "940",
                 "-OutputDir", folder, "-IdmPath", fakeIdm, "-KasiBench", FindBenchDll(root), "-WorkDir", Path.Combine(folder, "work"),
-                "-SkipDnsFlush", "-NoPrompt",
+                "-SkipDnsFlush", "-NoPrompt", "-TimeoutMinutes", "2",
             })
             {
                 start.ArgumentList.Add(argument);
@@ -59,7 +59,13 @@ public sealed class CompareIdmScriptTests
             using var process = Process.Start(start)!;
             var output = process.StandardOutput.ReadToEndAsync(ct);
             var error = process.StandardError.ReadToEndAsync(ct);
-            await process.WaitForExitAsync(ct).WaitAsync(TimeSpan.FromMinutes(3), ct);
+            // a loaded CI runner can be slow, but a hang must say where it was: stop the run and show what it printed
+            if (!await WaitAsync(process, TimeSpan.FromMinutes(8), ct))
+            {
+                process.Kill(entireProcessTree: true);
+                Assert.Fail("The dry run did not finish in 8 minutes. Output so far:" + Environment.NewLine + await output + await error);
+            }
+
             var log = await output + await error;
 
             // the fake is slower than the engine, so the gate passes; what matters is that every row is there and verified
@@ -113,6 +119,19 @@ public sealed class CompareIdmScriptTests
         finally
         {
             File.Delete(fake);
+        }
+    }
+
+    private static async Task<bool> WaitAsync(Process process, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).WaitAsync(timeout, cancellationToken);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
         }
     }
 

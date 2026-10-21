@@ -1,0 +1,55 @@
+name: CI conformance (Linux containers)
+
+# TRD 14.5 / TPL 4: the engine against real vsftpd, Squid and Dante (KASI-ENG-002, KASI-ENG-011; TC-ENG-019 and TC-ENG-022, container
+# half). GitHub's Windows runners cannot run Linux containers, so this leg is Ubuntu. The tests (Category=ContainerIntegration) are
+# excluded from the Windows jobs in ci.yml. It needs no secrets, so it runs on pull requests as well.
+
+on:
+  pull_request: # any base branch, so stacked PRs are checked too
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  KASI_REQUIRE_DOCKER: '1' # a missing Docker fails the leg instead of skipping the tests
+
+jobs:
+  containers:
+    name: Container conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore tests/Kasi.Engine.Tests/Kasi.Engine.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/Kasi.Engine.Tests/Kasi.Engine.Tests.csproj -c Release --no-restore
+
+      - name: Container conformance tests
+        run: >
+          dotnet test tests/Kasi.Engine.Tests/Kasi.Engine.Tests.csproj -c Release --no-build
+          --filter "Category=ContainerIntegration" --logger trx --results-directory TestResults/containers
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-conformance-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
