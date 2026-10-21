@@ -1,0 +1,17 @@
+{
+  "extensionName": {
+    "message": "Kasi Download Manager"
+  },
+  "extensionDescription": {
+    "message": "Send downloads to Kasi."
+  },
+  "connectionUnavailable": {
+    "message": "Kasi is not connected."
+  },
+  "openSettings": {
+    "message": "Open Kasi settings"
+  },
+  "settingsRequestSent": {
+    "message": "Opening Kasi settings…"
+  }
+}
