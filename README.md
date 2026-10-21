@@ -1,5 +1,13 @@
 # Kasi Download Manager
 
+[![CI](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml)
+![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
+![Avalonia 12](https://img.shields.io/badge/Avalonia-12.1-8B44AC)
+![TypeScript 5.9](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![SQLite WAL](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
+![Windows 10 22H2+ and 11](https://img.shields.io/badge/Windows-10%2022H2%2B%20%7C%2011-0078D4)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-green)](LICENSE)
+
 Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates downloads with dynamic segmentation, resumes from the exact saved byte after any interruption, captures unencrypted HLS/DASH streams, and runs HTTP, FTP, media and BitTorrent jobs in one queue with one set of bandwidth limits.
 
 | | |
