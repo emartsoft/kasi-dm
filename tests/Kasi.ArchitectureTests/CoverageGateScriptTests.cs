@@ -36,6 +36,8 @@ public sealed class CoverageGateScriptTests
             }
 
             var start = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            // the runner's job summary belongs to the real gate step, not to these test runs
+            start.Environment.Remove("GITHUB_STEP_SUMMARY");
             foreach (var argument in new[] { "-NoProfile", "-File", _script, "-Cobertura", path, "-Assembly", assembly, "-Threshold", threshold.ToString(System.Globalization.CultureInfo.InvariantCulture) })
             {
                 start.ArgumentList.Add(argument);

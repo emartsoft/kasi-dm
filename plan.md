@@ -3,7 +3,7 @@
 Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5). It turns the roadmap in TRD section 16 and the gates in TPL section 4 into ordered tasks, each with the requirement and test-case IDs it covers and how it is verified.
 
 - **Sources of truth:** TRD `docs/specs/KASI-TRD-2026-001.md` (what to build), test plan `docs/specs/KASI-TPL-2026-001.md` (how it is proven), `CONTRIBUTING.md` (how we work). If this file disagrees with them, they win; fix this file.
-- **Last updated:** 2026-10-19, after M1.11 (shared bandwidth limiter, PR #32) merged; M1.12 (checksums, duplicates, proxies, FTP/FTPS; PRs #33 to #35) merged; M1.13 (engine facade; PRs #36 to #38) merged; M1.14 (fault-injection harness; PRs #39, #40, #43) merged except the owner's Hyper-V evidence; M1.16a (engine coverage gate) implemented; M1.1 to M1.14 merged.
+- **Last updated:** 2026-10-21, after M1.11 (shared bandwidth limiter, PR #32) merged; M1.12 (checksums, duplicates, proxies, FTP/FTPS; PRs #33 to #35) merged; M1.13 (engine facade; PRs #36 to #38) merged; M1.14 (fault-injection harness; PRs #39, #40, #43) merged except the owner's Hyper-V evidence; M1.16a (engine coverage gate) implemented; M1.1 to M1.14 merged.
 - **Estimates:** week numbers are the TRD's (24 weeks for v1.0, engine first). The TRD says estimates are confirmed at the end of M0. Sub-task weeks below are indicative.
 - **Status marks:** in the task tables ✅ done and verified, 🔶 partly done, ⬜ not started; only the gate checklists keep `- [ ]` boxes. Update this file in the same PR that finishes a task.
 
