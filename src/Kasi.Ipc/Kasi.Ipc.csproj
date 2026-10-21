@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The pipe uses Windows access control lists and Win32 calls (TRD 5.1: Windows only). -->
+    <!-- The tests exercise internal helpers: the server-owner lookup, the current-user SID, the pipe access list read-back and the ConnectAsync overload that takes an owner lookup. -->
     <InternalsVisibleTo Include="Kasi.Ipc.Tests" />
   </ItemGroup>
 
