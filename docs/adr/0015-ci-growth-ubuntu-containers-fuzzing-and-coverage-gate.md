@@ -1,6 +1,6 @@
 # 0015. CI growth: the coverage gate, Ubuntu containers and nightly fuzzing
 
-- Status: Accepted incrementally for M1.16 (16a landed first; 16b and 16c extend it)
+- Status: Accepted incrementally for M1.16 (16a and 16b landed; 16c extends it)
 - Date: 2026-10-20
 - Requirements: KASI-NFR-018; later steps KASI-ENG-002, KASI-ENG-003, KASI-ENG-011
 - Related: ADR 0013, TPL 4, TPL 7.2
@@ -27,6 +27,36 @@ job fails instead of the gate quietly disappearing.
 
 **The threshold is an input** (`-Threshold`, default 0.80) so the script's tests can show the verdict flip: they run it on canned
 Cobertura files at, above and below the threshold, and with a missing file or assembly.
+
+## Decision (16b)
+
+**One image, built by the test.** `tests/Kasi.Engine.Tests/Containers/Dockerfile` installs the Ubuntu 24.04 packages for vsftpd,
+Squid, Dante, OpenSSL and CA certificates on a base pinned by digest. Testcontainers builds it once per run and each test class
+starts the role it needs with its own configuration (mapped in as files), so there is no third-party image to trust or to drift,
+and the daemons are the distribution's own. Testcontainers (MIT, tests only) is the one new package.
+
+**Ubuntu only, and out of the Windows jobs.** GitHub's Windows runners cannot run Linux containers. The tests carry
+`Category=Integration` and `Category=ContainerIntegration`; the Windows integration step now filters
+`Category=Integration&Category!=ContainerIntegration`, and the unit step already excludes `Integration`. The new
+`ci-conformance-linux.yml` runs only the container category. It needs no secrets, so it runs on pull requests.
+
+**A missing Docker is a failure in CI and a skip on a laptop.** The workflow sets `KASI_REQUIRE_DOCKER=1`, like
+`KASI_REQUIRE_VHD` for the disk-full test; without it the tests skip with the reason.
+
+**What is checked.** vsftpd: passive FTP and explicit FTPS (a generated self-signed certificate pinned as the trust root) each
+download 16 MiB and match its SHA-256, a transfer stopped after a few MiB resumes with `REST` at the flushed cursor, and a wrong
+password is an authentication failure that does not echo the password. Squid: a plain HTTP download, an HTTPS download tunnelled
+with `CONNECT`, and Basic proxy credentials accepted when right and refused without echoing them. Dante: a download over SOCKS5
+with username and password, and a wrong password. The origin is a `Kasi.TestServer` bound to all interfaces; the containers reach
+it as `kasi-origin.test` (a name already in the test certificate) mapped to the Docker host gateway, and only the proxy ever
+resolves that name.
+
+**Reused behaviour, new assertions only where a real daemon differs.** The in-process FTP and proxy servers keep proving the
+engine's detailed behaviour (dropped data connections, retries, bandwidth caps); the containers prove the same transfers against
+the software users run.
+
+**Known limit.** Docker would not start on the development machine, so the first execution of these tests is the Ubuntu CI leg.
+The daemon configurations are the likeliest place for a first-run fix.
 
 ## Consequences
 
