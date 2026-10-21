@@ -318,7 +318,8 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         var ct = TestContext.Current.CancellationToken;
         await using var harness = await Harness.CreateAsync(_host, _root);
         const string id = "engine-mutable-cap";
-        const int size = 8 * 1024 * 1024;
+        // a change is only seen by the next request, so the file has to outlast the three changes by a wide margin on a slow runner
+        const int size = 32 * 1024 * 1024;
         _host.Mutable.Change(id, size);
         var job = harness.NewJob($"/mutable/{id}", "engine-mutable-cap.bin");
         await harness.Engine.AddJobAsync(job, cancellationToken: ct);
@@ -338,7 +339,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         await download;
 
         var failed = (await harness.Jobs.GetAsync(job.Id, ct))!;
-        failed.State.Should().Be(JobState.Failed);
+        failed.State.Should().Be(JobState.Failed, $"the job ended with {failed.DoneBytes} of {size} bytes done and {failed.RestartCount} restart(s)");
         failed.Error.Should().Contain("changed repeatedly");
         failed.RestartCount.Should().Be(2);
     }
