@@ -84,7 +84,7 @@ public sealed class CompareIdmScriptTests
             var rows = document.RootElement.GetProperty("rows").EnumerateArray().ToList();
             rows.Should().HaveCount(4, "two runs of each of the two tools");
             rows.Select(r => r.GetProperty("tool").GetString()).Should().Equal("idm", "kasi", "idm", "kasi");
-            rows.Should().OnlyContain(r => r.GetProperty("sha256Ok").GetBoolean() && r.GetProperty("bytes").GetInt64() == Size);
+            rows.Should().OnlyContain(r => r.GetProperty("sha256Ok").GetBoolean() && r.GetProperty("bytes").GetInt64() == Size, "every download must verify; the run said:" + Environment.NewLine + log);
             document.RootElement.GetProperty("dnsFlushed").GetBoolean().Should().BeFalse("the dry run skipped the flush and says so");
             document.RootElement.GetProperty("window").GetString().Should().Be("night");
             Directory.GetFiles(folder, "idm-comparison-*.md").Should().ContainSingle();
