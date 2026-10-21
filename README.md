@@ -23,7 +23,7 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 Under construction in **M2 (browser integration)**; see [plan.md](plan.md) for task status. The M1 download engine supports segmented HTTP and FTP/FTPS downloads, durable resume, authentication, proxies, checksums, duplicate detection and shared bandwidth limits. The engine gate still needs the owner's benchmark and fault-injection evidence.
 
-M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types; M2.3b adds its native port manager, rules cache, redacting logger, Ajv fixture tests, CI job and nightly browser smoke. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). M2.4a adds the rule semantics (extension, MIME type, excluded sites, minimum size, bypass key) as pure, tested extension code and the optional `minSizeBytes` on `rules`. The interception logic, the end-to-end harness and the desktop UI follow in later M2 tasks.
+M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types; M2.3b adds its native port manager, rules cache, redacting logger, Ajv fixture tests, CI job and nightly browser smoke. M2.2 adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script), fuzzed with 100,000 malformed messages in the tests and nightly with SharpFuzz, and published with Native AOT in CI (size limit and start-up time recorded). M2.4a adds the rule semantics (extension, MIME type, excluded sites, minimum size, bypass key) as pure, tested extension code and the optional `minSizeBytes` on `rules`. The interception logic, the end-to-end harness and the desktop UI follow in later M2 tasks.
 
 ## Repository layout
 
@@ -38,7 +38,7 @@ kasi-dm/
 │   ├── Kasi.Data/            SQLite repositories, migrations, checkpoint writer
 │   ├── Kasi.Ipc/             Strict message contracts and serializer, hardened named-pipe client/server (M2.1)
 │   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray (empty shell)
-│   └── Kasi.NativeHost/      Native AOT browser native-messaging host: frame reader/writer, two-way relay, Kasi launcher (M2.2a)
+│   └── Kasi.NativeHost/      Native AOT browser native-messaging host: frame reader/writer, two-way relay, Kasi launcher (M2.2)
 ├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox, M2.3a and M2.3b)
 ├── tests/
 │   ├── Kasi.Engine.Tests/    Unit + property tests (FsCheck)
@@ -129,6 +129,15 @@ pwsh build/Test-CoverageGate.ps1 -Cobertura coverage/Cobertura.xml -Assembly Kas
 The container conformance tests (`Category=ContainerIntegration`, `tests/Kasi.Engine.Tests/Containers`) run on the Ubuntu CI leg and skip themselves without Docker (`KASI_REQUIRE_DOCKER=1` makes a missing Docker a failure); locally, start Docker and run `dotnet test tests/Kasi.Engine.Tests --filter "Category=ContainerIntegration"`.
 
 The disk-full test (`TC-ENG-015`, `PartFileVhdIntegrationTests`) mounts a small VHDX with `diskpart` and skips itself unless you run elevated; CI sets `KASI_REQUIRE_VHD=1`, which turns a skip into a failure.
+
+The native host's AOT executable sample (`TC-BRW-006`, `AotExecutableTests`, `Category=AotSample`) needs the published executable. It skips itself without `KASI_NATIVEHOST_AOT`; CI sets that and `KASI_REQUIRE_AOT=1`, which turns a skip into a failure. Locally (the Visual Studio C++ tools must be installed and `vswhere.exe` on `PATH`):
+
+```powershell
+dotnet publish src/Kasi.NativeHost -c Release -r win-x64 -o artifacts/native-host
+pwsh build/Measure-NativeHost.ps1 -Exe artifacts/native-host/Kasi.NativeHost.exe   # size limit 5 MB, start-up median
+$env:KASI_NATIVEHOST_AOT = (Resolve-Path artifacts/native-host/Kasi.NativeHost.exe).Path
+dotnet test tests/Kasi.NativeHost.Tests --filter "Category=AotSample"
+```
 
 Micro-benchmarks (BenchmarkDotNet) live in `bench/Kasi.Bench`:
 

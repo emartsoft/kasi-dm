@@ -1,10 +1,11 @@
 name: Nightly fuzzing
 
-# TPL 7.2: the Content-Disposition and URL filename parser (KASI-ENG-003), 3 minutes a night with SharpFuzz and libFuzzer. libFuzzer
+# TPL 7.2: the Content-Disposition and URL filename parser (KASI-ENG-003), 3 minutes a night, and the native messaging host's frame reader,
+# strict parser and error replies (KASI-NFR-010, TC-BRW-006), 5 minutes a night, each with SharpFuzz and libFuzzer. libFuzzer
 # runs natively on Windows, the platform Kasi ships on. Runs on main only (a schedule always does) and by hand, never on
 # pull_request: PRs replay the saved crash corpus as ordinary unit tests instead.
-# A finding fails the run, is minimised, and is uploaded as an artifact; add it to tests/fixtures/fuzz/crashes with the fix and
-# file a High defect.
+# A finding fails the run, is minimised, and is uploaded as an artifact; add it to tests/fixtures/fuzz/crashes (host:
+# tests/fixtures/fuzz/host-crashes) with the fix and file a High defect.
 
 on:
   schedule:
@@ -12,8 +13,8 @@ on:
   workflow_dispatch:
     inputs:
       seconds:
-        description: Fuzzing time in seconds (default 180, the TPL budget)
-        default: '180'
+        description: Fuzzing time in seconds for each target (default empty, the TPL budgets - filename 180, host 300)
+        default: ''
 
 permissions:
   contents: read
@@ -27,9 +28,19 @@ env:
 
 jobs:
   fuzz:
-    name: Filename parser
+    name: Fuzz (${{ matrix.target }})
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: filename
+            seconds: '180'
+            findings: artifacts/fuzz/findings/
+          - target: host
+            seconds: '300'
+            findings: artifacts/fuzz-host/findings/
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,12 +61,12 @@ jobs:
 
       - name: Fuzz
         shell: pwsh
-        run: ./build/Run-Fuzz.ps1 -LibFuzzer $env:LIBFUZZER -Seconds ${{ inputs.seconds || '180' }}
+        run: ./build/Run-Fuzz.ps1 -LibFuzzer $env:LIBFUZZER -Target ${{ matrix.target }} -Seconds ${{ inputs.seconds || matrix.seconds }}
 
       - name: Upload findings
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-findings
-          path: artifacts/fuzz/findings/
+          name: fuzz-findings-${{ matrix.target }}
+          path: ${{ matrix.findings }}
           if-no-files-found: warn

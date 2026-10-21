@@ -2,6 +2,7 @@ name: CI
 
 # TRD 14.5 step 1: build, unit tests, integration tests against local test servers, coverage.
 # The extension job (lint, format, type drift, Vitest, dual build) is a separate Windows job; no browsers are installed in it.
+# The native-host job publishes Kasi.NativeHost with Native AOT, checks its size and runs the AOT executable sample test (M2.2b).
 # The engine coverage gate (80% of Kasi.Engine lines, KASI-NFR-018) is on since M1.16a: build/Test-CoverageGate.ps1 reads the merged Cobertura report.
 
 on:
@@ -139,3 +140,42 @@ jobs:
       - run: npm run check:types
       - run: npm test
       - run: npm run build
+
+  # M2.2b (plan docs/plans/m2-2.md section 3): the Native AOT publish of the browser's native messaging host, with zero warnings
+  # (TreatWarningsAsErrors covers trimming and AOT warnings), a size limit, a recorded cold start and the malformed-message sample
+  # (TC-BRW-006) run against the published executable over real pipes.
+  native-host-aot:
+    name: Native host (AOT publish, size, start-up)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish (Native AOT, win-x64)
+        run: dotnet publish src/Kasi.NativeHost/Kasi.NativeHost.csproj -c Release -r win-x64 -o artifacts/native-host --nologo
+
+      - name: Size limit and cold start
+        shell: pwsh
+        # the size (5 MB) gates; the start-up median of 20 launches is recorded in the job summary and never gates
+        run: ./build/Measure-NativeHost.ps1 -Exe artifacts/native-host/Kasi.NativeHost.exe -MaxMegabytes 5 -Launches 20
+
+      - name: AOT executable sample (TC-BRW-006)
+        shell: pwsh
+        env:
+          KASI_REQUIRE_AOT: '1'
+        run: |
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path artifacts/native-host/Kasi.NativeHost.exe).Path
+          dotnet test tests/Kasi.NativeHost.Tests -c Release --nologo --filter "Category=AotSample"
+
+      - name: Upload the host
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-host-win-x64
+          path: artifacts/native-host/Kasi.NativeHost.exe
+          if-no-files-found: error

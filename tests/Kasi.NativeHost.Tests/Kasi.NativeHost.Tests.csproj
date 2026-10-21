@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.NativeHost/Kasi.NativeHost.csproj" />
+    <ProjectReference Include="../Kasi.Fuzz/Kasi.Fuzz.csproj" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
