@@ -11,7 +11,8 @@ public sealed record FaultIterationResult(
     string? Error,
     long BytesServed,
     long RefetchedBytes,
-    int Kills);
+    int Kills,
+    double KillLatencySeconds = 0);
 
 /// <summary>The nightly report. It never contains URLs, query strings or user paths (CLAUDE.md rule 3).</summary>
 public sealed record FaultInjectionReport(

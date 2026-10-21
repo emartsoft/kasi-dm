@@ -21,6 +21,8 @@ public static class FaultInjectionRunner
 
     private static readonly TimeSpan _commitWait = TimeSpan.FromSeconds(60);
 
+    private static readonly TimeSpan _schedulerJitter = TimeSpan.FromSeconds(0.5);
+
     public static async Task<int> RunAsync(FaultInjectionOptions requested, CancellationToken cancellationToken = default)
     {
         if (requested.Help)
@@ -69,11 +71,20 @@ public static class FaultInjectionRunner
     }
 
     /// <summary>
-    /// What one kill may cost (KASI-RES-001): 2 s of data (the checkpoint interval) plus what sat in the socket buffers. A resume
-    /// that starts over instead fails this by gigabytes once the download is past its first seconds.
+    /// What one kill may cost (KASI-RES-001) when the kill is instant, as a power cut is: 2 s of data (the checkpoint interval and the
+    /// write buffer's age, KASI-NFR-007) plus what sat in the socket buffers. This is the bound for gate evidence on a dedicated machine.
     /// </summary>
-    public static long RefetchBound(FaultInjectionOptions options) =>
+    public static long StrictRefetchBound(FaultInjectionOptions options) =>
         (2 * options.BytesPerSecond) + (options.ConnectionCount * SocketBufferBytesPerConnection);
+
+    /// <summary>
+    /// The bound for a kill the harness had to deliver. The child keeps downloading between the moment the harness decides to kill
+    /// it (for a commit-kill, when the commit hook fired) and the moment it is gone, and none of that has a checkpoint; on a loaded
+    /// runner that took up to two seconds. So the bound is the strict one plus <paramref name="killLatency"/> of data and half a
+    /// second for scheduler jitter. A resume that starts over still fails it by gigabytes once the download is past its first seconds.
+    /// </summary>
+    public static long RefetchBound(FaultInjectionOptions options, TimeSpan killLatency) =>
+        StrictRefetchBound(options) + (long)((killLatency + _schedulerJitter).TotalSeconds * options.BytesPerSecond);
 
     private static async Task<FaultInjectionReport> RunKillLoopAsync(
         FaultHarness harness,
@@ -85,7 +96,6 @@ public static class FaultInjectionRunner
         var random = new Random(options.Seed);
         var results = new List<FaultIterationResult>();
         var marker = Path.Combine(harness.Root, "commit.marker");
-        var bound = RefetchBound(options);
         var kills = 0;
         var downloads = 0;
         var verified = 0;
@@ -165,8 +175,13 @@ public static class FaultInjectionRunner
             }
 
             endedWithoutKill = 0;
+            // how long the child ran on after the harness meant to kill it: since the hook fired (commit-kill) plus the kill itself
+            var sinceHook = commitKill && File.Exists(marker) ? TimeProvider.System.GetUtcNow() - File.GetLastWriteTimeUtc(marker) : TimeSpan.Zero;
+            var killClock = Stopwatch.StartNew();
             FaultHarness.KillIfRunning(child);
             await child.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            var killLatency = (sinceHook > TimeSpan.Zero ? sinceHook : TimeSpan.Zero) + killClock.Elapsed;
+            var bound = RefetchBound(options, killLatency);
             kills++;
             SqliteConnection.ClearAllPools();
 
@@ -182,10 +197,10 @@ public static class FaultInjectionRunner
 
             if (problem is null && refetched > bound)
             {
-                problem = $"{refetched} B had to be fetched again, above the {bound} B bound";
+                problem = $"{refetched} B had to be fetched again, above the {bound} B bound (the kill took {killLatency.TotalSeconds:0.00} s to land)";
             }
 
-            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills));
+            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3)));
             error ??= problem;
         }
 

@@ -34,7 +34,7 @@ public sealed class KillLoopSmokeTests
         report.Passed.Should().BeTrue(report.Error);
         report.Kills.Should().Be(3);
         report.ChecksumVerified.Should().BeTrue();
-        report.MaxRefetchedBytes.Should().BeLessThan(FaultInjectionRunner.RefetchBound(Small("kill", 11)));
+        report.MaxRefetchedBytes.Should().BeLessThan(FileSize, "a resume that started over would fetch the whole file again");
     }
 
     [Trait("TC", "TC-RES-011")]

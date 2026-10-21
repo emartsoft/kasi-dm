@@ -93,3 +93,12 @@ Critical or High defects, and the evidence only people can produce (the Hyper-V 
 ## Fast versions in pull requests
 
 `Kasi.FaultInjection.Tests` runs the same code with three kills on 16 MiB downloads (`KillLoopSmokeTests`) and small runs of the other suites (`FaultSuiteSmokeTests`); the disk-pressure test skips itself unless the process is elevated, and the soak test unless `KASI_TOXIPROXY` points at a daemon.
+
+## The refetch bound
+
+After every kill the harness works out how many bytes had to be fetched again (what the server sent minus what the job had checkpointed) and compares it with a bound.
+
+- **Strict bound** (`StrictRefetchBound`): 2 s of data (the 1.5 s checkpoint interval plus 0.5 s of write-buffer age, KASI-NFR-007) plus 1 MiB of socket buffer per connection. A power cut is instant, so this is the bound for gate evidence on a dedicated machine (TC-RES-003).
+- **Bound for a kill the harness delivers** (`RefetchBound`): the strict bound plus the data the child downloaded while the kill was landing plus 0.5 s for scheduler jitter. The kill latency is measured per iteration (from the commit hook firing, for `commit-kill`, until the child is gone) and written to `fault-report.json` as `killLatencySeconds`. On a quiet machine it is tens of milliseconds; on a loaded shared runner it reached about two seconds, which is what made the old fixed bound fail while the engine met its promise.
+
+A resume that starts over still fails either bound by gigabytes once the download is past its first seconds.
