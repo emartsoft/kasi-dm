@@ -2,6 +2,12 @@
 
   <PropertyGroup>
     <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The tests exercise internal helpers: the server-owner lookup, the current-user SID, the pipe access list read-back and the ConnectAsync overload that takes an owner lookup. -->
+    <InternalsVisibleTo Include="Kasi.Ipc.Tests" />
+  </ItemGroup>
 
 </Project>
