@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isStatusRequest, resolveStatus, STATUS_REQUEST } from '../../src/shared/status';
+import {
+  isConnectedReply,
+  isStatusRequest,
+  resolveStatus,
+  STATUS_REQUEST,
+} from '../../src/shared/status';
 
 describe('status', () => {
   it('asks for permission before reporting the connection', () => {
@@ -16,5 +21,16 @@ describe('status', () => {
     expect(isStatusRequest(STATUS_REQUEST)).toBe(true);
     expect(isStatusRequest({ kind: 'other' })).toBe(false);
     expect(isStatusRequest(null)).toBe(false);
+  });
+});
+
+describe('isConnectedReply', () => {
+  it('is true only for { connected: true }', () => {
+    expect(isConnectedReply({ connected: true })).toBe(true);
+    expect(isConnectedReply({ connected: false })).toBe(false);
+    expect(isConnectedReply({ connected: 'true' })).toBe(false);
+    expect(isConnectedReply(null)).toBe(false);
+    expect(isConnectedReply(undefined)).toBe(false);
+    expect(isConnectedReply('connected')).toBe(false);
   });
 });

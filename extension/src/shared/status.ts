@@ -17,3 +17,10 @@ export function resolveStatus(connected: boolean, hasAllSites: boolean): Connect
   if (!hasAllSites) return 'needsPermission';
   return connected ? 'connected' : 'unavailable';
 }
+
+// The background replies to STATUS_REQUEST with { connected: boolean }; this is the one place that reads that shape.
+export function isConnectedReply(reply: unknown): boolean {
+  return (
+    typeof reply === 'object' && reply !== null && 'connected' in reply && reply.connected === true
+  );
+}
