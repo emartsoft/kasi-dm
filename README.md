@@ -1,5 +1,13 @@
 # Kasi Download Manager
 
+[![CI](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml)
+![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
+![Avalonia 12](https://img.shields.io/badge/Avalonia-12.1-8B44AC)
+![TypeScript 5.9](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![SQLite WAL](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
+![Windows 10 22H2+ and 11](https://img.shields.io/badge/Windows-10%2022H2%2B%20%7C%2011-0078D4)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-green)](LICENSE)
+
 Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates downloads with dynamic segmentation, resumes from the exact saved byte after any interruption, captures unencrypted HLS/DASH streams, and runs HTTP, FTP, media and BitTorrent jobs in one queue with one set of bandwidth limits.
 
 | | |
@@ -15,7 +23,7 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 Under construction in **M2 (browser integration)**; see [plan.md](plan.md) for task status. The M1 download engine supports segmented HTTP and FTP/FTPS downloads, durable resume, authentication, proxies, checksums, duplicate detection and shared bandwidth limits. The engine gate still needs the owner's benchmark and fault-injection evidence.
 
-M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types. The native host, browser behaviour and desktop UI follow in later M2 tasks.
+M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types; M2.3b adds its native port manager, rules cache, redacting logger, Ajv fixture tests, CI job and nightly browser smoke. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). Browser interception and the desktop UI follow in later M2 tasks.
 
 ## Repository layout
 
@@ -30,8 +38,8 @@ kasi-dm/
 │   ├── Kasi.Data/            SQLite repositories, migrations, checkpoint writer
 │   ├── Kasi.Ipc/             Strict message contracts and serializer, hardened named-pipe client/server (M2.1)
 │   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray (empty shell)
-│   └── Kasi.NativeHost/      Native AOT browser native-messaging host (stub, M2)
-├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox scaffold, M2.3a)
+│   └── Kasi.NativeHost/      Native AOT browser native-messaging host: frame reader/writer, two-way relay, Kasi launcher (M2.2a)
+├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox, M2.3a and M2.3b)
 ├── tests/
 │   ├── Kasi.Engine.Tests/    Unit + property tests (FsCheck)
 │   ├── Kasi.*.Tests/         One test project per src project
@@ -88,13 +96,14 @@ npm run build:chromium      # output: extension/dist/chromium
 npm run build:firefox       # output: extension/dist/firefox
 ```
 
-Load `dist/chromium` via `chrome://extensions` → Developer mode → Load unpacked. Native messaging is not available in M2.3a. When M2.6 adds development host registration, use:
+Load `dist/chromium` via `chrome://extensions` → Developer mode → Load unpacked. Then publish and register the development native host so the extension can reach your local build (`Kasi.exe` must sit next to the host for the browser to be able to start Kasi):
 
 ```powershell
-pwsh ./build/register-dev-host.ps1 -ExtensionId <your unpacked extension ID>
+dotnet publish src/Kasi.NativeHost -c Release -r win-x64
+pwsh ./scripts/native-host/Register-NativeHost.ps1 -ChromeExtensionId <unpacked extension ID> -FirefoxExtensionId <add-on ID>
 ```
 
-That future script will write `com.martsoft.kasi` host manifests under `HKCU` pointing at the Debug build of `Kasi.NativeHost`; `-Remove` will undo registration.
+This writes `com.martsoft.kasi` host manifests under `%LOCALAPPDATA%\Kasi\NativeHost` and registers them under `HKCU` for Chrome, Edge and Firefox (a browser whose id you leave out is skipped). Run the script with `-Unregister` to undo. The installer takes over this job in M4.
 
 ## Testing
 

@@ -1,0 +1,7 @@
+{
+  "name": "com.martsoft.kasi",
+  "description": "Kasi Download Manager native messaging host",
+  "path": "@HOST_PATH@",
+  "type": "stdio",
+  "@ALLOW_KEY@": [@ALLOWED@]
+}

@@ -11,4 +11,9 @@
     <ProjectReference Include="../Kasi.Ipc/Kasi.Ipc.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The tests drive the relay, the writer and the launcher directly, without a browser. -->
+    <InternalsVisibleTo Include="Kasi.NativeHost.Tests" />
+  </ItemGroup>
+
 </Project>
