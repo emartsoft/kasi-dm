@@ -1,29 +1,46 @@
 import browser from 'webextension-polyfill';
-import type { Ack, OpenSettings } from '../types/protocol';
+import { parseAck } from '../shared/messages';
+import { STATUS_REQUEST, resolveStatus } from '../shared/status';
+import type { OpenSettings } from '../types/protocol';
 
-function isMatchingAck(value: unknown, id: string): value is Ack {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'v' in value &&
-    value.v === 1 &&
-    'type' in value &&
-    value.type === 'ack' &&
-    'id' in value &&
-    value.id === id &&
-    'ok' in value &&
-    value.ok === true
-  );
-}
+const ALL_SITES = { origins: ['<all_urls>'] };
 
 const title = document.querySelector<HTMLHeadingElement>('#title');
 const button = document.querySelector<HTMLButtonElement>('#open-settings');
 const status = document.querySelector<HTMLParagraphElement>('#status');
+const allow = document.querySelector<HTMLButtonElement>('#allow-sites');
 
-if (title && button && status) {
+async function isConnected(): Promise<boolean> {
+  try {
+    const reply: unknown = await browser.runtime.sendMessage(STATUS_REQUEST);
+    return (
+      typeof reply === 'object' &&
+      reply !== null &&
+      'connected' in reply &&
+      reply.connected === true
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function render(): Promise<void> {
+  if (!status || !allow) return;
+  const state = resolveStatus(await isConnected(), await browser.permissions.contains(ALL_SITES));
+  status.textContent = browser.i18n.getMessage(`status_${state}`);
+  allow.hidden = state !== 'needsPermission';
+}
+
+if (title && button && status && allow) {
   title.textContent = browser.i18n.getMessage('extensionName');
   button.textContent = browser.i18n.getMessage('openSettings');
-  status.textContent = browser.i18n.getMessage('connectionUnavailable');
+  allow.textContent = browser.i18n.getMessage('allowAllSites');
+  void render();
+
+  allow.addEventListener('click', () => {
+    // permissions.request needs this user gesture.
+    void browser.permissions.request(ALL_SITES).then(render, render);
+  });
 
   button.addEventListener('click', () => {
     const request = {
@@ -33,15 +50,17 @@ if (title && button && status) {
       section: 'browser',
     } satisfies OpenSettings;
 
-    // M2.3b supplies the background listener and native port manager.
     void browser.runtime.sendMessage(request).then(
       (response: unknown) => {
-        status.textContent = browser.i18n.getMessage(
-          isMatchingAck(response, request.id) ? 'settingsRequestSent' : 'connectionUnavailable',
-        );
+        const ack = parseAck(response);
+        if (ack?.id === request.id) {
+          status.textContent = browser.i18n.getMessage('settingsRequestSent');
+        } else {
+          void render();
+        }
       },
       () => {
-        status.textContent = browser.i18n.getMessage('connectionUnavailable');
+        void render();
       },
     );
   });

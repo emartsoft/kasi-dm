@@ -5,8 +5,17 @@
   "extensionDescription": {
     "message": "Send downloads to Kasi."
   },
-  "connectionUnavailable": {
+  "status_connected": {
+    "message": "Connected to Kasi."
+  },
+  "status_unavailable": {
     "message": "Kasi is not connected."
+  },
+  "status_needsPermission": {
+    "message": "Kasi needs permission to work on all sites."
+  },
+  "allowAllSites": {
+    "message": "Allow Kasi on all sites"
   },
   "openSettings": {
     "message": "Open Kasi settings"
