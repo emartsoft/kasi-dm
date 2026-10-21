@@ -1,0 +1,74 @@
+{
+  "sources": [
+    {
+      "id": "mirror-east-africa",
+      "type": "Linux ISO mirror, East Africa",
+      "url": "https://mirror.example.ke/ubuntu-releases/noble/ubuntu-24.04-desktop-amd64.iso",
+      "sizeBytes": null,
+      "purpose": "Local high-bandwidth path",
+      "owner": "owner: pick a regional university mirror (KENET or similar) and check the URL monthly",
+      "placeholder": true
+    },
+    {
+      "id": "mirror-europe",
+      "type": "Linux ISO mirror, Europe",
+      "url": "https://mirror.example.eu/ubuntu-releases/noble/ubuntu-24.04-desktop-amd64.iso",
+      "sizeBytes": null,
+      "purpose": "International transit typical for Kenyan users",
+      "owner": "owner: pick a major European university or ISP mirror",
+      "placeholder": true
+    },
+    {
+      "id": "cdn-large-file",
+      "type": "Global CDN",
+      "url": "https://cdn.example.com/downloads/large-sdk.bin",
+      "sizeBytes": null,
+      "purpose": "HTTP/2 and CDN edge behaviour",
+      "owner": "owner: pick a large public file on a commercial CDN",
+      "placeholder": true
+    },
+    {
+      "id": "cloud-object",
+      "type": "Cloud object storage",
+      "url": "https://bench.example.com/test-2gb.bin",
+      "sizeBytes": 2147483648,
+      "purpose": "Signed URLs and per-connection throttling",
+      "owner": "owner: a 2 GiB object on S3 or Azure Blob; a signed URL carries a query string, so it is supplied at run time and never stored here",
+      "placeholder": true
+    },
+    {
+      "id": "origin-capped",
+      "type": "Single-server origin with a per-connection cap",
+      "url": "http://capped.example.com/1gb.bin",
+      "sizeBytes": 1073741824,
+      "purpose": "Shows segmentation gains most clearly",
+      "owner": "owner: a VPS limited to 2 MB/s per connection",
+      "placeholder": true
+    },
+    {
+      "id": "origin-norange",
+      "type": "Range-less server",
+      "url": "http://norange.example.com/100mb.bin",
+      "sizeBytes": 104857600,
+      "purpose": "Confirms no regression in single-connection mode",
+      "owner": "owner: the same VPS with ranges disabled",
+      "placeholder": true
+    }
+  ],
+  "local": [
+    {
+      "id": "local-files",
+      "type": "TestServer, ranges",
+      "route": "/files/bench-local/268435456",
+      "sizeBytes": 268435456,
+      "purpose": "Runs the harness end to end without the owner's servers"
+    },
+    {
+      "id": "local-norange",
+      "type": "TestServer, no ranges",
+      "route": "/norange/bench-local/67108864",
+      "sizeBytes": 67108864,
+      "purpose": "Single-connection fallback"
+    }
+  ]
+}

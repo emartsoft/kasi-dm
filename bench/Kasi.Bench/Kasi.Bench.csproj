@@ -6,8 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Kasi.Bench.Tests" />
     <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
     <ProjectReference Include="../../src/Kasi.Core/Kasi.Core.csproj" />
+    <ProjectReference Include="../../src/Kasi.Data/Kasi.Data.csproj" />
+    <ProjectReference Include="../../tests/Kasi.TestServer/Kasi.TestServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "startedUtc": "2026-10-20T10:18:01.8354781+00:00",
+  "machine": {
+    "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+    "logicalCores": 22,
+    "memoryMegabytes": 64969,
+    "os": "Microsoft Windows 10.0.26300"
+  },
+  "lineSpeedMbps": null,
+  "window": "local",
+  "dnsFlushed": false,
+  "tools": {
+    "kasi": "bench",
+    "control": "23127 Mbit/s"
+  },
+  "rows": [
+    {
+      "source": "local-1gbit",
+      "connections": 16,
+      "run": 1,
+      "tool": "kasi",
+      "seconds": 4.3953165,
+      "bytes": 4294967296,
+      "mbps": 7817.35248599276,
+      "peakConnections": 16,
+      "sha256Ok": true,
+      "peakWorkingSetMegabytes": null
+    },
+    {
+      "source": "local-1gbit",
+      "connections": 16,
+      "run": 2,
+      "tool": "kasi",
+      "seconds": 3.0724477,
+      "bytes": 4294967296,
+      "mbps": 11183.180878229432,
+      "peakConnections": 16,
+      "sha256Ok": true,
+      "peakWorkingSetMegabytes": null
+    },
+    {
+      "source": "local-1gbit",
+      "connections": 16,
+      "run": 3,
+      "tool": "kasi",
+      "seconds": 3.1819014,
+      "bytes": 4294967296,
+      "mbps": 10798.492488799306,
+      "peakConnections": 16,
+      "sha256Ok": true,
+      "peakWorkingSetMegabytes": null
+    }
+  ]
+}
