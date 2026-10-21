@@ -92,5 +92,8 @@ public class FixtureTests
         var timeout = d.GetProperty("rules").GetProperty("properties").GetProperty("ackTimeoutMs");
         timeout.GetProperty("minimum").GetInt32().Should().Be(IpcLimits.AckTimeoutMinMs);
         timeout.GetProperty("maximum").GetInt32().Should().Be(IpcLimits.AckTimeoutMaxMs);
+        var minSize = d.GetProperty("rules").GetProperty("properties").GetProperty("minSizeBytes");
+        minSize.GetProperty("minimum").GetInt64().Should().Be(0);
+        minSize.GetProperty("maximum").GetInt64().Should().Be(IpcLimits.MinSizeMaxBytes);
     }
 }

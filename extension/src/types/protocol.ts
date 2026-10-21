@@ -54,6 +54,10 @@ export interface Rules {
   excludedSites: TextList;
   bypassKey: 'alt' | 'ctrl' | 'shift' | 'none';
   ackTimeoutMs: number;
+  /**
+   * Optional. Downloads known to be smaller are not intercepted; an unknown size is. Kasi sends it only when hello.extensionVersion is 0.2.0 or later, because an older strict parser rejects the whole message.
+   */
+  minSizeBytes?: number;
 }
 /**
  * Extension to Kasi: one intercepted or context-menu download.

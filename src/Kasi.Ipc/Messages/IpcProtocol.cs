@@ -4,6 +4,9 @@ namespace Kasi.Ipc.Messages;
 public static class IpcProtocol
 {
     public const int Version = 1;
+
+    /// <summary>The first extension version that accepts <c>minSizeBytes</c> in <c>rules</c>; an older strict parser rejects the whole message.</summary>
+    public const string MinSizeExtensionVersion = "0.2.0";
 }
 
 /// <summary>
@@ -30,5 +33,6 @@ public static class IpcLimits
     public const int BatchLinks = 100_000;
     public const int AckTimeoutMinMs = 100;
     public const int AckTimeoutMaxMs = 60_000;
+    public const long MinSizeMaxBytes = 9_007_199_254_740_991;
     public const int MaxProtocolVersion = 1_000;
 }

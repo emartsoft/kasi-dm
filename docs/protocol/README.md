@@ -18,6 +18,16 @@ The messages between the Kasi browser extension (through `Kasi.NativeHost`) and 
 - **Secrets.** Cookie values and URLs are never logged, and they are not copied into an exception or an `error` reply.
 - **Adding or changing a message** means changing the schema, the records, the sample files (a valid one and an invalid one per type) and TRD 9.4 in one PR. The tests fail if the list of types, the caps or the samples disagree with the records; the extension's Ajv tests (M2.3) check the same samples against the schema. A change that old peers cannot read raises `v` and needs an ADR.
 
+## Rule semantics
+
+What `rules` means, so Kasi and the extension decide alike (TRD 9.2; the pure implementation is `extension/src/shared/rules-match.ts`):
+
+- **Intercept** when `enabled`, the download is not excluded and its extension **or** its MIME type matches. Nothing is intercepted before the first `rules` message.
+- **`extensions`:** lowercase, no leading dot, compared with the end of the file name (`tar.gz` matches `a.tar.gz`). **`mimeTypes`:** lowercase, exact or `type/*`, parameters ignored. **An empty list matches nothing.**
+- **`excludedSites`:** `example.com` matches that host and its subdomains; the URL, the final URL and the referrer are all tested, and any hit excludes.
+- **`minSizeBytes`** (optional, 0 to 2^53-1): a download whose size is known and below it is left to the browser; an unknown size is intercepted. Kasi sends the field **only when `hello.extensionVersion` is 0.2.0 or later** (`IpcProtocol.MinSizeExtensionVersion`), because an older strict parser rejects the whole message; `v` stays 1.
+- **`ack` for `addDownload`** means Kasi has durably accepted the request (the job exists or the add dialog is queued), not that the user confirmed anything.
+
 ## Messages
 
 | Type | Direction | Purpose |

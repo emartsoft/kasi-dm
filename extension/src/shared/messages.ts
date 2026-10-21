@@ -58,6 +58,7 @@ export function parseRules(value: unknown): Rules | undefined {
     'excludedSites',
     'bypassKey',
     'ackTimeoutMs',
+    'minSizeBytes',
   ];
   if (!isObj(value) || !hasOnly(value, keys) || !isHeader(value, 'rules')) return undefined;
   const timeout = value.ackTimeoutMs;
@@ -70,6 +71,8 @@ export function parseRules(value: unknown): Rules | undefined {
     typeof timeout === 'number' &&
     Number.isInteger(timeout) &&
     timeout >= 100 &&
-    timeout <= 60000;
+    timeout <= 60000 &&
+    (value.minSizeBytes === undefined ||
+      (Number.isSafeInteger(value.minSizeBytes) && (value.minSizeBytes as number) >= 0));
   return valid ? (value as unknown as Rules) : undefined;
 }

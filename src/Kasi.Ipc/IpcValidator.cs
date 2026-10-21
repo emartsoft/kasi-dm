@@ -22,7 +22,8 @@ internal static class IpcValidator
             && m.ProtocolMin is >= 1 and <= IpcLimits.MaxProtocolVersion
             && m.ProtocolMax >= m.ProtocolMin && m.ProtocolMax <= IpcLimits.MaxProtocolVersion,
         Rules m => List(m.Extensions) && List(m.MimeTypes) && List(m.ExcludedSites)
-            && m.AckTimeoutMs is >= IpcLimits.AckTimeoutMinMs and <= IpcLimits.AckTimeoutMaxMs,
+            && m.AckTimeoutMs is >= IpcLimits.AckTimeoutMinMs and <= IpcLimits.AckTimeoutMaxMs
+            && m.MinSizeBytes is null or >= 0 and <= IpcLimits.MinSizeMaxBytes,
         AddDownload m => Url(m.Url, _downloadSchemes) && Url(m.FinalUrl, _downloadSchemes) && Optional(m.Referrer, v => Url(v, _webSchemes))
             && Text(m.Filename, IpcLimits.FileNameLength, min: 1) && Text(m.Mime, IpcLimits.MimeLength)
             && Text(m.UserAgent, IpcLimits.UserAgentLength) && Cookies(m.Cookies),
