@@ -17,6 +17,9 @@
   "allowAllSites": {
     "message": "Allow Kasi on all sites"
   },
+  "badge_disconnected": {
+    "message": "!"
+  },
   "openSettings": {
     "message": "Open Kasi settings"
   },

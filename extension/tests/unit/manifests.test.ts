@@ -21,6 +21,16 @@ describe('merged manifests', () => {
     expect(firefox.manifest_version).toBe(3);
   });
 
+  it('[TC-BRW-003] runs the content script early in every frame so modifier clicks are seen', () => {
+    expect(chromium.content_scripts).toEqual([
+      expect.objectContaining({
+        run_at: 'document_start',
+        all_frames: true,
+        match_about_blank: true,
+      }),
+    ]);
+  });
+
   it('use the right background form', () => {
     expect(chromium.background).toEqual({ service_worker: 'background.js' });
     expect(firefox.background).toEqual({ scripts: ['background.js'] });
