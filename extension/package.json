@@ -15,7 +15,9 @@
     "check:manifests": "tsx scripts/check-manifests.ts",
     "lint": "eslint . && tsc --noEmit",
     "format:check": "prettier --check .",
-    "test": "vitest run --config vitest.config.ts --passWithNoTests"
+    "test": "vitest run --config vitest.config.ts",
+    "smoke:chromium": "tsx tests/browser/chromium-smoke.ts",
+    "smoke:firefox": "web-ext lint --source-dir dist/firefox --warnings-as-errors"
   },
   "dependencies": {
     "webextension-polyfill": "0.12.0"
@@ -33,6 +35,7 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0",
     "vite": "7.3.7",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "web-ext": "10.8.0"
   }
 }

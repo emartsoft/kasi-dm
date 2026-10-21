@@ -15,7 +15,7 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 Under construction in **M2 (browser integration)**; see [plan.md](plan.md) for task status. The M1 download engine supports segmented HTTP and FTP/FTPS downloads, durable resume, authentication, proxies, checksums, duplicate detection and shared bandwidth limits. The engine gate still needs the owner's benchmark and fault-injection evidence.
 
-M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). Browser behaviour and the desktop UI follow in later M2 tasks.
+M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types; M2.3b adds its native port manager, rules cache, redacting logger, Ajv fixture tests, CI job and nightly browser smoke. M2.2a adds the native messaging host (browser frames, relay to the pipe, launcher, developer registration script). Browser interception and the desktop UI follow in later M2 tasks.
 
 ## Repository layout
 
@@ -31,7 +31,7 @@ kasi-dm/
 │   ├── Kasi.Ipc/             Strict message contracts and serializer, hardened named-pipe client/server (M2.1)
 │   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray (empty shell)
 │   └── Kasi.NativeHost/      Native AOT browser native-messaging host: frame reader/writer, two-way relay, Kasi launcher (M2.2a)
-├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox scaffold, M2.3a)
+├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox, M2.3a and M2.3b)
 ├── tests/
 │   ├── Kasi.Engine.Tests/    Unit + property tests (FsCheck)
 │   ├── Kasi.*.Tests/         One test project per src project
