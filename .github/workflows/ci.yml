@@ -2,7 +2,7 @@ name: CI
 
 # TRD 14.5 step 1: build, unit tests, integration tests against local test servers, coverage.
 # Extension lint/tests are added in M2 together with the extension itself.
-# The engine coverage gate (80%, KASI-NFR-018) is switched on in M1, once Kasi.Engine contains code.
+# The engine coverage gate (80% of Kasi.Engine lines, KASI-NFR-018) is on since M1.16a: build/Test-CoverageGate.ps1 reads the merged Cobertura report.
 
 on:
   pull_request: # any base branch, so stacked PRs are checked too
@@ -68,6 +68,12 @@ jobs:
             "-reporttypes:HtmlInline_AzurePipelines;MarkdownSummaryGithub;Cobertura" `
             "-assemblyfilters:+Kasi.*;-Kasi.TestServer;-*.Tests;-Kasi.ArchitectureTests"
           if (Test-Path coverage/SummaryGithub.md) { Get-Content coverage/SummaryGithub.md >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Engine coverage gate (KASI-NFR-018)
+        # no hashFiles guard: a missing report must fail the gate (exit 2), not skip it
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./build/Test-CoverageGate.ps1 -Cobertura coverage/Cobertura.xml -Assembly Kasi.Engine -Threshold 0.80
 
       - name: Upload test results and coverage
         if: ${{ !cancelled() }}
