@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "id": "rl1",
+  "type": "refreshLink",
+  "jobId": "0198f0f2-6a40-7c3e-9d5a-3b2f1c0a9e11",
+  "referrerUrl": "ftp://example.com/page",
+  "matchHint": "setup.exe"
+}

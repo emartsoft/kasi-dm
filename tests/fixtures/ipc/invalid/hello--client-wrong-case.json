@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "id": "h1",
+  "type": "hello",
+  "client": "Chrome",
+  "extensionVersion": "1.0.0",
+  "protocolMin": 1,
+  "protocolMax": 1
+}

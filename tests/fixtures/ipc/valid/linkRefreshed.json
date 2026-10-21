@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "id": "lr1",
+  "type": "linkRefreshed",
+  "jobId": "0198f0f2-6a40-7c3e-9d5a-3b2f1c0a9e11",
+  "url": "https://cdn.example.com/fresh/setup.exe",
+  "cookies": [
+    {
+      "name": "session",
+      "value": "s3cr3t-value",
+      "domain": ".example.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "id": "m1",
+  "type": "mediaDetected",
+  "tabId": 12,
+  "pageUrl": "https://example.com/watch",
+  "kind": "hls",
+  "url": "ftp://example.com/video.mp4",
+  "title": "A video"
+}

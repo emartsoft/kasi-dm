@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "id": "d2",
+  "type": "addDownload",
+  "url": "ftp://files.example.com/pub/data.iso",
+  "finalUrl": "ftp://files.example.com/pub/data.iso",
+  "filename": "data.iso",
+  "mime": "",
+  "userAgent": "",
+  "cookies": []
+}

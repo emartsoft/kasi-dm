@@ -18,7 +18,7 @@ internal static class SolutionLayout
         ["Kasi.Torrent"] = ["Kasi.Core"],
         ["Kasi.Scheduling"] = ["Kasi.Core"],
         ["Kasi.Data"] = ["Kasi.Core"],
-        ["Kasi.Ipc"] = ["Kasi.Core"],
+        ["Kasi.Ipc"] = [],
         ["Kasi.App"] = _engineProjects,
         ["Kasi.NativeHost"] = ["Kasi.Ipc"],
     };

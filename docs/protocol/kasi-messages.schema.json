@@ -1,0 +1,583 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kasi protocol message (TRD 9.4, version 1)",
+  "description": "One message between the Kasi browser extension (through the native host) and the Kasi application. See docs/protocol/README.md.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/hello"
+    },
+    {
+      "$ref": "#/definitions/rules"
+    },
+    {
+      "$ref": "#/definitions/addDownload"
+    },
+    {
+      "$ref": "#/definitions/addBatch"
+    },
+    {
+      "$ref": "#/definitions/mediaDetected"
+    },
+    {
+      "$ref": "#/definitions/captureMedia"
+    },
+    {
+      "$ref": "#/definitions/refreshLink"
+    },
+    {
+      "$ref": "#/definitions/linkRefreshed"
+    },
+    {
+      "$ref": "#/definitions/openSettings"
+    },
+    {
+      "$ref": "#/definitions/ack"
+    },
+    {
+      "$ref": "#/definitions/error"
+    }
+  ],
+  "definitions": {
+    "id": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1
+    },
+    "shortText": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1
+    },
+    "webUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^https?://[^\\s/?#]+"
+    },
+    "downloadUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^(https?|ftps?)://[^\\s/?#]+"
+    },
+    "textList": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "string",
+        "maxLength": 256,
+        "minLength": 1
+      }
+    },
+    "cookie": {
+      "type": "object",
+      "description": "A cookie the browser holds for the download. The value is a secret and is never logged.",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value",
+        "domain",
+        "path",
+        "secure",
+        "httpOnly"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 256,
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "domain": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "minLength": 1
+        },
+        "secure": {
+          "type": "boolean"
+        },
+        "httpOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "cookies": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/definitions/cookie"
+      }
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "$ref": "#/definitions/downloadUrl"
+        },
+        "filename": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        }
+      }
+    },
+    "mediaKind": {
+      "enum": [
+        "hls",
+        "dash",
+        "direct"
+      ]
+    },
+    "hello": {
+      "type": "object",
+      "description": "Extension to Kasi: the version handshake. protocolMax must not be below protocolMin (checked by the C# parser).",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "client",
+        "extensionVersion",
+        "protocolMin",
+        "protocolMax"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "hello"
+        },
+        "client": {
+          "enum": [
+            "chrome",
+            "edge",
+            "firefox"
+          ]
+        },
+        "extensionVersion": {
+          "$ref": "#/definitions/shortText"
+        },
+        "protocolMin": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "protocolMax": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "description": "Kasi to extension: interception rules, bypass key, enabled flag.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "enabled",
+        "extensions",
+        "mimeTypes",
+        "excludedSites",
+        "bypassKey",
+        "ackTimeoutMs"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "rules"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "extensions": {
+          "$ref": "#/definitions/textList"
+        },
+        "mimeTypes": {
+          "$ref": "#/definitions/textList"
+        },
+        "excludedSites": {
+          "$ref": "#/definitions/textList"
+        },
+        "bypassKey": {
+          "enum": [
+            "alt",
+            "ctrl",
+            "shift",
+            "none"
+          ]
+        },
+        "ackTimeoutMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        }
+      }
+    },
+    "addDownload": {
+      "type": "object",
+      "description": "Extension to Kasi: one intercepted or context-menu download.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "url",
+        "finalUrl",
+        "filename",
+        "mime",
+        "userAgent",
+        "cookies"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "addDownload"
+        },
+        "url": {
+          "$ref": "#/definitions/downloadUrl"
+        },
+        "finalUrl": {
+          "$ref": "#/definitions/downloadUrl"
+        },
+        "referrer": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "filename": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1
+        },
+        "mime": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "userAgent": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "cookies": {
+          "$ref": "#/definitions/cookies"
+        }
+      }
+    },
+    "addBatch": {
+      "type": "object",
+      "description": "Extension to Kasi: the links chosen in the picker.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "referrer",
+        "links",
+        "cookies",
+        "userAgent"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "addBatch"
+        },
+        "referrer": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "links": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/definitions/link"
+          }
+        },
+        "cookies": {
+          "$ref": "#/definitions/cookies"
+        },
+        "userAgent": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "mediaDetected": {
+      "type": "object",
+      "description": "Extension to Kasi: a manifest or direct media file found in a tab.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "tabId",
+        "pageUrl",
+        "kind",
+        "url"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "mediaDetected"
+        },
+        "tabId": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pageUrl": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "kind": {
+          "$ref": "#/definitions/mediaKind"
+        },
+        "url": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "captureMedia": {
+      "type": "object",
+      "description": "Extension to Kasi: the user chose a stream from the popup or overlay.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "tabId",
+        "url",
+        "kind",
+        "cookies",
+        "referrer",
+        "userAgent"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "captureMedia"
+        },
+        "tabId": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "url": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "kind": {
+          "$ref": "#/definitions/mediaKind"
+        },
+        "cookies": {
+          "$ref": "#/definitions/cookies"
+        },
+        "referrer": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "userAgent": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    },
+    "refreshLink": {
+      "type": "object",
+      "description": "Kasi to extension: open the referrer page and watch for a matching download.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "jobId",
+        "referrerUrl"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "refreshLink"
+        },
+        "jobId": {
+          "$ref": "#/definitions/id"
+        },
+        "referrerUrl": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "matchHint": {
+          "type": "string",
+          "maxLength": 256,
+          "minLength": 1
+        }
+      }
+    },
+    "linkRefreshed": {
+      "type": "object",
+      "description": "Extension to Kasi: the fresh URL and cookies for a paused job.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "jobId",
+        "url",
+        "cookies"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "linkRefreshed"
+        },
+        "jobId": {
+          "$ref": "#/definitions/id"
+        },
+        "url": {
+          "$ref": "#/definitions/downloadUrl"
+        },
+        "cookies": {
+          "$ref": "#/definitions/cookies"
+        }
+      }
+    },
+    "openSettings": {
+      "type": "object",
+      "description": "Extension to Kasi: show Kasi's settings window. section defaults to browser. Answered with ack.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "openSettings"
+        },
+        "section": {
+          "enum": [
+            "general",
+            "browser"
+          ]
+        }
+      }
+    },
+    "ack": {
+      "type": "object",
+      "description": "The result for a correlation id (both directions).",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "ok"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "ack"
+        },
+        "ok": {
+          "const": true
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "description": "A failure for a correlation id (both directions). The detail never carries the offending input.",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "id",
+        "type",
+        "code"
+      ],
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "type": {
+          "const": "error"
+        },
+        "code": {
+          "enum": [
+            "INVALID_MESSAGE",
+            "UNSUPPORTED_VERSION",
+            "APP_NOT_RUNNING",
+            "APP_NOT_INSTALLED",
+            "INTERNAL"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}

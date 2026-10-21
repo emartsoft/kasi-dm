@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "id": "h1",
+  "type": "error",
+  "code": "UNSUPPORTED_VERSION",
+  "detail": "protocol 2 is not supported"
+}
