@@ -15,7 +15,7 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 
 Under construction in **M2 (browser integration)**; see [plan.md](plan.md) for task status. The M1 download engine supports segmented HTTP and FTP/FTPS downloads, durable resume, authentication, proxies, checksums, duplicate detection and shared bandwidth limits. The engine gate still needs the owner's benchmark and fault-injection evidence.
 
-M2.1a (merged) adds strict IPC message contracts, the JSON Schema and shared protocol fixtures. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types. The named pipe, native host, browser behaviour and desktop UI follow in later M2 tasks.
+M2.1 (merged) adds strict IPC message contracts, the JSON Schema, shared protocol fixtures and the hardened per-user named pipe. M2.3a adds the TypeScript extension scaffold with separate Chromium and Firefox MV3 bundles and schema-generated types. The native host, browser behaviour and desktop UI follow in later M2 tasks.
 
 ## Repository layout
 
@@ -28,7 +28,7 @@ kasi-dm/
 │   ├── Kasi.Torrent/         MonoTorrent adapter (placeholder, M4)
 │   ├── Kasi.Scheduling/      Queue runner, schedules, post-actions, wake timers (placeholder, M2)
 │   ├── Kasi.Data/            SQLite repositories, migrations, checkpoint writer
-│   ├── Kasi.Ipc/             Strict message contracts and serializer (M2.1a); named-pipe client/server (planned, M2.1b)
+│   ├── Kasi.Ipc/             Strict message contracts and serializer, hardened named-pipe client/server (M2.1)
 │   ├── Kasi.App/             Avalonia desktop app: composition root, views, view models, tray (empty shell)
 │   └── Kasi.NativeHost/      Native AOT browser native-messaging host (stub, M2)
 ├── extension/                TypeScript Manifest V3 extension (Chromium and Firefox scaffold, M2.3a)
