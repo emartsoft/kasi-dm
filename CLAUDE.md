@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M2 — Browser integration, queues, categories, main UI (TRD section 16; plan.md section 5).** M2.1a protocol contracts and M2.3a extension scaffold are implemented on feature branches; the named pipe, native host, browser behaviour and desktop UI follow. The M1 engine gate still awaits owner benchmark and fault-injection evidence. M0 is closed except the owner items in plan.md section 3.2. Update this line when the phase changes.
+**M2 — Browser integration, queues, categories, main UI (TRD section 16; plan.md section 5).** M2.1a protocol contracts are merged and the M2.3a extension scaffold is implemented; the named pipe, native host, browser behaviour and desktop UI follow. The M1 engine gate still awaits owner benchmark and fault-injection evidence. M0 is closed except the owner items in plan.md section 3.2. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 

@@ -545,6 +545,7 @@
       }
     },
     "error": {
+      "title": "ErrorMessage",
       "type": "object",
       "description": "A failure for a correlation id (both directions). The detail never carries the offending input.",
       "additionalProperties": false,

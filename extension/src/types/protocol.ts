@@ -14,7 +14,7 @@ export type KasiProtocolMessage =
   | LinkRefreshed
   | OpenSettings
   | Ack
-  | Error;
+  | ErrorMessage;
 export type Id = string;
 export type ShortText = string;
 /**
@@ -172,7 +172,7 @@ export interface Ack {
 /**
  * A failure for a correlation id (both directions). The detail never carries the offending input.
  */
-export interface Error {
+export interface ErrorMessage {
   v: 1;
   id: Id;
   type: 'error';
