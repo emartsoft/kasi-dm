@@ -1,0 +1,48 @@
+name: M1 gate report
+
+# plan.md 4.2: runs build/Check-M1Gate.ps1 against the latest evidence on main and publishes the gate report for the owner's
+# sign-off. Manual only; it reads CI runs, nightly runs, benchmark sessions and open defects, and changes nothing.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  gate:
+    name: Gate check
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build Kasi.Bench (for the benchmark scorecard)
+        run: dotnet build bench/Kasi.Bench/Kasi.Bench.csproj -c Release
+
+      - name: Check the gate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./build/Check-M1Gate.ps1 -Repository ${{ github.repository }} -OutputDir artifacts/gate
+
+      - name: Upload the gate report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-gate-report
+          path: artifacts/gate/
+          if-no-files-found: warn

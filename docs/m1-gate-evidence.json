@@ -1,0 +1,9 @@
+{
+  "note": "Evidence that only people can produce, read by build/Check-M1Gate.ps1. Replace null with an object such as { \"date\": \"2026-11-02\", \"iterations\": 20, \"report\": \"link or artifact name\" } once the run has happened.",
+  "testCases": {
+    "TC-RES-003": null
+  },
+  "weekly": {
+    "sleepHibernate": null
+  }
+}

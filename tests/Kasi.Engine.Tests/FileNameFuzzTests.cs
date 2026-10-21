@@ -19,20 +19,53 @@ public class FileNameFuzzTests
     ];
 
     /// <summary>
-    /// Reusable fuzz entry point for <c>SharpFuzz</c> (TPL 7.2, wired into nightly CI in M1.16). Splits raw bytes
-    /// into a header and URL pair and verifies all filename parser and sanitiser invariants.
+    /// The fuzz entry point is <see cref="Kasi.Fuzz.FileNameFuzz.Run"/> (TPL 7.2): the nightly SharpFuzz run, the saved crash corpus
+    /// and these tests all go through it, so the invariants live in one place.
     /// </summary>
-    internal static void FuzzTarget(ReadOnlySpan<byte> data)
-    {
-        var split = data.IndexOf((byte)'\n');
-        var header = split >= 0
-            ? Encoding.Latin1.GetString(data[..split])
-            : Encoding.Latin1.GetString(data);
-        var url = split >= 0
-            ? Encoding.UTF8.GetString(data[(split + 1)..])
-            : header;
+    internal static void FuzzTarget(ReadOnlySpan<byte> data) => Kasi.Fuzz.FileNameFuzz.Run(data);
 
-        VerifyInvariants(header, url, context: "FuzzTarget(ReadOnlySpan<byte>)");
+    [Fact]
+    public void Every_saved_fuzz_finding_still_passes_the_invariants()
+    {
+        // tests/fixtures/fuzz/crashes holds the minimised inputs of past findings; each must stay fixed
+        var folder = Path.Combine(RepositoryRoot(), "tests", "fixtures", "fuzz", "crashes");
+        foreach (var file in Directory.GetFiles(folder).Where(f => !f.EndsWith(".md", StringComparison.Ordinal)))
+        {
+            FuzzTarget(File.ReadAllBytes(file));
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a<b")]
+    [InlineData("name.")]
+    [InlineData(" name")]
+    [InlineData("na\u202Eme")]
+    [InlineData("a/b")]
+    [InlineData("a\0b")]
+    public void The_shared_invariant_check_rejects_an_unsafe_name(string name)
+    {
+        var act = () => Kasi.Fuzz.FileNameFuzz.CheckName(name, "test");
+
+        act.Should().Throw<Kasi.Fuzz.FileNameInvariantException>();
+    }
+
+    [Fact]
+    public void The_shared_invariant_check_rejects_an_unpaired_surrogate()
+    {
+        // a lone surrogate cannot travel in InlineData (it becomes U+FFFD), so it is built here
+        var act = () => Kasi.Fuzz.FileNameFuzz.CheckName(new string((char)0xD800, 1), "test");
+
+        act.Should().Throw<Kasi.Fuzz.FileNameInvariantException>();
+    }
+
+    [Fact]
+    public void The_shared_invariant_check_accepts_the_names_the_sanitiser_makes_from_the_seed_corpus()
+    {
+        foreach (var seed in LoadSeedCorpus())
+        {
+            Kasi.Fuzz.FileNameFuzz.Check(seed, seed);
+        }
     }
 
     [Fact]
@@ -147,7 +180,7 @@ public class FileNameFuzzTests
         return new string(buffer);
     }
 
-    private static IReadOnlyList<string> LoadSeedCorpus()
+    private static string RepositoryRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Kasi.slnx")))
@@ -155,8 +188,13 @@ public class FileNameFuzzTests
             dir = dir.Parent;
         }
 
+        return dir?.FullName ?? throw new InvalidOperationException("Kasi.slnx not found.");
+    }
+
+    private static IReadOnlyList<string> LoadSeedCorpus()
+    {
         var path = Path.Combine(
-            dir?.FullName ?? throw new InvalidOperationException("Kasi.slnx not found."),
+            RepositoryRoot(),
             "tests",
             "fixtures",
             "disposition-corpus",

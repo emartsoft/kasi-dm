@@ -14,3 +14,6 @@ node_modules/
 .cr/
 
 BenchmarkDotNet.Artifacts/
+
+# harness output (fuzz runs, gate reports, fault reports)
+artifacts/

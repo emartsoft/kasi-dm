@@ -8,7 +8,7 @@
   <!-- Licences: Avalonia (+Desktop, Headless.XUnit) MIT; FluentAvaloniaUI MIT; CommunityToolkit.Mvvm MIT;
        Microsoft.Extensions.Hosting MIT; MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; xunit.runner.visualstudio Apache-2.0;
        AwesomeAssertions Apache-2.0;
-       Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); System.Security.Cryptography.ProtectedData MIT; Dapper Apache-2.0; FluentFTP MIT; FsCheck.Xunit.v3 BSD-3-Clause (3.4 and later need xunit.v3 4.x, which Avalonia.Headless.XUnit does not allow yet); Microsoft.Extensions.TimeProvider.Testing MIT; coverlet.collector MIT; BenchmarkDotNet MIT (bench only). -->
+       Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); System.Security.Cryptography.ProtectedData MIT; Dapper Apache-2.0; FluentFTP MIT; FsCheck.Xunit.v3 BSD-3-Clause (3.4 and later need xunit.v3 4.x, which Avalonia.Headless.XUnit does not allow yet); Microsoft.Extensions.TimeProvider.Testing MIT; coverlet.collector MIT; BenchmarkDotNet MIT (bench only); SharpFuzz MIT (tests/Kasi.Fuzz only). -->
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="Dapper" Version="2.1.89" />
@@ -26,6 +26,7 @@
     <PackageVersion Include="MinVer" Version="8.0.0" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="18.12.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="SharpFuzz" Version="2.3.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
