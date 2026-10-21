@@ -2,10 +2,13 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- Kasi.NativeHost is a Native AOT (self-contained) executable; the fuzz target only runs its managed relay in process. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
+    <ProjectReference Include="../../src/Kasi.NativeHost/Kasi.NativeHost.csproj" />
     <PackageReference Include="SharpFuzz" />
   </ItemGroup>
 
