@@ -187,3 +187,142 @@ describe('native port manager', () => {
     expect(onRules).not.toHaveBeenCalled();
   });
 });
+
+describe('[TC-BRW-002] native port: connected means Kasi answered', () => {
+  const quiet = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+  let made: FakePort[];
+  const start = (onLateAck?: (id: string) => void) => {
+    made = [];
+    const manager = createNativePort({
+      connect: () => {
+        const p = new FakePort();
+        made.push(p);
+        return p;
+      },
+      client: 'chrome',
+      extensionVersion: '0.2.0',
+      logger: quiet,
+      newId: () => `h${String(made.length)}-${String(made[made.length - 1]?.sent.length)}`,
+      ...(onLateAck ? { onLateAck } : {}),
+    });
+    manager.start();
+    return manager;
+  };
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('is not connected after an ack or an ordinary error, only after rules', () => {
+    const manager = start();
+    made[0]?.receive({ v: 1, id: 'x', type: 'ack', ok: true });
+    made[0]?.receive({ v: 1, id: 'x', type: 'error', code: 'INTERNAL' });
+    expect(manager.isConnected()).toBe(false);
+    made[0]?.receive(rules);
+    expect(manager.isConnected()).toBe(true);
+  });
+
+  it.each([
+    ['APP_NOT_RUNNING', 'app-not-running'],
+    ['APP_NOT_INSTALLED', 'app-not-installed'],
+  ])('%s turns connected off and is remembered as %s', async (code, failure) => {
+    const manager = start();
+    made[0]?.receive(rules);
+    const pending = manager.request({ id: 'a' });
+    made[0]?.receive({ v: 1, id: 'a', type: 'error', code });
+    await expect(pending).rejects.toMatchObject({ code });
+    expect(manager.isConnected()).toBe(false);
+    expect(manager.lastFailure()).toBe(failure);
+    made[0]?.receive(rules);
+    expect(manager.isConnected()).toBe(true);
+    expect(manager.lastFailure()).toBeUndefined();
+  });
+
+  it('says hello again on the same port after an APP_* error, and again on a new port after a disconnect', () => {
+    const manager = start();
+    made[0]?.receive({ v: 1, id: 'h', type: 'error', code: 'APP_NOT_RUNNING' });
+    vi.advanceTimersByTime(1000);
+    expect(made).toHaveLength(1);
+    expect(made[0]?.sent.map((m) => m.type)).toEqual(['hello', 'hello']);
+    made[0]?.drop();
+    vi.advanceTimersByTime(2000);
+    expect(made).toHaveLength(2);
+    expect(made[1]?.sent[0]?.type).toBe('hello');
+    expect(manager.isConnected()).toBe(false);
+  });
+
+  it('reports a host that died before saying anything as missing, and a silent connect failure too', () => {
+    const manager = start();
+    made[0]?.drop();
+    expect(manager.lastFailure()).toBe('host-missing');
+    const thrower = createNativePort({
+      connect: () => {
+        throw new Error('no host');
+      },
+      client: 'chrome',
+      extensionVersion: '0.2.0',
+      logger: quiet,
+    });
+    thrower.start();
+    expect(thrower.lastFailure()).toBe('host-missing');
+  });
+
+  it('whenConnected resolves on rules, expires on time, and answers false at once when nothing can answer', async () => {
+    const manager = start();
+    const ok = manager.whenConnected(6000);
+    made[0]?.receive(rules);
+    await expect(ok).resolves.toBe(true);
+    await expect(manager.whenConnected(1)).resolves.toBe(true);
+
+    const slow = start();
+    const late = slow.whenConnected(6000);
+    vi.advanceTimersByTime(5999);
+    vi.advanceTimersByTime(1);
+    await expect(late).resolves.toBe(false);
+
+    const missing = start();
+    made[0]?.drop();
+    await expect(missing.whenConnected(6000)).resolves.toBe(false);
+  });
+
+  it('whenConnected gives up when the host reports Kasi is not running', async () => {
+    const manager = start();
+    const waiting = manager.whenConnected(6000);
+    made[0]?.receive({ v: 1, id: 'h', type: 'error', code: 'APP_NOT_RUNNING' });
+    await expect(waiting).resolves.toBe(false);
+  });
+
+  it('reconnectNow skips the backoff, but does not repeat a hello that is still in flight', () => {
+    const manager = start();
+    manager.reconnectNow();
+    expect(made[0]?.sent).toHaveLength(1);
+    made[0]?.drop();
+    manager.reconnectNow();
+    expect(made).toHaveLength(2);
+    made[1]?.receive(rules);
+    manager.reconnectNow();
+    expect(made[1]?.sent).toHaveLength(1);
+  });
+
+  it('reports an ack nobody waits for, so a late ack can be acted on', async () => {
+    const late = vi.fn<(id: string) => void>();
+    const manager = start(late);
+    made[0]?.receive(rules);
+    const pending = manager.request({ id: 'a' });
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' });
+    vi.advanceTimersByTime(2000);
+    await assertion;
+    made[0]?.receive({ v: 1, id: 'a', type: 'ack', ok: true });
+    expect(late).toHaveBeenCalledWith('a');
+  });
+
+  it('keeps requests in the order they were made', () => {
+    const manager = start();
+    made[0]?.receive(rules);
+    void manager.request({ id: 'first' }).catch(() => undefined);
+    void manager.request({ id: 'second' }).catch(() => undefined);
+    expect(made[0]?.sent.slice(1).map((m) => m.id)).toEqual(['first', 'second']);
+  });
+});

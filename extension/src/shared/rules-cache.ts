@@ -16,3 +16,14 @@ export function createRulesCache(area: StorageAreaLike) {
     load: async (): Promise<Rules | undefined> => parseRules((await area.get(KEY))[KEY]),
   };
 }
+
+// The rules in use: the last message from Kasi, else the cache, so a worker started cold by a download decides as a warm one does.
+export function createRulesProvider(cache: ReturnType<typeof createRulesCache>) {
+  let current: Rules | undefined;
+  return {
+    set: (rules: Rules): void => {
+      current = rules;
+    },
+    get: async (): Promise<Rules | undefined> => (current ??= await cache.load()),
+  };
+}
