@@ -28,7 +28,8 @@ public class CrossUserPipeTests
         }
 
         var account = "kasiipc" + Guid.NewGuid().ToString("N")[..8];
-        var password = "Kp!" + Guid.NewGuid().ToString("N") + "A1";
+        // net user asks a question when a password is longer than 14 characters, so keep it short
+        var password = "Kp!" + Guid.NewGuid().ToString("N")[..6] + "A1";
         var kasiName = NewPipeName();
         var controlName = NewPipeName();
         await using var server = StartServer(kasiName);
