@@ -34,6 +34,16 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
         _server.Start();
     }
 
+    /// <summary>Closes the pipe as a quitting Kasi would: every connection ends and the pipe name is free (TC-BRW-002, status after Kasi quits).</summary>
+    public async Task StopAsync()
+    {
+        var server = Interlocked.Exchange(ref _server, null);
+        if (server is not null)
+        {
+            await server.DisposeAsync();
+        }
+    }
+
     public void SetMode(string mode, int answerDelayMs)
     {
         _mode = mode;

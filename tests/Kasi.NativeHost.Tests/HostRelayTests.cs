@@ -157,50 +157,19 @@ public sealed class HostRelayTests
     }
 
     [Fact]
-    public async Task When_Kasi_closes_the_pipe_the_host_reconnects_once_and_sends_the_hello_again()
+    public async Task When_Kasi_closes_the_pipe_the_host_sends_one_APP_NOT_RUNNING_error_and_exits_without_starting_Kasi_again()
     {
-        var first = Server();
-        var second = Server();
-        await using var session = new RelaySession(new FakeConnector().Then(first).Then(second));
-        session.Stdin.Feed(Msg.Hello("h1"));
-        await session.Stdout.WaitForAsync(1);
-
-        first.Close();
-
-        await NativeFrameTests.WaitUntilAsync(() => second.SentCount == 1);
-        second.Sent[0].Should().BeOfType<Hello>().Which.Id.Should().Be("h1");
-        session.Stdin.Feed(Msg.Download("d1"));
-        (await session.Stdout.WaitForAsync(3)).Last().Id.Should().Be("d1");
-    }
-
-    [Fact]
-    public async Task When_Kasi_closes_the_pipe_and_does_not_come_back_the_host_exits()
-    {
+        var connector = new FakeConnector();
         var pipe = Server();
-        await using var session = new RelaySession(new FakeConnector().Then(pipe).ThenFail(IpcErrorCode.AppNotRunning));
+        await using var session = new RelaySession(connector.Then(pipe).Then(Server()));
         session.Stdin.Feed(Msg.Hello("h1"));
         await session.Stdout.WaitForAsync(1);
 
         pipe.Close();
 
         (await session.ExitCodeAsync()).Should().Be(HostRelay.ExitPipeLost);
-    }
-
-    [Fact]
-    public async Task A_pipe_that_closes_again_before_saying_anything_ends_the_host_instead_of_looping()
-    {
-        var connector = new FakeConnector();
-        var first = Server();
-        var flaky = new FakePipe();
-        flaky.Close(); // closes at once, forever
-        await using var session = new RelaySession(connector.Then(first).Then(flaky).Then(new FakePipe()));
-        session.Stdin.Feed(Msg.Hello("h1"));
-        await session.Stdout.WaitForAsync(1);
-
-        first.Close();
-
-        (await session.ExitCodeAsync()).Should().Be(HostRelay.ExitPipeLost);
-        connector.Connects.Should().BeLessThan(4);
+        session.Stdout.Messages().Skip(1).Should().ContainSingle().Which.Should().BeOfType<IpcError>().Which.Code.Should().Be(IpcErrorCode.AppNotRunning);
+        connector.Connects.Should().Be(1);
     }
 
     [Fact]

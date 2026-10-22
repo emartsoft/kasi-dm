@@ -50,6 +50,20 @@ internal static class PageServer
             await stub.SetRulesAsync(rules);
             return Results.NoContent();
         });
+        app.MapPost("/_stub/stop-pipe", async () =>
+        {
+            await stub.StopAsync();
+            return Results.NoContent();
+        });
+        app.MapPost("/_stub/start-pipe", () =>
+        {
+            if (!stub.Running)
+            {
+                stub.Start();
+            }
+
+            return Results.NoContent();
+        });
         app.MapPost("/_stub/quit", () =>
         {
             quit();

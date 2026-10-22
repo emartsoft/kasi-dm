@@ -25,7 +25,7 @@ internal sealed class HostRelay(Stream stdin, NativeFrameWriter output, IHostPip
     private Hello? _hello;
     private Task? _pump;
 
-    /// <summary>Runs until stdin closes (0), a frame is broken (<see cref="ExitFraming"/>) or Kasi is lost for good (<see cref="ExitPipeLost"/>).</summary>
+    /// <summary>Runs until stdin closes (0), a frame is broken (<see cref="ExitFraming"/>) or Kasi closed the pipe, which ends the host after one <c>APP_NOT_RUNNING</c> error (<see cref="ExitPipeLost"/>).</summary>
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -169,12 +169,15 @@ internal sealed class HostRelay(Stream stdin, NativeFrameWriter output, IHostPip
         }
     }
 
-    private async Task DropAsync(IHostPipe pipe)
+    /// <summary>Forgets <paramref name="pipe"/> and disposes it. True when it was still the current one (nobody had replaced it already).</summary>
+    private async Task<bool> DropAsync(IHostPipe pipe)
     {
+        bool current;
         await _connectLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            if (ReferenceEquals(_pipe, pipe))
+            current = ReferenceEquals(_pipe, pipe);
+            if (current)
             {
                 _pipe = null;
             }
@@ -185,11 +188,11 @@ internal sealed class HostRelay(Stream stdin, NativeFrameWriter output, IHostPip
         }
 
         await pipe.DisposeAsync().ConfigureAwait(false);
+        return current;
     }
 
     private async Task PumpPipeAsync(CancellationToken ct)
     {
-        var closedWithoutTraffic = 0;
         try
         {
             while (true)
@@ -215,35 +218,34 @@ internal sealed class HostRelay(Stream stdin, NativeFrameWriter output, IHostPip
 
                 if (message is not null)
                 {
-                    closedWithoutTraffic = 0;
                     await SendToBrowserAsync(message, ct).ConfigureAwait(false);
                     continue;
                 }
 
-                // Kasi closed the pipe: one reconnect through the launcher, otherwise the host ends. A pipe that closes again before
-                // delivering anything is not retried a second time.
-                if (pipe is not null)
+                // The pipe ended. When Kasi ended it (it is still our current pipe) the user quit Kasi: tell the browser once and exit, so the
+                // extension shows "not connected" and nothing relaunches Kasi (plan m2-5 decision 3, ADR 0017). When a failed send already
+                // replaced it, the sender is reconnecting: wait for that connection (or make it).
+                if (pipe is null || !await DropAsync(pipe).ConfigureAwait(false))
                 {
-                    await DropAsync(pipe).ConfigureAwait(false);
+                    try
+                    {
+                        await GetPipeAsync(ct).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is AppUnavailableException or IOException)
+                    {
+                        await LogAsync("host: Kasi is gone and did not come back, exiting").ConfigureAwait(false);
+                        await ReplyAsync(UnknownId, IpcErrorCode.AppNotRunning, "Kasi is not running.", ct).ConfigureAwait(false);
+                        _exit.TrySetResult(ExitPipeLost);
+                        return;
+                    }
+
+                    continue;
                 }
 
-                if (++closedWithoutTraffic > 1)
-                {
-                    await LogAsync("host: Kasi closed the pipe again at once, exiting").ConfigureAwait(false);
-                    _exit.TrySetResult(ExitPipeLost);
-                    return;
-                }
-
-                try
-                {
-                    await GetPipeAsync(ct).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is AppUnavailableException or IOException)
-                {
-                    await LogAsync("host: Kasi is gone and did not come back, exiting").ConfigureAwait(false);
-                    _exit.TrySetResult(ExitPipeLost);
-                    return;
-                }
+                await LogAsync("host: Kasi closed the pipe, exiting").ConfigureAwait(false);
+                await ReplyAsync(UnknownId, IpcErrorCode.AppNotRunning, "Kasi is not running.", ct).ConfigureAwait(false);
+                _exit.TrySetResult(ExitPipeLost);
+                return;
             }
         }
         catch (OperationCanceledException)
