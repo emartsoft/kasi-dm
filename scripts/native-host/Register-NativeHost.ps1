@@ -3,12 +3,12 @@
   Registers the Kasi native messaging host for the current user (development only; the installer does this in M4, KASI-BRW-001).
 
 .DESCRIPTION
-  Writes one manifest per browser family next to the host and points the per-user (HKCU) registry keys for Chrome, Edge and Firefox at it.
+  Writes one manifest per browser family next to the host and points the per-user (HKCU) registry keys for Chrome, Edge, Chromium and Firefox at it.
   Chromium browsers get "allowed_origins" from -ChromeExtensionId; Firefox gets "allowed_extensions" from -FirefoxExtensionId. A browser
   whose id is not given is skipped. Nothing outside HKCU and the manifest folder is touched. -Unregister removes the keys and the manifests.
 
 .PARAMETER HostPath            Kasi.NativeHost.exe (default: the Release publish folder). Kasi.exe must sit in the same folder.
-.PARAMETER ChromeExtensionId   The 32-letter id of the extension in Chrome and Edge.
+.PARAMETER ChromeExtensionId   The 32-letter id of the extension in Chrome, Edge and Chromium.
 .PARAMETER FirefoxExtensionId  The add-on id (for example kasi@martsoft.example) in Firefox.
 #>
 [CmdletBinding()]
@@ -28,6 +28,7 @@ $template = Get-Content (Join-Path $PSScriptRoot '..\..\src\Kasi.NativeHost\Regi
 $targets = @(
     @{ Browser = 'Chrome';  Key = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$hostName";   Allow = 'allowed_origins';    Id = $ChromeExtensionId;  Format = 'chrome-extension://{0}/' }
     @{ Browser = 'Edge';    Key = "HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\$hostName";  Allow = 'allowed_origins';    Id = $ChromeExtensionId;  Format = 'chrome-extension://{0}/' }
+    @{ Browser = 'Chromium'; Key = "HKCU:\Software\Chromium\NativeMessagingHosts\$hostName";       Allow = 'allowed_origins';    Id = $ChromeExtensionId;  Format = 'chrome-extension://{0}/' }
     @{ Browser = 'Firefox'; Key = "HKCU:\Software\Mozilla\NativeMessagingHosts\$hostName";         Allow = 'allowed_extensions'; Id = $FirefoxExtensionId; Format = '{0}' }
 )
 

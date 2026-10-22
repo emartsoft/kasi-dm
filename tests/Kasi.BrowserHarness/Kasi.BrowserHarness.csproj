@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- Kasi.TestServer is an executable project; the harness only uses it in process. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kasi.Ipc/Kasi.Ipc.csproj" />
+    <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
+  </ItemGroup>
+
+</Project>

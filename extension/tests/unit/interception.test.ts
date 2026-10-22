@@ -58,7 +58,7 @@ describe('[TC-BRW-001] a matching download goes to Kasi', () => {
 
     r.port().receive(ack(request?.id ?? ''));
     await done;
-    expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'erase:1']);
+    expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'removeFile:1', 'erase:1']);
     expect(r.badge.text).toBe('');
   });
 
@@ -120,7 +120,7 @@ describe('[TC-BRW-001] a matching download goes to Kasi', () => {
     expect(request).toBeDefined();
     r.port().receive(ack(request?.id ?? ''));
     await done;
-    expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'erase:1']);
+    expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'removeFile:1', 'erase:1']);
   });
 
   it('reads cookies for the URL and the final URL, de-duplicated, with the domain unchanged', async () => {
@@ -174,22 +174,16 @@ describe('[TC-BRW-001] a matching download goes to Kasi', () => {
     await done;
   });
 
-  it('removes the part file on Firefox between cancel and erase, and only there', async () => {
-    const firefox = rig({ firefox: true });
-    firefox.online();
-    const doneF = firefox.start(firefox.add());
-    await settle();
-    firefox.port().receive(ack(firefox.port().requests()[0]?.id ?? ''));
-    await doneF;
-    expect(firefox.downloads.calls).toEqual(['pause:1', 'cancel:1', 'removeFile:1', 'erase:1']);
-
-    const chromium = rig();
-    chromium.online();
-    const doneC = chromium.start(chromium.add());
-    await settle();
-    chromium.port().receive(ack(chromium.port().requests()[0]?.id ?? ''));
-    await doneC;
-    expect(chromium.downloads.calls).not.toContain('removeFile:1');
+  it('removes the file between cancel and erase in both browsers (a part file, or bytes that completed while paused)', async () => {
+    for (const firefox of [true, false]) {
+      const r = rig({ firefox });
+      r.online();
+      const done = r.start(r.add());
+      await settle();
+      r.port().receive(ack(r.port().requests()[0]?.id ?? ''));
+      await done;
+      expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'removeFile:1', 'erase:1']);
+    }
   });
 
   it('runs concurrent downloads independently, each with its own request id', async () => {
@@ -267,7 +261,7 @@ describe('[TC-BRW-002] Kasi is missing, slow or refuses: the browser keeps the d
     expect(request).toBeDefined();
     r.port().receive(ack(request?.id ?? ''));
     await done;
-    expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'erase:1']);
+    expect(r.downloads.calls).toEqual(['pause:1', 'cancel:1', 'removeFile:1', 'erase:1']);
   });
 
   it('gives up after the 6 s ready wait: resume, badge, and no request ever sent', async () => {
@@ -324,9 +318,23 @@ describe('[TC-BRW-002] Kasi is missing, slow or refuses: the browser keeps the d
     const done = r.start(item);
     await settle();
     item.state = 'interrupted';
+    item.canResume = false;
     await vi.advanceTimersByTimeAsync(2000);
     await done;
     expect(r.downloads.calls).toEqual(['pause:1']);
+  });
+
+  it('resumes a download Firefox reports as interrupted while it is paused', async () => {
+    const r = rig();
+    r.online();
+    const item = r.add();
+    const done = r.start(item);
+    await settle();
+    item.state = 'interrupted'; // what Firefox shows for a paused download, with paused and canResume still set
+    item.canResume = true;
+    await vi.advanceTimersByTimeAsync(2000);
+    await done;
+    expect(r.downloads.calls).toEqual(['pause:1', 'resume:1']);
   });
 
   it('leaves a download alone when it cannot be paused or already finished', async () => {
@@ -356,7 +364,13 @@ describe('[TC-BRW-002] Kasi is missing, slow or refuses: the browser keeps the d
     await vi.advanceTimersByTimeAsync(5000);
     r.port().receive(ack(id));
     await settle();
-    expect(r.downloads.calls).toEqual(['pause:1', 'resume:1', 'cancel:1', 'erase:1']);
+    expect(r.downloads.calls).toEqual([
+      'pause:1',
+      'resume:1',
+      'cancel:1',
+      'removeFile:1',
+      'erase:1',
+    ]);
   });
 
   it('leaves a late-acked download alone when its bytes are already complete', async () => {

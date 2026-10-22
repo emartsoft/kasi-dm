@@ -20,6 +20,7 @@ export interface DownloadItemLike {
   totalBytes?: number;
   state?: string;
   paused?: boolean;
+  canResume?: boolean;
   incognito?: boolean;
   byExtensionId?: string;
 }
@@ -31,7 +32,7 @@ export interface InterceptionDeps {
     cancel(id: number): Promise<void>;
     erase(query: { id: number }): Promise<unknown>;
     search(query: { id: number }): Promise<DownloadItemLike[]>;
-    // Firefox only: cancel can leave the part file behind.
+    // cancel does not delete a part file left by Firefox, nor a download that completed while paused (its bytes were all in).
     removeFile?(id: number): Promise<void>;
   };
   port: {
@@ -67,8 +68,11 @@ export function createInterception(deps: InterceptionDeps) {
   async function resumeIfPaused(id: number): Promise<void> {
     try {
       const [item] = await deps.downloads.search({ id });
-      // A download the user cancelled (or one that finished) meanwhile is left alone.
-      if (item?.state === 'in_progress' && item.paused) await deps.downloads.resume(id);
+      // A download the user cancelled (or one that finished) meanwhile is left alone. Firefox reports a paused download as
+      // 'interrupted' (error USER_CANCELED) with paused and canResume set, so the state alone cannot tell the two apart.
+      if (item?.paused && item.canResume !== false && item.state !== 'complete') {
+        await deps.downloads.resume(id);
+      }
     } catch (error) {
       log.warn('Could not resume a download', { error });
     }

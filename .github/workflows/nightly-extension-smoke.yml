@@ -3,7 +3,7 @@ name: Nightly extension smoke
 # M2.3b: loads the built extension in real browsers. Not part of PR CI (needs browser downloads). No test touches the public internet
 # beyond the browser and npm downloads; no native host is registered, so the popup must show the not-connected state.
 # Chromium: Playwright persistent context. Firefox: Playwright cannot load extensions, so this job runs web-ext lint on dist/firefox
-# (the AMO validator); driving the Firefox popup needs geckodriver and arrives with the registered host in M2.4.
+# (the AMO validator); the Firefox popup is driven through geckodriver by the end-to-end workflow (extension-e2e.yml, M2.4c).
 
 on:
   schedule:

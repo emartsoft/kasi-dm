@@ -43,4 +43,15 @@ npm run smoke:chromium   # popup shows the not-connected state
 npm run smoke:firefox    # web-ext lint (AMO validator) on dist/firefox
 ```
 
-Playwright cannot load Firefox extensions, so the Firefox popup is not driven yet; that needs geckodriver and arrives with the end-to-end harness in M2.4c. Interception tests are titled `[TC-BRW-001]` to `[TC-BRW-004]`: `npx vitest run -t "TC-BRW-003"`.
+The end-to-end suites (M2.4c, `TC-BRW-001` to `004`) drive a real browser with the real Native AOT host and a stub Kasi (`tests/Kasi.BrowserHarness`); see ADR 0019. They need Windows and register the native host under HKCU for the browser under test (the previous value is restored), so they run only with `KASI_E2E=1`; without it, or without the pieces below, each suite is skipped with the reason printed.
+
+```powershell
+dotnet publish src/Kasi.NativeHost -c Release -r win-x64           # Native AOT needs the VS C++ tools, with vswhere on PATH
+dotnet build tests/Kasi.BrowserHarness -c Release
+npm run build; npx playwright install chromium
+$env:KASI_E2E = '1'                                                # KASI_NATIVEHOST_AOT / KASI_HARNESS_DIR override the default paths
+npm run test:e2e -- chromium
+npm run test:e2e -- firefox     # needs geckodriver on PATH (or GECKODRIVER) and Firefox
+```
+
+CI: `.github/workflows/extension-e2e.yml` runs Chromium on pull requests that touch the extension, the protocol, the host or the harness, and Chromium plus Firefox nightly. Interception unit tests are titled `[TC-BRW-001]` to `[TC-BRW-004]`: `npx vitest run -t "TC-BRW-003"`. Not automated: branded Chrome and Edge (they ignore `--load-extension`), private windows, the Firefox toolbar badge and a revoked Firefox host permission; `docs/qa/browser-interception.md` lists them for the release-candidate run.

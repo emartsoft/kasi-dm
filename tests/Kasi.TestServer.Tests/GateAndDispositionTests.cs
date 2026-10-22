@@ -39,6 +39,20 @@ public sealed class GateAndDispositionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Post_download_answers_a_form_post_with_an_attachment_and_refuses_a_get()
+    {
+        using var client = TestClient.Create(_host);
+        using var form = new StringContent("a=b");
+
+        using var post = await client.PostAsync("/post-download/pd/300", form, TestClient.Ct);
+        using var get = await client.GetAsync("/post-download/pd/300", TestClient.Ct);
+
+        post.Content.Headers.ContentDisposition!.DispositionType.Should().Be("attachment");
+        (await post.Content.ReadAsByteArrayAsync(TestClient.Ct)).Should().Equal(GeneratedContent.Bytes("pd", 300));
+        get.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+    }
+
+    [Fact]
     public async Task Redirect_followed_automatically_ends_at_the_file()
     {
         using var client = TestClient.Create(_host);

@@ -46,10 +46,8 @@ const interception = createInterception({
     cancel: (id) => browser.downloads.cancel(id),
     erase: (query) => browser.downloads.erase(query),
     search: (query) => browser.downloads.search(query),
-    // Firefox's cancel can leave the part file behind.
-    ...(clientName() === 'firefox'
-      ? { removeFile: (id: number) => browser.downloads.removeFile(id) }
-      : {}),
+    // cancel leaves the part file behind on Firefox, and does nothing to a download that finished while Kasi was answering
+    removeFile: (id: number) => browser.downloads.removeFile(id),
   },
   port: nativePort,
   getRules: rulesInUse.get,
