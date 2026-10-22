@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.ViewModels"
+        x:Class="Kasi.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="{Binding Title}"
+        AutomationProperties.Name="{Binding AutomationName}"
+        Width="640"
+        Height="640"
+        MinWidth="480"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" AutomationProperties.Name="{Binding StatusText}" />
+      <Button Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" IsDefault="True" AutomationProperties.Name="{Binding SaveLabel}" />
+      <Button x:Name="CancelButton" Content="{Binding CancelLabel}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
+    </StackPanel>
+    <TabControl SelectedIndex="{Binding SelectedTab}">
+      <TabItem Header="{Binding GeneralTab}" AutomationProperties.Name="{Binding GeneralTab}">
+        <TextBlock Text="{Binding GeneralPlaceholder}" Margin="0,12,0,0" TextWrapping="Wrap" />
+      </TabItem>
+      <TabItem Header="{Binding BrowserTab}" AutomationProperties.Name="{Binding BrowserTab}">
+        <ScrollViewer>
+          <StackPanel Spacing="8" Margin="0,12,0,0">
+            <CheckBox Content="{Binding EnabledLabel}" IsChecked="{Binding Enabled}" AutomationProperties.Name="{Binding EnabledLabel}" />
+            <TextBlock Text="{Binding ExtensionsLabel}" />
+            <TextBox Text="{Binding ExtensionsText}" AcceptsReturn="True" Height="110" TextWrapping="Wrap" AutomationProperties.Name="{Binding ExtensionsLabel}" />
+            <TextBlock Text="{Binding MimeTypesLabel}" />
+            <TextBox Text="{Binding MimeTypesText}" AcceptsReturn="True" Height="110" TextWrapping="Wrap" AutomationProperties.Name="{Binding MimeTypesLabel}" />
+            <TextBlock Text="{Binding ExcludedSitesLabel}" />
+            <TextBox Text="{Binding ExcludedSitesText}" AcceptsReturn="True" Height="80" TextWrapping="Wrap" AutomationProperties.Name="{Binding ExcludedSitesLabel}" />
+            <TextBlock Text="{Binding BypassKeyLabel}" />
+            <ComboBox ItemsSource="{Binding BypassKeys}" SelectedItem="{Binding SelectedBypassKey}" AutomationProperties.Name="{Binding BypassKeyLabel}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:BypassKeyChoice">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{Binding MinSizeLabel}" />
+            <NumericUpDown Value="{Binding MinSizeMegabytes}" Minimum="0" Maximum="1000000" Increment="1" FormatString="0.##" AutomationProperties.Name="{Binding MinSizeLabel}" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </DockPanel>
+</Window>

@@ -1,3 +1,4 @@
+using Kasi.App.Browser;
 using Kasi.Ipc.Transport;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -6,7 +7,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Kasi.App.Startup;
 
 /// <summary>What the UI step of <see cref="AppStartup.Run"/> gets: the built host and the relay to attach to. Disposing it closes both pipes (tests; the process end does it otherwise).</summary>
-internal sealed class AppSession(IHost host, LaunchRelay relay, bool startHidden, KasiPipeServer browserPipe, HandOffServer handOffPipe) : IAsyncDisposable
+internal sealed class AppSession(
+    IHost host,
+    LaunchRelay relay,
+    bool startHidden,
+    KasiPipeServer browserPipe,
+    HandOffServer handOffPipe,
+    BrowserServices browser,
+    IDisposable rulesPublisher) : IAsyncDisposable
 {
     public IHost Host { get; } = host;
 
@@ -15,8 +23,12 @@ internal sealed class AppSession(IHost host, LaunchRelay relay, bool startHidden
     /// <summary>True for <c>--tray</c>: no window until someone asks for one.</summary>
     public bool StartHidden { get; } = startHidden;
 
+    /// <summary>The settings, intake and launcher the UI attaches to.</summary>
+    public BrowserServices Browser { get; } = browser;
+
     public async ValueTask DisposeAsync()
     {
+        rulesPublisher.Dispose();
         await browserPipe.DisposeAsync().ConfigureAwait(false);
         await handOffPipe.DisposeAsync().ConfigureAwait(false);
     }
@@ -38,7 +50,8 @@ internal static class AppStartup
         AppEndpoints endpoints,
         Func<string[], IHost> buildHost,
         Func<AppSession, int> runUi,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        BrowserServices? browser = null)
     {
         logger ??= NullLogger.Instance;
         var request = AppArguments.Parse(args);
@@ -51,8 +64,9 @@ internal static class AppStartup
             return 0;
         }
 
+        browser ??= BrowserServices.ForCurrentUser(Environment.GetEnvironmentVariable(AppEndpoints.TestSuffixVariable), logger);
         var relay = new LaunchRelay(logger);
-        var browserPipe = new KasiPipeServer(endpoints.BrowserPipe, BrowserPipeHandler.Create());
+        var browserPipe = new KasiPipeServer(endpoints.BrowserPipe, browser.Handler.Handler);
         var handOffPipe = new HandOffServer(endpoints.HandOffPipe, relay.OnHandOffAsync);
         try
         {
@@ -73,7 +87,7 @@ internal static class AppStartup
             relay.Submit(request);
         }
 
-        return runUi(new AppSession(host, relay, request.Tray, browserPipe, handOffPipe));
+        return runUi(new AppSession(host, relay, request.Tray, browserPipe, handOffPipe, browser, browser.PublishChanges(browserPipe)));
     }
 #pragma warning restore CA2000
 }

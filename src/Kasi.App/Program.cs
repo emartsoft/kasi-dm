@@ -1,4 +1,5 @@
 using Avalonia;
+using Kasi.App.Browser;
 using Kasi.App.Startup;
 
 namespace Kasi.App;
@@ -11,8 +12,8 @@ internal static class Program
             args,
             AppEndpoints.ForCurrentUser(),
             CompositionRoot.Build,
-            session => BuildAvaloniaApp(session.Host.Services, session.StartHidden, session.Relay).StartWithClassicDesktopLifetime(args));
+            session => BuildAvaloniaApp(session.Host.Services, session.StartHidden, session.Relay, session.Browser).StartWithClassicDesktopLifetime(args));
 
-    internal static AppBuilder BuildAvaloniaApp(IServiceProvider services, bool startHidden = false, LaunchRelay? relay = null) =>
-        AppBuilder.Configure(() => new App(services, startHidden, relay)).UsePlatformDetect();
+    internal static AppBuilder BuildAvaloniaApp(IServiceProvider services, bool startHidden = false, LaunchRelay? relay = null, BrowserServices? browser = null) =>
+        AppBuilder.Configure(() => new App(services, startHidden, relay, browser)).UsePlatformDetect();
 }
