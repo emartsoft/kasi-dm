@@ -37,10 +37,18 @@ export interface Received {
   cookies: { name: string; value: string; domain: string }[];
 }
 
+export interface ReceivedBatch {
+  referrer: string;
+  urls: string[];
+  cookies: { name: string; value: string; domain: string }[];
+}
+
 export interface Harness {
   admin: string;
   testServer: string;
   received(): Promise<Received[]>;
+  /** The `addBatch` messages the stub has had (the link picker's input). */
+  receivedBatches(): Promise<ReceivedBatch[]>;
   /** How many `hello` messages the stub has had from a native host. */
   hellos(): Promise<number>;
   clear(): Promise<void>;
@@ -114,6 +122,7 @@ function api(admin: string): Omit<Harness, 'testServer' | 'stop'> {
   return {
     admin,
     received: () => json<Received[]>(`${admin}/_stub/received`),
+    receivedBatches: () => json<ReceivedBatch[]>(`${admin}/_stub/received-batches`),
     hellos: async () => (await json<{ count: number }>(`${admin}/_stub/hellos`)).count,
     clear: async () => {
       await send(`${admin}/_stub/received`, 'DELETE');

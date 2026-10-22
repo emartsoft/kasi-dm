@@ -70,6 +70,36 @@ export async function launchFirefox(
     files: async () => (await filesIn(downloads)).filter((f) => !f.name.endsWith('.part')),
     folder: async () => (await filesIn(downloads)).map((f) => f.name),
     resetFiles: () => emptyDirectory(downloads),
+    selectText: async (selector) => {
+      await session.execute(
+        `const element = document.querySelector(arguments[0]);
+         if (!element) throw new Error('nothing to select');
+         const range = document.createRange();
+         range.selectNodeContents(element);
+         const selection = window.getSelection();
+         selection.removeAllRanges();
+         selection.addRange(range);`,
+        [selector],
+      );
+    },
+    menuClick: async (menuItemId, info = {}) => {
+      const pageUrl = await session.execute<string>('return document.URL;');
+      await session.inExtensionTab(`moz-extension://${uuid}/src/options/index.html`, async () => {
+        await session.executeAsync(
+          `const [menuItemId, pageUrl, info, done] = arguments;
+           browser.tabs.query({}).then((tabs) => {
+             const tab = tabs.find((t) => t.url === pageUrl);
+             if (!tab) throw new Error('the page tab was not found');
+             return browser.runtime.sendMessage({
+               kind: 'kasi-menu-click',
+               info: Object.assign({ menuItemId, pageUrl }, info),
+               tab: { id: tab.id, url: pageUrl },
+             });
+           }).then(() => done(null), (error) => done(String(error)));`,
+          [menuItemId, pageUrl, info],
+        );
+      });
+    },
     popupText: () =>
       session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, async () => {
         for (let attempt = 0; attempt < 50; attempt++) {

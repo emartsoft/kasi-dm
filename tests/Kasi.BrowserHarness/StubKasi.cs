@@ -9,6 +9,9 @@ internal sealed record ReceivedDownload(string Url, string FinalUrl, string? Ref
 
 internal sealed record ReceivedCookie(string Name, string Value, string Domain);
 
+/// <summary>What the stub received for one <c>addBatch</c> (the link picker's input, TC-BRW-005).</summary>
+internal sealed record ReceivedBatch(string Referrer, IReadOnlyList<string> Urls, IReadOnlyList<ReceivedCookie> Cookies);
+
 /// <summary>
 /// Kasi as the browser protocol sees it: the real <see cref="KasiPipeServer"/> on the real per-user pipe (so the framing, the access list
 /// and the native host are all genuine), with a handler that answers <c>hello</c> with rules and <c>addDownload</c> as the mode says.
@@ -16,6 +19,7 @@ internal sealed record ReceivedCookie(string Name, string Value, string Domain);
 internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
 {
     private readonly ConcurrentQueue<ReceivedDownload> _received = new();
+    private readonly ConcurrentQueue<ReceivedBatch> _batches = new();
     private volatile string _mode = options.Mode;
     private volatile RulesOptions _rules = options.Rules;
     private int _answerDelayMs = options.AnswerDelayMs;
@@ -29,7 +33,13 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
 
     public bool Running => _server is not null;
 
-    public void Clear() => _received.Clear();
+    public IReadOnlyList<ReceivedBatch> Batches => [.. _batches];
+
+    public void Clear()
+    {
+        _received.Clear();
+        _batches.Clear();
+    }
 
     /// <summary>Throws when something (a real Kasi, another harness) already holds the pipe: the test must not run against it.</summary>
     public void Start()
@@ -91,6 +101,12 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
                         return new Ack { Id = message.Id, Ok = true };
                 }
 
+            case AddBatch batch:
+                _batches.Enqueue(new ReceivedBatch(
+                    batch.Referrer,
+                    [.. batch.Links.Select(l => l.Url)],
+                    [.. batch.Cookies.Select(c => new ReceivedCookie(c.Name, c.Value, c.Domain))]));
+                return new Ack { Id = message.Id, Ok = true };
             default:
                 return new Ack { Id = message.Id, Ok = true };
         }

@@ -35,6 +35,9 @@ internal static class PageServer
         app.MapGet("/_stub/sha256/{seed}/{size:long}", (string seed, long size) => Results.Text(GeneratedContent.Sha256Hex(seed, size)));
         app.MapGet("/_stub/ready", () => Results.Ok(new { stub = stub.Running }));
         app.MapGet("/_stub/received", () => Results.Json(stub.Received, _json));
+        app.MapGet("/_stub/received-batches", () => Results.Json(stub.Batches, _json));
+        // 40 links to files of the test server; the first 12 sit in #picked, so a test can select exactly those (TC-BRW-005)
+        app.MapGet("/pages/links", () => Results.Content(Links(testServer), "text/html; charset=utf-8"));
         app.MapGet("/_stub/hellos", () => Results.Json(new { count = stub.Hellos }, _json));
         app.MapDelete("/_stub/received", () =>
         {
@@ -74,6 +77,23 @@ internal static class PageServer
     }
 
     internal sealed record ModeBody(string Mode, int AnswerDelayMs);
+
+    private static string Links(string testServer)
+    {
+        var page = new StringBuilder("<!doctype html><meta charset=\"utf-8\"><title>Kasi links</title><body><div id=\"picked\">");
+        for (var i = 0; i < 40; i++)
+        {
+            if (i == 12)
+            {
+                page.Append("</div><div id=\"rest\">");
+            }
+
+            page.Append(CultureInfo.InvariantCulture, $"<a href=\"{testServer}/files/doc{i}/1000\">doc {i}</a> ");
+        }
+
+        page.Append("</div></body>");
+        return page.ToString();
+    }
 
     private static string Home(string testServer, int size)
     {

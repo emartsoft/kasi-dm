@@ -1,6 +1,6 @@
 # 0020. Extension status, interception toggle, menus and the link batch
 
-- Status: Proposed (2.5a, status and the toggle; 2.5b and 2.5c extend it with the menus, the link batch and `refreshLink`)
+- Status: Proposed (2.5a, status and the toggle; 2.5b, the menus and the link batch; 2.5c extends it with `refreshLink`)
 - Date: 2026-10-22
 - Requirements: KASI-BRW-006, KASI-BRW-004, KASI-BRW-005
 - Related: `docs/plans/m2-5.md`; ADR 0017, ADR 0019
@@ -16,6 +16,12 @@ BRW-006 asks for the connection status to turn red within 5 s. A poll cannot del
 3. **The popup does not bring Kasi back after a quit.** Opening the popup reconnects unless the last failure is `app-not-running` (the user quit Kasi): otherwise looking at the status would start the program the user just closed. This narrows the plan's "popup is a reason"; a download still reconnects.
 4. **The popup asks the background for the state once a second while it is open** and re-renders (the popup page is alive, so a timer is safe there).
 5. **Interception toggle.** `interceptionEnabled` (boolean, default true) in `storage.local`, flipped from the popup, read in `interception.handle` after the claims (so a refresh watcher still runs) and before the rules. The badge shows `off` while it is off (`!` wins). Menus will not depend on it. TRD 9.1 says the extension stores this flag besides the rules cache.
+
+**Context menus and the link batch** (M2.5b, KASI-BRW-004, 005). Three menus, created with fixed ids: "Download with Kasi" (link, image, video, audio), "Download all links" (page) and "Download selected links" (selection). They are created in `runtime.onInstalled` and once per browser session at start-up (a flag in `storage.local` is wrong because it would outlive a browser restart; `storage.session` is used), always after `removeAll()`, so overlapping calls never duplicate a menu. A click never pauses anything; it waits for Kasi exactly like a download does (`kasi-ready.ts`: no wait when no host or no Kasi is installed, up to 6 s while the host starts Kasi) and sends one `addDownload` or one `addBatch`; a refusal, a timeout or an unreachable Kasi shows the red `!` badge. The menus do not depend on the interception toggle: a user who switched interception off still has them.
+- *Collecting links.* The plan said the content script would answer a `kasi-collect` message per frame. `scripting.executeScript` with `allFrames` does the same with no content-script change and returns one result per frame, so that is what is used: a small, self-contained page function (`collectPageLinks`, serialised by the browser; a test evaluates its source in an empty context to keep it free of imports) returns raw anchors, and `normalizeLinks` in the background keeps http, https and ftp links of at most 8,192 characters, drops fragment-only links, `javascript:`, `mailto:`, `data:`, `blob:` and `file:`, removes duplicates (the first wins) and stops at 100,000. The batch is cut at 32 MiB serialised (the browser may send 64 MiB to the host). The file name hint is the `download` attribute, else the last path segment; no link text crosses the protocol (plan decision 1).
+- *Cookies* for a batch come from the page and from one representative URL per distinct origin, at most 50 origins; a page of links to hundreds of sites sends the cookies of the first ones. A single link sends the cookies for that URL. Nothing is logged but counts and codes.
+- *The test seam.* A native context menu cannot be clicked by Playwright or WebDriver, so the background also accepts a `kasi-menu-click` message carrying the data of a click and hands it to the same handler. It is accepted only from a page of this extension (`sender.url` under the extension's own origin): never from a content script, so never from a web page. A real right-click stays a manual row in `docs/qa/browser-interception.md`.
+- *`mime`.* A link click has no MIME type; `addDownload` carries `application/octet-stream` and Kasi resolves the real type and name from the response.
 
 ## Consequences
 

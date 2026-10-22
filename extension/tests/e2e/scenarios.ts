@@ -213,6 +213,63 @@ export function defineScenarios(kit: BrowserKit): void {
       );
       expect(await harness.received()).toEqual([]);
     });
+
+    // The native menu cannot be clicked by Playwright or WebDriver, so a page of the extension sends the click's data to the same
+    // handler (docs/plans/m2-5.md, G5); the real right-click stays a manual row in docs/qa.
+    const batchUrls = (from: number, to: number) =>
+      Array.from(
+        { length: to - from },
+        (_, i) => `${harness.testServer}/files/doc${String(from + i)}/1000`,
+      );
+    const handedOffBatches = () =>
+      waitFor('the link batch', async () => {
+        const all = await harness.receivedBatches();
+        return all.length > 0 ? all : false;
+      });
+
+    it('[TC-BRW-005] "Download all links" sends the 40 links of the page in one batch, with the referrer and the cookies', async () => {
+      await driver.addCookie(CANARY_NAME, CANARY_VALUE, harness.testServer);
+      await driver.open(`${harness.admin}/pages/links`);
+
+      await driver.menuClick('kasi-download-all');
+
+      const [batch, ...rest] = await handedOffBatches();
+      expect(rest).toHaveLength(0);
+      expect(batch?.urls).toEqual(batchUrls(0, 40));
+      expect(batch?.referrer).toBe(`${harness.admin}/pages/links`);
+      expect(batch?.cookies).toContainEqual(
+        expect.objectContaining({ name: CANARY_NAME, value: CANARY_VALUE }),
+      );
+    });
+
+    it('[TC-BRW-005] "Download selected links" sends only the 12 links that are selected', async () => {
+      await driver.open(`${harness.admin}/pages/links`);
+      await driver.selectText('#picked');
+
+      await driver.menuClick('kasi-download-selected');
+
+      const [batch, ...rest] = await handedOffBatches();
+      expect(rest).toHaveLength(0);
+      expect(batch?.urls).toEqual(batchUrls(0, 12));
+    });
+
+    it('[TC-BRW-004] "Download with Kasi" on a link sends that link to Kasi and the browser downloads nothing', async () => {
+      await driver.addCookie(CANARY_NAME, CANARY_VALUE, harness.testServer);
+      await driver.open(`${harness.admin}/pages/links`);
+      const link = batchUrls(3, 4)[0] ?? '';
+
+      await driver.menuClick('kasi-download-link', { linkUrl: link });
+
+      const [first, ...rest] = await handedOff();
+      expect(rest).toHaveLength(0);
+      expect(first?.url).toBe(link);
+      expect(first?.referrer).toBe(`${harness.admin}/pages/links`);
+      expect(first?.cookies).toContainEqual(
+        expect.objectContaining({ name: CANARY_NAME, value: CANARY_VALUE }),
+      );
+      await pause(1000);
+      expect(await driver.folder()).toEqual([]);
+    });
   });
 
   suite(`end to end (${kit.family}): the host starts Kasi, then Kasi goes missing`, () => {

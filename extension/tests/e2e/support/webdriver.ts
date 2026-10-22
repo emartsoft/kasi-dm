@@ -138,6 +138,16 @@ export class WebDriverSession {
     await this.call('DELETE', '/actions');
   }
 
+  /** Runs a script in the current page; `script` is a function body that receives `arguments` and returns a value. */
+  async execute<T>(script: string, args: unknown[] = []): Promise<T> {
+    return this.call<T>('POST', '/execute/sync', { script, args });
+  }
+
+  /** Like execute, for a script that finishes by calling the last argument (a callback). */
+  async executeAsync<T>(script: string, args: unknown[] = []): Promise<T> {
+    return this.call<T>('POST', '/execute/async', { script, args });
+  }
+
   async addCookie(name: string, value: string): Promise<void> {
     await this.call('POST', '/cookie', { cookie: { name, value } });
   }

@@ -10,4 +10,5 @@ Automated end to end in Playwright's Chromium (stand-in for Chrome and Edge) and
 | TC-BRW-003 | Alt-click (then the configured key if changed) such a link | The browser keeps the download; Kasi hears nothing |
 | TC-BRW-004 | Download a `blob:` file, a `data:` file, a file from a POST form, a file from an excluded site | The browser keeps each one |
 | TC-BRW-004 (private) | Allow the extension in private windows, then download there; then switch that off and repeat | Taken only when allowed |
+| TC-BRW-005 (menus) | Right-click a link, an image, a page and a text selection with links on a page of about 40 links | The three menu items appear in the right places; "Download with Kasi" on a link, "Download all links" and "Download selected links" each reach Kasi (a download, or one batch with the 40 or the selected links); the browser downloads nothing itself |
 | Firefox permission | Remove "Access your data for all websites" from the add-on, click such a link | The popup shows "needs permission" and the browser downloads normally |
