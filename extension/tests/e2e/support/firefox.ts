@@ -57,8 +57,7 @@ export async function launchFirefox(profile?: string): Promise<BrowserDriver> {
     folder: async () => (await filesIn(downloads)).map((f) => f.name),
     resetFiles: () => emptyDirectory(downloads),
     popupText: () =>
-      session.inNewTab(async () => {
-        await session.navigate(`moz-extension://${uuid}/src/popup/index.html`);
+      session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, async () => {
         for (let attempt = 0; attempt < 50; attempt++) {
           const text = await session.text('#status');
           if (text !== '') return text;

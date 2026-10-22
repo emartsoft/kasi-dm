@@ -23,11 +23,16 @@ export interface BrowserKit {
   allowed: string;
   /** With a profile folder the profile survives `close()`, so a second launch finds what the extension cached. */
   launch(profile?: string): Promise<BrowserDriver>;
+  /** Size of the files the scenarios download; large enough that the browser is still receiving when the extension pauses it. */
+  size?: number;
+  /** False when the browser drops a temporary add-on's storage between sessions, so a restart loses the cached rules. */
+  rulesSurviveRestart?: boolean;
   /** Why this browser cannot be driven here, if it cannot. */
   unavailable(): string | undefined;
 }
 
-const SIZE = 20_000;
+// Set per browser by defineScenarios: Firefox has finished a very small file before the extension can pause it.
+let SIZE = 20_000;
 const CANARY_NAME = 'kasi_e2e_canary';
 const CANARY_VALUE = 'CANARY-COOKIE-VALUE-5d1e';
 const NOT_CONNECTED = 'Kasi is not connected.';
@@ -42,6 +47,7 @@ async function fileSha(
 }
 
 export function defineScenarios(kit: BrowserKit): void {
+  SIZE = kit.size ?? 20_000;
   const reason = unavailableReason() ?? kit.unavailable();
   if (reason) console.warn(`end-to-end tests (${kit.family}) are skipped: ${reason}`);
   const suite = describe.skipIf(reason !== undefined);
@@ -93,7 +99,8 @@ export function defineScenarios(kit: BrowserKit): void {
       expect(rest).toHaveLength(0);
       expect(first?.url).toBe(`${harness.testServer}/files/plain/${String(SIZE)}`);
       expect(first?.finalUrl).toBe(first?.url);
-      expect(first?.referrer).toBe(`${harness.admin}/`);
+      // Chromium reports the referrer's origin, Firefox the whole page address
+      expect(first?.referrer?.startsWith(`${harness.admin}/`)).toBe(true);
       expect(first?.mime).toBe('application/octet-stream');
       expect(first?.cookies).toContainEqual(
         expect.objectContaining({ name: CANARY_NAME, value: CANARY_VALUE }),
@@ -226,31 +233,34 @@ export function defineScenarios(kit: BrowserKit): void {
       await rm(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     });
 
-    it('[TC-BRW-002] with Kasi not running the host starts it and the download is taken', async () => {
-      // end the browser and Kasi; the next Kasi the host starts opens its pipe only after three seconds
-      await driver.close();
-      await stopTray(admin);
-      await waitFor('Kasi to be gone', kasiIsDown);
-      await host.setLaunchDelay(3000);
+    it.skipIf(kit.rulesSurviveRestart === false)(
+      '[TC-BRW-002] with Kasi not running the host starts it and the download is taken',
+      async () => {
+        // end the browser and Kasi; the next Kasi the host starts opens its pipe only after three seconds
+        await driver.close();
+        await stopTray(admin);
+        await waitFor('Kasi to be gone', kasiIsDown);
+        await host.setLaunchDelay(3000);
 
-      driver = await kit.launch(profile); // the cached rules decide, and the extension has to wait for the host to start Kasi
-      await driver.open(home(page));
-      expect(await kasiIsDown()).toBe(true);
-      await driver.click('#plain');
+        driver = await kit.launch(profile); // the cached rules decide, and the extension has to wait for the host to start Kasi
+        await driver.open(home(page));
+        expect(await kasiIsDown()).toBe(true);
+        await driver.click('#plain');
 
-      const taken = await waitFor(
-        'the hand-off through the started Kasi',
-        async () => {
-          const all = await kasi.received().catch(() => []);
-          return all.length > 0 ? all : false;
-        },
-        60_000,
-      );
-      expect(taken[0]?.url).toBe(`${page.testServer}/files/plain/${String(SIZE)}`);
-      await pause(1500);
-      // a paused download still completes when all its bytes were in; what counts is that the extension removed the file
-      expect(await driver.folder()).toEqual([]);
-    });
+        const taken = await waitFor(
+          'the hand-off through the started Kasi',
+          async () => {
+            const all = await kasi.received().catch(() => []);
+            return all.length > 0 ? all : false;
+          },
+          60_000,
+        );
+        expect(taken[0]?.url).toBe(`${page.testServer}/files/plain/${String(SIZE)}`);
+        await pause(1500);
+        // a paused download still completes when all its bytes were in; what counts is that the extension removed the file
+        expect(await driver.folder()).toEqual([]);
+      },
+    );
 
     it('[TC-BRW-002] with Kasi missing the browser keeps its own download and the popup shows disconnected', async () => {
       await waitFor(

@@ -28,7 +28,7 @@ public static class DispositionEndpoints
         // A form POST that answers with an attachment: the browser downloads it, but a DownloadItem has no method (TC-BRW-004).
         app.MapPost("/post-download/{seed}/{size:long}", async (HttpContext context, string seed, long size) =>
         {
-            if (size is < 0 or > 10_000_000)
+            if (size is < 0 or > 100_000_000)
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 return;

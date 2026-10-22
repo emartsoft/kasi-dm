@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { freePort } from './harness';
 import { pause } from './driver';
 
+const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 const ELEMENT = 'element-6066-11e4-a52e-4f735466cecf';
 
 export function findGeckodriver(): string | undefined {
@@ -31,10 +32,14 @@ export class WebDriverSession {
     firefoxOptions: Record<string, unknown>,
   ): Promise<WebDriverSession> {
     const port = await freePort();
-    const child = spawn(geckodriver, ['--port', String(port), '--host', '127.0.0.1'], {
-      stdio: 'ignore',
-      windowsHide: true,
-    });
+    const child = spawn(
+      geckodriver,
+      ['--port', String(port), '--host', '127.0.0.1', '--allow-system-access'],
+      {
+        stdio: 'ignore',
+        windowsHide: true,
+      },
+    );
     const base = `http://127.0.0.1:${String(port)}`;
     try {
       for (let attempt = 0; ; attempt++) {
@@ -48,6 +53,7 @@ export class WebDriverSession {
       }
       const response = await fetch(`${base}/session`, {
         method: 'POST',
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           capabilities: {
             alwaysMatch: { browserName: 'firefox', 'moz:firefoxOptions': firefoxOptions },
@@ -70,7 +76,8 @@ export class WebDriverSession {
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const response = await fetch(`${this.base}/session/${this.sessionId}${path}`, {
       method,
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      headers: JSON_HEADERS,
+      body: method === 'GET' ? null : JSON.stringify(body ?? {}),
     });
     const parsed = (await response.json()) as WireValue<T & { error?: string; message?: string }>;
     if (!response.ok) {
@@ -139,11 +146,26 @@ export class WebDriverSession {
     return this.call<string>('GET', `/element/${await this.find(css)}/text`);
   }
 
-  /** Runs `body` in a fresh tab and returns to the first one. */
-  async inNewTab<T>(body: () => Promise<T>): Promise<T> {
+  /**
+   * Opens a privileged URL (moz-extension://) in a new tab and runs `body` there. WebDriver refuses to navigate to it, so the tab is
+   * opened from the chrome context with the system principal (geckodriver is started with --allow-system-access for this).
+   */
+  async inExtensionTab<T>(url: string, body: () => Promise<T>): Promise<T> {
     const [first] = await this.call<string[]>('GET', '/window/handles');
-    const opened = await this.call<{ handle: string }>('POST', '/window/new', { type: 'tab' });
-    await this.call('POST', '/window', { handle: opened.handle });
+    await this.call('POST', '/moz/context', { context: 'chrome' });
+    try {
+      await this.call('POST', '/execute/sync', {
+        script:
+          'const [url] = arguments; gBrowser.selectedTab = gBrowser.addTab(url, { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });',
+        args: [url],
+      });
+    } finally {
+      await this.call('POST', '/moz/context', { context: 'content' });
+    }
+    const handles = await this.call<string[]>('GET', '/window/handles');
+    const opened = handles.find((h) => h !== first);
+    if (!opened) throw new Error('the extension tab did not open');
+    await this.call('POST', '/window', { handle: opened });
     try {
       return await body();
     } finally {

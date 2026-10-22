@@ -32,13 +32,17 @@ export async function filesIn(dir: string): Promise<SavedFile[]> {
   const found: SavedFile[] = [];
   for (const name of await readdir(dir)) {
     const path = join(dir, name);
-    if ((await stat(path)).isFile()) {
-      found.push({
-        name,
-        sha256: createHash('sha256')
-          .update(await readFile(path))
-          .digest('hex'),
-      });
+    try {
+      if ((await stat(path)).isFile()) {
+        found.push({
+          name,
+          sha256: createHash('sha256')
+            .update(await readFile(path))
+            .digest('hex'),
+        });
+      }
+    } catch {
+      // the browser renamed or removed it while we looked (Firefox moves .part files into place)
     }
   }
   return found;

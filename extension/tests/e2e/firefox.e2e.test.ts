@@ -4,6 +4,10 @@ import { FIREFOX_ADDON_ID, firefoxUnavailable, launchFirefox } from './support/f
 
 defineScenarios({
   family: 'firefox',
+  size: 30_000_000,
+  // Firefox drops a WebDriver-installed add-on's storage between sessions: the launch-chain case needs the rules cached by an earlier
+  // session, so it runs in Chromium only (the unit suite covers the wait itself).
+  rulesSurviveRestart: false,
   allowed: FIREFOX_ADDON_ID,
   launch: (profile) => launchFirefox(profile),
   unavailable: firefoxUnavailable,
