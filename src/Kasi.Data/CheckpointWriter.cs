@@ -154,6 +154,9 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
     /// </summary>
     internal Func<Task>? BeforeCommit { get; set; }
 
+    /// <summary>Test-only seam: told how long each successful commit took, from opening the connection to the commit returning.</summary>
+    internal Action<TimeSpan>? CommitCompleted { get; set; }
+
     /// <summary>Commits the pending updates; returns null on success (or nothing to do) and the error otherwise, keeping the updates.</summary>
     private async Task<Exception?> TryCommitAsync()
     {
@@ -162,6 +165,7 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
             return null;
         }
 
+        var started = _time.GetTimestamp();
         try
         {
             using var connection = await _factory.OpenAsync().ConfigureAwait(false);
@@ -200,6 +204,7 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
         _pending.Clear();
         _lastError = null;
         Interlocked.Increment(ref _commits);
+        CommitCompleted?.Invoke(_time.GetElapsedTime(started));
         return null;
     }
 

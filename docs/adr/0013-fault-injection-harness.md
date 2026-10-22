@@ -71,6 +71,13 @@ schedule (start offset, latency, slow window, reset, partition) is drawn from th
 progress for two minutes fails the run (the longest toxic is 30 s). A child that exits without a finished job is started again,
 up to five times; needing a restart is reported, not hidden.
 
+## Decision (flush latency in the refetch bound)
+
+**The bound includes the slowest checkpoint commit.** A commit that runs slow on a shared runner postpones the checkpoint by that
+long, so a kill loses more than the 2 s the strict bound allows. The child reports its slowest commit through a test-only
+`CheckpointWriter.CommitCompleted` seam; the harness adds it to the bound (`RefetchBound`) and records it per iteration as
+`flushLatencySeconds`. The strict bound, the power-cut evidence and TC-RES-003 are unchanged, and the jitter constant was not widened.
+
 ## Decision (14d)
 
 **The guest half is part of the harness.** `--scenario power-guest` has three phases (`run`, `progress`, `verify`). Its test server uses a

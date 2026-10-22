@@ -80,11 +80,12 @@ public static class FaultInjectionRunner
     /// <summary>
     /// The bound for a kill the harness had to deliver. The child keeps downloading between the moment the harness decides to kill
     /// it (for a commit-kill, when the commit hook fired) and the moment it is gone, and none of that has a checkpoint; on a loaded
-    /// runner that took up to two seconds. So the bound is the strict one plus <paramref name="killLatency"/> of data and half a
-    /// second for scheduler jitter. A resume that starts over still fails it by gigabytes once the download is past its first seconds.
+    /// runner that took up to two seconds. A checkpoint commit that ran slow (<paramref name="flushLatency"/>, the child's slowest) also
+    /// postponed the checkpoint by that long. So the bound is the strict one plus both latencies of data and half a second for
+    /// scheduler jitter. A resume that starts over still fails it by gigabytes once the download is past its first seconds.
     /// </summary>
-    public static long RefetchBound(FaultInjectionOptions options, TimeSpan killLatency) =>
-        StrictRefetchBound(options) + (long)((killLatency + _schedulerJitter).TotalSeconds * options.BytesPerSecond);
+    public static long RefetchBound(FaultInjectionOptions options, TimeSpan killLatency, TimeSpan flushLatency = default) =>
+        StrictRefetchBound(options) + (long)((killLatency + flushLatency + _schedulerJitter).TotalSeconds * options.BytesPerSecond);
 
     private static async Task<FaultInjectionReport> RunKillLoopAsync(
         FaultHarness harness,
@@ -149,7 +150,11 @@ public static class FaultInjectionRunner
             var before = (await harness.GetJobAsync(job.Id, cancellationToken).ConfigureAwait(false))!;
             var servedBefore = harness.Host.Metrics.BytesServed;
             await DeleteWithRetryAsync(marker, cancellationToken).ConfigureAwait(false);
-            using var child = harness.StartChild(job.Id, options.BytesPerSecond, commitKill ? ChildEnvironment.CommitKill(marker, random.Next(1, 6)) : null);
+            var flushFile = Path.Combine(harness.Root, "flush.latency");
+            await DeleteWithRetryAsync(flushFile, cancellationToken).ConfigureAwait(false);
+            var environment = commitKill ? ChildEnvironment.CommitKill(marker, random.Next(1, 6)) : new Dictionary<string, string>();
+            environment[ChildEnvironment.FlushFile] = flushFile;
+            using var child = harness.StartChild(job.Id, options.BytesPerSecond, environment);
             var hit = commitKill
                 ? await WaitForMarkerOrExitAsync(child, marker, _commitWait, cancellationToken).ConfigureAwait(false)
                 : !await FaultHarness.WaitOrTimeoutAsync(child, TimeSpan.FromSeconds(random.Next(1, options.MaxKillSeconds + 1)), cancellationToken).ConfigureAwait(false);
@@ -181,7 +186,8 @@ public static class FaultInjectionRunner
             FaultHarness.KillIfRunning(child);
             await child.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             var killLatency = (sinceHook > TimeSpan.Zero ? sinceHook : TimeSpan.Zero) + killClock.Elapsed;
-            var bound = RefetchBound(options, killLatency);
+            var flushLatency = ReadFlushLatency(flushFile);
+            var bound = RefetchBound(options, killLatency, flushLatency);
             kills++;
             SqliteConnection.ClearAllPools();
 
@@ -197,10 +203,10 @@ public static class FaultInjectionRunner
 
             if (problem is null && refetched > bound)
             {
-                problem = $"{refetched} B had to be fetched again, above the {bound} B bound (the kill took {killLatency.TotalSeconds:0.00} s to land)";
+                problem = $"{refetched} B had to be fetched again, above the {bound} B bound (the kill took {killLatency.TotalSeconds:0.00} s to land, the slowest checkpoint commit {flushLatency.TotalSeconds:0.00} s)";
             }
 
-            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3)));
+            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3), Math.Round(flushLatency.TotalSeconds, 3)));
             error ??= problem;
         }
 
@@ -235,6 +241,21 @@ public static class FaultInjectionRunner
             started.Elapsed,
             error,
             results);
+    }
+
+    /// <summary>The child's slowest commit; zero when it wrote nothing, or was killed while writing and left a partial number.</summary>
+    internal static TimeSpan ReadFlushLatency(string path)
+    {
+        try
+        {
+            return double.TryParse(File.ReadAllText(path), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds > 0
+                ? TimeSpan.FromSeconds(seconds)
+                : TimeSpan.Zero;
+        }
+        catch (IOException)
+        {
+            return TimeSpan.Zero;
+        }
     }
 
     /// <summary>After a kill the database must open, pass SQLite's own check and still agree with itself about the job's bytes.</summary>

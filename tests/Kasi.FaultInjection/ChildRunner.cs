@@ -35,6 +35,21 @@ internal static class ChildRunner
             };
         }
 
+        // Slowest commit so far, for the parent's refetch bound: a slow flush delays the checkpoint, so more is lost to a kill.
+        var flushFile = Environment.GetEnvironmentVariable(ChildEnvironment.FlushFile);
+        if (flushFile is not null)
+        {
+            var slowest = TimeSpan.Zero;
+            checkpoints.CommitCompleted = took =>
+            {
+                if (took > slowest)
+                {
+                    slowest = took;
+                    File.WriteAllText(flushFile, slowest.TotalSeconds.ToString("R", CultureInfo.InvariantCulture));
+                }
+            };
+        }
+
         checkpoints.Start();
         await using var engine = new DownloadEngine(jobs, segments, checkpoints, new BandwidthLimiter(bytesPerSecond));
 
