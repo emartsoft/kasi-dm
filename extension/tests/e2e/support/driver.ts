@@ -21,6 +21,13 @@ export interface BrowserDriver {
   folder(): Promise<string[]>;
   /** Deletes what is in the download folder, so one scenario's files do not leak into the next. */
   resetFiles(): Promise<void>;
+  /** Selects the contents of the first element matching the selector, as a person dragging over it would. */
+  selectText(selector: string): Promise<void>;
+  /**
+   * Stands in for a click on one of the extension's context menu items (a native menu cannot be clicked by Playwright or WebDriver):
+   * a page of the extension sends the same data the browser's click event carries to the same handler. `pageUrl` is the open page.
+   */
+  menuClick(menuItemId: string, info?: { linkUrl?: string }): Promise<void>;
   /** The text of the popup's status line. */
   popupText(): Promise<string>;
   /** The toolbar badge text, or undefined when this driver cannot read it. */

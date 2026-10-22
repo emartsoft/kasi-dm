@@ -101,6 +101,46 @@ export async function launchChromium(
       finished = [];
       await emptyDirectory(downloads);
     },
+    selectText: async (selector) => {
+      await page.evaluate((sel) => {
+        const element = document.querySelector(sel);
+        if (!element) throw new Error('nothing to select');
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }, selector);
+    },
+    menuClick: async (menuItemId, info = {}) => {
+      const pageUrl = page.url();
+      const extensionPage = await context.newPage();
+      try {
+        await extensionPage.goto(`chrome-extension://${extension.id}/src/options/index.html`);
+        await extensionPage.evaluate(
+          async (args) => {
+            const api = (
+              globalThis as unknown as {
+                chrome: {
+                  tabs: { query(q: object): Promise<{ id?: number; url?: string }[]> };
+                  runtime: { sendMessage(m: object): Promise<unknown> };
+                };
+              }
+            ).chrome;
+            const tab = (await api.tabs.query({})).find((t) => t.url === args.pageUrl);
+            if (tab?.id === undefined) throw new Error('the page tab was not found');
+            await api.runtime.sendMessage({
+              kind: 'kasi-menu-click',
+              info: { menuItemId: args.menuItemId, pageUrl: args.pageUrl, ...args.info },
+              tab: { id: tab.id, url: args.pageUrl },
+            });
+          },
+          { menuItemId, pageUrl, info },
+        );
+      } finally {
+        await extensionPage.close();
+      }
+    },
     popupText: async () => {
       const popup = await context.newPage();
       try {
