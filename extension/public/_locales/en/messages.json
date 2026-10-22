@@ -20,6 +20,15 @@
   "badge_disconnected": {
     "message": "!"
   },
+  "badge_off": {
+    "message": "off"
+  },
+  "interceptionToggle": {
+    "message": "Send downloads to Kasi"
+  },
+  "optionsNote": {
+    "message": "Downloads in private windows are only sent to Kasi if you allow Kasi there in the browser's extension settings. The switch in the toolbar popup turns sending downloads off and on."
+  },
   "openSettings": {
     "message": "Open Kasi settings"
   },

@@ -43,6 +43,8 @@ export interface InterceptionDeps {
     request(message: { id: string }): Promise<unknown>;
   };
   getRules(): Promise<Rules | undefined>;
+  // The popup's toggle (settings.ts). Off: nothing is intercepted, claims still run.
+  isEnabled(): Promise<boolean>;
   isIncognitoAllowed(): Promise<boolean>;
   hasHostPermission(): Promise<boolean>;
   isPost(...urls: string[]): Promise<boolean>;
@@ -152,6 +154,7 @@ export function createInterception(deps: InterceptionDeps) {
       const ours = { paused: false };
       try {
         for (const claim of deps.claims ?? []) if (await claim(item)) return;
+        if (!(await deps.isEnabled())) return;
         const rules = await deps.getRules();
         if (!rules || !(await wanted(item, rules))) return;
         // Pause first (TRD 9.2) so no bytes are written while Kasi decides.

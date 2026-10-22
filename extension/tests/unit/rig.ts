@@ -10,6 +10,7 @@ import {
   createRulesProvider,
   type StorageAreaLike,
 } from '../../src/shared/rules-cache';
+import { readInterceptionEnabled } from '../../src/shared/settings';
 import { collectCookies, storeFor, type CookiesApi } from '../../src/shared/cookies';
 import type { AddDownload, Cookie, Rules } from '../../src/types/protocol';
 
@@ -130,6 +131,7 @@ export interface RigOptions {
   cookies?: Record<string, Cookie[]>;
   cachedRules?: Rules;
   realGrace?: boolean;
+  claims?: ((item: DownloadItemLike) => boolean | Promise<boolean>)[];
 }
 
 // Flush promise chains that do not depend on timers.
@@ -185,6 +187,9 @@ export function rig(options: RigOptions = {}) {
       badge.text = '';
     },
     onLateAck: (id) => void interception.lateAck(id),
+    onLost: () => {
+      badge.text = '!';
+    },
   });
   interception = createInterception({
     downloads: {
@@ -197,6 +202,7 @@ export function rig(options: RigOptions = {}) {
     },
     port: native,
     getRules: provider.get,
+    isEnabled: () => readInterceptionEnabled(local),
     isIncognitoAllowed: () => Promise.resolve(options.incognitoAllowed ?? false),
     hasHostPermission: () => Promise.resolve(options.hostPermission ?? true),
     isPost: tracker.isPost,
@@ -214,9 +220,12 @@ export function rig(options: RigOptions = {}) {
       badge.text = '!';
     },
     logger,
+    ...(options.claims ? { claims: options.claims } : {}),
   });
 
   return {
+    /** storage.local: the rules cache and the interception toggle. */
+    local,
     ports,
     logs,
     downloads,

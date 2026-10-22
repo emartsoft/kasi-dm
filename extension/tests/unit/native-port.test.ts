@@ -117,7 +117,7 @@ describe('native port manager', () => {
     make();
     port(0).drop();
     vi.advanceTimersByTime(1000);
-    port(1).receive(rules);
+    port(1).receive({ v: 1, id: 'x', type: 'ack', ok: true }); // heard, but Kasi never connected: this is no lost connection
     port(1).drop();
     vi.advanceTimersByTime(999);
     expect(ports).toHaveLength(2);
@@ -235,7 +235,11 @@ describe('[TC-BRW-002] native port: connected means Kasi answered', () => {
     await expect(pending).rejects.toMatchObject({ code });
     expect(manager.isConnected()).toBe(false);
     expect(manager.lastFailure()).toBe(failure);
-    made[0]?.receive(rules);
+    // the host exits after the notice: nothing comes back by itself, a reason (here a download) reconnects on a fresh port
+    vi.advanceTimersByTime(60_000);
+    expect(made).toHaveLength(1);
+    manager.reconnectNow();
+    made[1]?.receive(rules);
     expect(manager.isConnected()).toBe(true);
     expect(manager.lastFailure()).toBeUndefined();
   });

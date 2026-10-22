@@ -159,6 +159,29 @@ export function defineScenarios(kit: BrowserKit): void {
       expect(await harness.received()).toEqual([]);
     });
 
+    it('[TC-BRW-002] Kasi quitting turns the popup to not connected and the badge to !; the next download reconnects', async () => {
+      // the pipe closes as it does when the user quits Kasi: the host tells the extension once and exits, and nothing reconnects by itself
+      await harness.stopPipe();
+      await waitFor(
+        'the popup to say not connected',
+        async () => (await driver.popupText()) === NOT_CONNECTED,
+        15_000,
+      );
+      if ((await driver.badge()) !== undefined) {
+        await waitFor('the failure badge', async () => (await driver.badge()) === '!');
+      }
+
+      await harness.startPipe();
+      await driver.click('#plain');
+
+      const [first] = await handedOff();
+      expect(first?.url).toBe(`${harness.testServer}/files/plain/${String(SIZE)}`);
+      await waitFor(
+        'the extension to be connected again',
+        async () => (await driver.popupText()) === CONNECTED,
+      );
+    });
+
     it('[TC-BRW-004] blob: and data: downloads are not intercepted', async () => {
       await driver.click('#blob');
       await driver.click('#data');
@@ -261,6 +284,42 @@ export function defineScenarios(kit: BrowserKit): void {
         expect(await driver.folder()).toEqual([]);
       },
     );
+
+    it('[TC-BRW-002] after the user quits Kasi the popup stays not connected, and a download starts Kasi again through the host', async () => {
+      await waitFor(
+        'the extension to be connected',
+        async () => (await driver.popupText()) === CONNECTED,
+        60_000,
+      );
+      await stopTray(admin);
+      await waitFor('Kasi to be gone', kasiIsDown);
+      await waitFor(
+        'the popup to say not connected',
+        async () => (await driver.popupText()) === NOT_CONNECTED,
+        15_000,
+      );
+      await pause(3000); // nothing relaunches Kasi on a timer, and opening the popup does not either
+      expect(await kasiIsDown()).toBe(true);
+      expect(await driver.popupText()).toBe(NOT_CONNECTED);
+      if ((await driver.badge()) !== undefined) {
+        await waitFor('the failure badge', async () => (await driver.badge()) === '!');
+      }
+
+      await host.setLaunchDelay(0);
+      await driver.resetFiles();
+      await driver.open(home(page));
+      await driver.click('#plain');
+
+      const taken = await waitFor(
+        'the hand-off through the Kasi the host started',
+        async () => {
+          const all = await kasi.received().catch(() => []);
+          return all.length > 0 ? all : false;
+        },
+        60_000,
+      );
+      expect(taken[0]?.url).toBe(`${page.testServer}/files/plain/${String(SIZE)}`);
+    });
 
     it('[TC-BRW-002] with Kasi missing the browser keeps its own download and the popup shows disconnected', async () => {
       await waitFor(

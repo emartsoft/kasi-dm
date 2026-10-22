@@ -32,9 +32,11 @@ extension and must treat them as untrusted.
    is started through the shell (`UseShellExecute`) so it does not inherit the browser's stdin and stdout handles, which would keep the
    protocol streams open. `--tray` is implemented by the application in a later M2 task; until then the launcher is tested with a fake
    starter. A pipe served by another user's process is `APP_NOT_RUNNING` and is never retried into.
-6. **Reconnect.** If Kasi closes the pipe the host reconnects once through the launcher and replays the last `hello` (Kasi closes a
-   connection that does not open with one); a pipe that closes again before delivering anything, or a failed reconnect, ends the host
-   with code 3. A send on a dead pipe reconnects once and sends again.
+6. **Reconnect.** *Changed in M2.5a (ADR 0020):* when Kasi closes the pipe the user has quit Kasi, so the host writes one
+   `error APP_NOT_RUNNING` (id `unknown`) to the browser and exits with code 3; it does not launch Kasi again. The extension then shows
+   "not connected" at once and reconnects only when there is a reason (a matching download, the popup, a browser start), which starts
+   a new host and, through it, Kasi. This closes plan m2-4 G8 and the known gap of ADR 0019. What stays: a send on a dead pipe
+   reconnects once through the launcher, replaying the last `hello` (Kasi closes a connection that does not open with one), and sends again.
 7. **Stdout belongs to the protocol.** `Console.Out` is redirected to stderr at start-up and logs carry fixed text only: never a URL, a
    cookie, a header or an exception message (CLAUDE.md rule 3). The host references only `Kasi.Ipc`.
 8. **Registration.** `src/Kasi.NativeHost/Registration/com.martsoft.kasi.json` is the manifest template and
@@ -63,4 +65,4 @@ extension and must treat them as untrusted.
 
 - The relay runs in a test process with fake streams and a fake pipe, so the failure policy is tested without a browser.
 - A host that cannot reach Kasi costs the first message up to 5 s; the extension's own ack timeout decides what the user sees.
-- Exit codes: 0 stdin closed, 1 unexpected failure, 2 broken frame, 3 Kasi lost.
+- Exit codes: 0 stdin closed, 1 unexpected failure, 2 broken frame, 3 Kasi closed the pipe (after one `APP_NOT_RUNNING` error).
