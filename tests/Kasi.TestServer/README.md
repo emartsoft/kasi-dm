@@ -23,6 +23,7 @@ As a process: `dotnet run --project tests/Kasi.TestServer -- 5080` (`KASI_TESTSE
 | `/auth/cookie/…` | `GET /auth/cookie/login` sets the session cookie; else 401 |
 | `/signed/…?exp=<unix seconds>` | 403 after `exp` or without it |
 | `/mutable/{id}` | `host.Mutable.Change(id)` or `POST /_mutable/{id}/change?size=` changes bytes and ETag |
+| `POST /post-download/{seed}/{size}` | Answers a form POST with an `attachment` download (TC-BRW-004) |
 | `/disposition/{case}` | Edge-case Content-Disposition values (`DispositionEndpoints.Cases`) |
 | `/hls/{kind}/master.m3u8` | Kinds in `StreamFixtures.HlsKinds`: clear, aes128, SAMPLE-AES and DRM key formats |
 | `/dash/{kind}/manifest.mpd` | Kinds in `StreamFixtures.DashKinds`: clear, segment-list, Widevine, PlayReady, FairPlay, ClearKey |

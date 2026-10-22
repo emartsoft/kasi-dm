@@ -23,7 +23,23 @@ public static class DispositionEndpoints
         ["inline"] = "inline; filename=\"inline.pdf\"",
     };
 
-    internal static void Map(IEndpointRouteBuilder app) =>
+    internal static void Map(IEndpointRouteBuilder app)
+    {
+        // A form POST that answers with an attachment: the browser downloads it, but a DownloadItem has no method (TC-BRW-004).
+        app.MapPost("/post-download/{seed}/{size:long}", async (HttpContext context, string seed, long size) =>
+        {
+            if (size is < 0 or > 10_000_000)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
+            }
+
+            context.Response.ContentType = "application/octet-stream";
+            context.Response.Headers.ContentDisposition = "attachment; filename=\"post.bin\"";
+            context.Response.ContentLength = size;
+            await FileEndpoints.WriteBodyAsync(context.Response.Body, seed, size, context.RequestAborted);
+        });
+
         app.MapGet("/disposition/{name}", async (HttpContext context, string name) =>
         {
             if (!Cases.TryGetValue(name, out var value))
@@ -38,4 +54,5 @@ public static class DispositionEndpoints
             context.Response.ContentLength = size;
             await FileEndpoints.WriteBodyAsync(context.Response.Body, "disposition-" + name, size, context.RequestAborted);
         });
+    }
 }
