@@ -13,6 +13,11 @@ public static class KasiPipeNames
 
     public static string ForCurrentUser() => For(CurrentUser());
 
+    /// <summary>The argument hand-off pipe for a user: <c>kasi-&lt;SID&gt;-open</c>, a second pipe so the browser protocol keeps one purpose (ADR 0023).</summary>
+    public static string HandOffFor(SecurityIdentifier user) => For(user) + "-open";
+
+    public static string HandOffForCurrentUser() => HandOffFor(CurrentUser());
+
     internal static SecurityIdentifier CurrentUser()
     {
         using var identity = WindowsIdentity.GetCurrent();

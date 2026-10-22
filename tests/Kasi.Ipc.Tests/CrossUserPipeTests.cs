@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Net;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using Kasi.Ipc.Transport;
 using static Kasi.Ipc.Tests.PipeTestSupport;
 
 namespace Kasi.Ipc.Tests;
@@ -32,7 +33,10 @@ public class CrossUserPipeTests
         var password = "Kp!" + Guid.NewGuid().ToString("N")[..6] + "A1";
         var kasiName = NewPipeName();
         var controlName = NewPipeName();
+        var handOffName = NewPipeName();
         await using var server = StartServer(kasiName);
+        await using var handOff = new HandOffServer(handOffName, (_, _) => ValueTask.CompletedTask);
+        handOff.Start();
         using var control = NamedPipeServerStreamAcl.Create(
             controlName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 0, EveryoneSecurity());
 
@@ -43,7 +47,7 @@ public class CrossUserPipeTests
                 "function Try-Open($n) { try { $c = New-Object System.IO.Pipes.NamedPipeClientStream('.', $n, [System.IO.Pipes.PipeDirection]::InOut); " +
                 "$c.Connect(3000); $c.Dispose(); 'CONNECTED' } catch [System.UnauthorizedAccessException] { 'DENIED' } " +
                 "catch { 'OTHER:' + $_.Exception.GetType().Name } }; " +
-                $"Write-Output ('control=' + (Try-Open '{controlName}')); Write-Output ('kasi=' + (Try-Open '{kasiName}'))";
+                $"Write-Output ('control=' + (Try-Open '{controlName}')); Write-Output ('kasi=' + (Try-Open '{kasiName}')); Write-Output ('handoff=' + (Try-Open '{handOffName}'))";
             var credentials = new NetworkCredential(account, password, Environment.MachineName);
 
             var output = await RunAsync(
@@ -54,6 +58,7 @@ public class CrossUserPipeTests
 
             output.Should().Contain("control=CONNECTED", "the other user's process must be able to open a pipe that allows it, or the next line proves nothing");
             output.Should().Contain("kasi=DENIED", "only the owner may open the Kasi pipe");
+            output.Should().Contain("handoff=DENIED", "the argument hand-off pipe is per-user too (ADR 0023)");
             server.Connections.Should().BeEmpty();
         }
         finally
