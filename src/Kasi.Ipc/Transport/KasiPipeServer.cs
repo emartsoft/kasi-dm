@@ -163,6 +163,11 @@ public sealed class KasiPipeServer : IAsyncDisposable
             {
                 return;
             }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                // DisposeAsync closed the listening instance before the first wait began (a server disposed right after Start): stopping
+                return;
+            }
             catch (IOException)
             {
                 // a client that connected and left again; listen on a fresh instance

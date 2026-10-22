@@ -97,6 +97,11 @@ public sealed class HandOffServer : IAsyncDisposable
             {
                 return;
             }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                // DisposeAsync closed the listening instance before the first wait began: stopping
+                return;
+            }
             catch (IOException)
             {
                 // a client that connected and left again; listen on a fresh instance
