@@ -318,9 +318,23 @@ describe('[TC-BRW-002] Kasi is missing, slow or refuses: the browser keeps the d
     const done = r.start(item);
     await settle();
     item.state = 'interrupted';
+    item.canResume = false;
     await vi.advanceTimersByTimeAsync(2000);
     await done;
     expect(r.downloads.calls).toEqual(['pause:1']);
+  });
+
+  it('resumes a download Firefox reports as interrupted while it is paused', async () => {
+    const r = rig();
+    r.online();
+    const item = r.add();
+    const done = r.start(item);
+    await settle();
+    item.state = 'interrupted'; // what Firefox shows for a paused download, with paused and canResume still set
+    item.canResume = true;
+    await vi.advanceTimersByTimeAsync(2000);
+    await done;
+    expect(r.downloads.calls).toEqual(['pause:1', 'resume:1']);
   });
 
   it('leaves a download alone when it cannot be paused or already finished', async () => {
