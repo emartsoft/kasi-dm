@@ -34,5 +34,14 @@
   },
   "settingsRequestSent": {
     "message": "Opening Kasi settings…"
+  },
+  "menu_download_link": {
+    "message": "Download with Kasi"
+  },
+  "menu_download_all": {
+    "message": "Download all links with Kasi"
+  },
+  "menu_download_selected": {
+    "message": "Download selected links with Kasi"
   }
 }

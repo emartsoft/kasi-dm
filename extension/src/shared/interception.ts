@@ -5,9 +5,10 @@ import { buildAddDownload } from './build-add-download';
 import { hashUrl } from './hash';
 import type { Logger } from './logger';
 import { NativeRequestError, type PortFailure } from './native-port';
+import { waitForKasi } from './kasi-ready';
 import { isEligible, matchesRules } from './rules-match';
 
-export const READY_WAIT_MS = 6000;
+export { READY_WAIT_MS } from './kasi-ready';
 const LATE_ACK_MS = 30_000;
 
 export interface DownloadItemLike {
@@ -97,14 +98,7 @@ export function createInterception(deps: InterceptionDeps) {
     return resumeIfPaused(id);
   }
 
-  // Waits only when Kasi has to be started; a machine with no host or no Kasi installed waits for nothing.
-  async function ready(): Promise<boolean> {
-    if (deps.port.isConnected()) return true;
-    const failure = deps.port.lastFailure();
-    if (failure === 'host-missing' || failure === 'app-not-installed') return false;
-    deps.port.reconnectNow();
-    return deps.port.whenConnected(READY_WAIT_MS);
-  }
+  const ready = (): Promise<boolean> => waitForKasi(deps.port);
 
   async function wanted(item: DownloadItemLike, rules: Rules): Promise<boolean> {
     const incognitoAllowed = item.incognito ? await deps.isIncognitoAllowed() : false;

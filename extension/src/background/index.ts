@@ -5,6 +5,8 @@ import { createNativePort, NATIVE_HOST } from '../shared/native-port';
 import { createBypass, parseModifierMessage } from '../shared/bypass';
 import { collectCookies, storeFor } from '../shared/cookies';
 import { createInterception, type DownloadItemLike } from '../shared/interception';
+import { collectPageLinks, parseRawAnchors, type LinkScope } from '../shared/link-collector';
+import { createMenus, parseMenuClick } from '../shared/menus';
 import { createRequestTracker } from '../shared/request-tracker';
 import { createRulesCache, createRulesProvider } from '../shared/rules-cache';
 import { INTERCEPTION_KEY, readInterceptionEnabled } from '../shared/settings';
@@ -90,6 +92,39 @@ const interception = createInterception({
   logger,
 });
 
+// Context menus (plan m2-5 2.4). The links of every frame come from scripting.executeScript, which needs no content-script message.
+const menus = createMenus({
+  menus: {
+    removeAll: () => browser.contextMenus.removeAll(),
+    create: (properties) =>
+      new Promise<void>((resolve) => {
+        browser.contextMenus.create(
+          { id: properties.id, title: properties.title, contexts: properties.contexts as never },
+          () => {
+            resolve();
+          },
+        );
+      }),
+  },
+  title: (key) => browser.i18n.getMessage(key),
+  collect: async (tabId: number, scope: LinkScope) => {
+    const frames = await browser.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: collectPageLinks,
+      args: [scope],
+    });
+    return frames.flatMap((frame) => parseRawAnchors(frame.result));
+  },
+  cookiesFor: async (urls, incognito) =>
+    collectCookies(browser.cookies, urls, await storeFor(browser.cookies, incognito)),
+  port: nativePort,
+  session: browser.storage.session,
+  userAgent: navigator.userAgent,
+  newId: () => crypto.randomUUID(),
+  onDisconnected: showDisconnected,
+  logger,
+});
+
 function isOpenSettings(value: unknown): value is OpenSettings {
   return (
     typeof value === 'object' &&
@@ -112,7 +147,19 @@ browser.runtime.onMessage.addListener((message: unknown, sender: Runtime.Message
   const modifier = parseModifierMessage(message);
   if (modifier) return bypass.record(modifier, sender.tab?.id);
   if (isOpenSettings(message)) return nativePort.request(message);
+  const menuClick = parseMenuClick(message);
+  // Only a page of this extension may stand in for a menu click (see parseMenuClick), never a content script or a web page.
+  if (menuClick && sender.url?.startsWith(browser.runtime.getURL(''))) {
+    return menus.onClicked(menuClick.info, menuClick.tab);
+  }
   return undefined;
+});
+
+browser.runtime.onInstalled.addListener(() => {
+  void menus.install(true);
+});
+browser.contextMenus.onClicked.addListener((info, tab) => {
+  void menus.onClicked(info, tab);
 });
 
 browser.downloads.onCreated.addListener((item: DownloadItemLike) => {
@@ -143,4 +190,6 @@ void readInterceptionEnabled(browser.storage.local).then((on) => {
   paintBadge();
 });
 
+// The menus survive a worker restart but not always a browser restart: create them once per browser session.
+void menus.install(false);
 nativePort.start();
