@@ -41,7 +41,6 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
         // The file outlasts the window by a wide margin, so a late timer on a busy runner cannot end the download inside it.
         const int size = 12_000_000;
         const string seed = "bandwidth-global";
-        var time = TimeProvider.System;
         var limiter = new BandwidthLimiter(500_000);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var download = new HttpTransferRunner().DownloadAsync(
@@ -60,13 +59,10 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
         }
 
         limiter.ConsumedBytes.Should().BeGreaterThan(0);
-        var before = limiter.ConsumedBytes;
-        var start = time.GetTimestamp();
-        await Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var tenSecondRate = (limiter.ConsumedBytes - before) / time.GetElapsedTime(start).TotalSeconds;
+        var tenSeconds = await BandwidthMeasure.MeasureAsync(() => limiter.ConsumedBytes, TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await stop.CancelAsync();
         (await download).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
-        tenSecondRate.Should().BeInRange(475_000, 525_000);
+        BandwidthMeasure.AssertAtCap(tenSeconds, 500_000);
     }
 
     [Fact]
@@ -94,19 +90,16 @@ public sealed class HttpTransferBandwidthTests : IAsyncLifetime
         }
 
         job.ConsumedBytes.Should().BeGreaterThan(0);
-        var before = job.ConsumedBytes;
-        var windowStart = time.GetTimestamp();
-        await Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var windowSeconds = time.GetElapsedTime(windowStart).TotalSeconds;
-        var tenSecondRate = (job.ConsumedBytes - before) / windowSeconds;
+        var tenSeconds = await BandwidthMeasure.MeasureAsync(() => job.ConsumedBytes, TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await stop.CancelAsync();
 
         var (freeOutcome, freeSeconds) = await measuredFreeTask;
         var free = freeOutcome.Should().BeOfType<TransferCompleted>().Subject;
         (await cappedTask).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
 
-        tenSecondRate.Should().BeInRange(190_000, 210_000);
-        freeSeconds.Should().BeLessThan(windowSeconds / 2, "the capped job must not slow the free one");
+        BandwidthMeasure.AssertAtCap(tenSeconds, 200_000);
+        // At the job's 200 KB/s the 5 MB file would need 25 s, so ending inside the 10 s window shows the cap did not reach it.
+        freeSeconds.Should().BeLessThan(tenSeconds.Seconds, "the capped job must not slow the free one");
         await AssertHashAsync(free.FinalPath, freeSeed, freeSize);
 
         async Task<(TransferOutcome Outcome, double Seconds)> DownloadFreeAsync()

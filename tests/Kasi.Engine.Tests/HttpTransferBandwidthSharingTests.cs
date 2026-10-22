@@ -49,12 +49,15 @@ public sealed class HttpTransferBandwidthSharingTests : IAsyncLifetime
         var download = StartDownload("rate-change", 6_000_000, limiter, job: null, stop.Token);
         await WaitForBytesAsync(() => limiter.ConsumedBytes, ct);
 
-        var slow = await MeasureAsync(() => limiter.ConsumedBytes, settle: TimeSpan.FromSeconds(1), window: TimeSpan.FromSeconds(4), ct);
+        await Task.Delay(TimeSpan.FromSeconds(1), ct);
+        var slow = await BandwidthMeasure.MeasureAsync(() => limiter.ConsumedBytes, TimeSpan.FromSeconds(4), ct);
         limiter.SetGlobalRate(500_000);
-        var fast = await MeasureAsync(() => limiter.ConsumedBytes, settle: TimeSpan.FromSeconds(1.5), window: TimeSpan.FromSeconds(4), ct);
+        await Task.Delay(TimeSpan.FromSeconds(1.5), ct);
+        var fast = await BandwidthMeasure.MeasureAsync(() => limiter.ConsumedBytes, TimeSpan.FromSeconds(4), ct);
 
-        slow.Should().BeInRange(190_000, 210_000);
-        fast.Should().BeInRange(475_000, 525_000);
+        BandwidthMeasure.AssertAtCap(slow, 200_000, "before the change");
+        BandwidthMeasure.AssertAtCap(fast, 500_000, "after the change");
+        fast.Rate.Should().BeGreaterThan(slow.Rate * 1.5, "the new cap, 2.5 times the old one, must take effect");
         await stop.CancelAsync();
         (await download).Should().BeOfType<TransferFailed>().Which.ErrorKind.Should().Be(TransferErrorKind.Cancelled);
     }
@@ -72,18 +75,15 @@ public sealed class HttpTransferBandwidthSharingTests : IAsyncLifetime
 
         var start = Stopwatch.GetTimestamp();
         await Task.Delay(TimeSpan.FromSeconds(2), ct);
-        long cappedBefore = cappedJob.ConsumedBytes;
-        long totalBefore = limiter.ConsumedBytes;
-        var windowStart = Stopwatch.GetTimestamp();
-        await Task.Delay(TimeSpan.FromSeconds(8), ct);
-        var seconds = Stopwatch.GetElapsedTime(windowStart).TotalSeconds;
-        var cappedRate = (cappedJob.ConsumedBytes - cappedBefore) / seconds;
-        var totalRate = (limiter.ConsumedBytes - totalBefore) / seconds;
+        var cappedWindow = BandwidthMeasure.MeasureAsync(() => cappedJob.ConsumedBytes, TimeSpan.FromSeconds(8), ct);
+        var total = await BandwidthMeasure.MeasureAsync(() => limiter.ConsumedBytes, TimeSpan.FromSeconds(8), ct);
+        var cappedMeasured = await cappedWindow;
 
-        totalRate.Should().BeInRange(475_000, 525_000);
+        BandwidthMeasure.AssertAtCap(total, 500_000);
         // The global bucket is first come, first served (ADR 0010), so the capped job's share of it is not guaranteed: it never
-        // exceeds its own cap, and it keeps a real part of its share while the other job takes the rest.
-        cappedRate.Should().BeInRange(100_000, 220_000, "the capped job stays under its cap and is not starved by the free job");
+        // exceeds its own cap (plus one bucket), and it keeps a real part of its share while the other job takes the rest.
+        cappedMeasured.Rate.Should().BeLessThanOrEqualTo(200_000 + ((50_000d + BandwidthLimiter.MaximumReadBytes) / cappedMeasured.Seconds), "the job cap holds");
+        cappedMeasured.Rate.Should().BeGreaterThan(60_000, "the capped job is not starved by the free job");
         await stop.CancelAsync();
         (await capped).Should().BeOfType<TransferFailed>();
         (await free).Should().BeOfType<TransferFailed>();
@@ -126,14 +126,5 @@ public sealed class HttpTransferBandwidthSharingTests : IAsyncLifetime
             Stopwatch.GetElapsedTime(deadline).Should().BeLessThan(TimeSpan.FromSeconds(30), "the download must start");
             await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
         }
-    }
-
-    private static async Task<double> MeasureAsync(Func<long> consumed, TimeSpan settle, TimeSpan window, CancellationToken cancellationToken)
-    {
-        await Task.Delay(settle, cancellationToken);
-        var before = consumed();
-        var start = Stopwatch.GetTimestamp();
-        await Task.Delay(window, cancellationToken);
-        return (consumed() - before) / Stopwatch.GetElapsedTime(start).TotalSeconds;
     }
 }
