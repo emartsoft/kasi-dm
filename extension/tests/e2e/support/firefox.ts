@@ -2,7 +2,7 @@
 // the toolbar badge text (WebDriver cannot read a browser action's badge, so badge() is undefined and the popup carries the proof),
 // the revoked-permission case (a WebDriver-installed add-on cannot have its host permission taken away), and private windows.
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,8 +10,12 @@ import { fileURLToPath } from 'node:url';
 import { emptyDirectory, filesIn, type BrowserDriver } from './driver';
 import { findGeckodriver, WebDriverSession } from './webdriver';
 
-/** The add-on id in manifest.firefox.json; the host manifest allows exactly this one. */
-export const FIREFOX_ADDON_ID = 'extension@kasi.martsoft.com';
+/** The add-on id in manifest.firefox.json (store-ids.json); the host manifest allows exactly this one. */
+export const FIREFOX_ADDON_ID = (
+  JSON.parse(readFileSync(new URL('../../../store-ids.json', import.meta.url), 'utf8')) as {
+    firefox: string[];
+  }
+).firefox[0] as string;
 
 const dist = fileURLToPath(new URL('../../../dist/firefox', import.meta.url));
 const defaultBinary = 'C:\\Program Files\\Mozilla Firefox\\firefox.exe';
@@ -22,7 +26,17 @@ export function firefoxUnavailable(): string | undefined {
   return undefined;
 }
 
-export async function launchFirefox(profile?: string): Promise<BrowserDriver> {
+export interface FirefoxAddon {
+  /** The unpacked add-on folder. */
+  dir: string;
+  id: string;
+}
+
+/** `addon` defaults to dist/firefox; TC-BRW-007 passes a copy with a different gecko id. */
+export async function launchFirefox(
+  profile?: string,
+  addon: FirefoxAddon = { dir: dist, id: FIREFOX_ADDON_ID },
+): Promise<BrowserDriver> {
   const geckodriver = findGeckodriver();
   if (!geckodriver) throw new Error('geckodriver was not found');
   const downloads = await mkdtemp(join(tmpdir(), 'kasi-downloads-'));
@@ -39,10 +53,10 @@ export async function launchFirefox(profile?: string): Promise<BrowserDriver> {
       'browser.helperApps.neverAsk.saveToDisk': 'application/octet-stream',
       // a second host name for the exclusion case; it resolves to loopback and never leaves the machine
       'network.dns.localDomains': 'excluded.test',
-      'extensions.webextensions.uuids': JSON.stringify({ [FIREFOX_ADDON_ID]: uuid }),
+      'extensions.webextensions.uuids': JSON.stringify({ [addon.id]: uuid }),
     },
   });
-  await session.installAddon(dist);
+  await session.installAddon(addon.dir);
 
   return {
     family: 'firefox',

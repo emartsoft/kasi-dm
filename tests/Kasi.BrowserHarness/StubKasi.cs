@@ -19,9 +19,13 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
     private volatile string _mode = options.Mode;
     private volatile RulesOptions _rules = options.Rules;
     private int _answerDelayMs = options.AnswerDelayMs;
+    private int _hellos;
     private KasiPipeServer? _server;
 
     public IReadOnlyList<ReceivedDownload> Received => [.. _received];
+
+    /// <summary>How many <c>hello</c> messages reached Kasi through a native host (TC-BRW-007: a refused extension sends none).</summary>
+    public int Hellos => Volatile.Read(ref _hellos);
 
     public bool Running => _server is not null;
 
@@ -66,6 +70,7 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
         switch (message)
         {
             case Hello:
+                Interlocked.Increment(ref _hellos);
                 return _rules.ToMessage(message.Id);
             case AddDownload add:
                 _received.Enqueue(new ReceivedDownload(
