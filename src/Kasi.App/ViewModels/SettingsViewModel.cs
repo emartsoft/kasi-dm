@@ -1,0 +1,134 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Kasi.App.Browser;
+using Kasi.App.Resources;
+using Kasi.Ipc.Messages;
+
+namespace Kasi.App.ViewModels;
+
+internal sealed record BypassKeyChoice(BypassKey Key, string Label);
+
+/// <summary>
+/// The Settings window's Browser section (the skeleton of M2.8b): the rules Kasi pushes to the extension. Text lists hold one entry per
+/// line (commas and semicolons also separate), cleaned by <see cref="BrowserSettings.Normalized"/> on save, which is also what the pipe sends.
+/// </summary>
+internal sealed partial class SettingsViewModel : ObservableObject
+{
+    private const long MegabyteBytes = 1024 * 1024;
+
+    private static readonly char[] _separators = ['\r', '\n', ',', ';'];
+
+    private readonly IBrowserSettings _store;
+
+    [ObservableProperty]
+    private bool _enabled;
+
+    [ObservableProperty]
+    private string _extensionsText = string.Empty;
+
+    [ObservableProperty]
+    private string _mimeTypesText = string.Empty;
+
+    [ObservableProperty]
+    private string _excludedSitesText = string.Empty;
+
+    [ObservableProperty]
+    private BypassKeyChoice _selectedBypassKey;
+
+    [ObservableProperty]
+    private decimal _minSizeMegabytes;
+
+    [ObservableProperty]
+    private string _statusText = string.Empty;
+
+    [ObservableProperty]
+    private int _selectedTab;
+
+    public SettingsViewModel(IBrowserSettings store)
+    {
+        _store = store;
+        BypassKeys =
+        [
+            new(BypassKey.Alt, Strings.BypassKeyAlt),
+            new(BypassKey.Ctrl, Strings.BypassKeyCtrl),
+            new(BypassKey.Shift, Strings.BypassKeyShift),
+            new(BypassKey.None, Strings.BypassKeyNone),
+        ];
+        _selectedBypassKey = BypassKeys[0];
+        Load(store.Current);
+    }
+
+    public IReadOnlyList<BypassKeyChoice> BypassKeys { get; }
+
+    public string Title => Strings.SettingsTitle;
+
+    public string AutomationName => Strings.SettingsAutomationName;
+
+    /// <summary>Raised after a successful save, so the window can close.</summary>
+    public event Action? Saved;
+
+    public void Load(BrowserSettings settings)
+    {
+        Enabled = settings.Enabled;
+        ExtensionsText = string.Join(Environment.NewLine, settings.Extensions);
+        MimeTypesText = string.Join(Environment.NewLine, settings.MimeTypes);
+        ExcludedSitesText = string.Join(Environment.NewLine, settings.ExcludedSites);
+        SelectedBypassKey = BypassKeys.First(choice => choice.Key == settings.BypassKey);
+        MinSizeMegabytes = settings.MinSizeBytes is { } bytes ? (decimal)bytes / MegabyteBytes : 0;
+    }
+
+    public void ShowSection(SettingsSection section) => SelectedTab = section == SettingsSection.General ? 0 : 1;
+
+    /// <summary>What the form holds, as settings (not yet cleaned; <see cref="BrowserSettings.Normalized"/> does that on save).</summary>
+    public BrowserSettings ToSettings() => new()
+    {
+        Enabled = Enabled,
+        Extensions = Split(ExtensionsText),
+        MimeTypes = Split(MimeTypesText),
+        ExcludedSites = Split(ExcludedSitesText),
+        BypassKey = SelectedBypassKey.Key,
+        AckTimeoutMs = _store.Current.AckTimeoutMs,
+        MinSizeBytes = MinSizeMegabytes > 0 ? (long)Math.Min(MinSizeMegabytes * MegabyteBytes, long.MaxValue) : null,
+    };
+
+    [RelayCommand]
+    private async Task SaveAsync()
+    {
+        try
+        {
+            await _store.SaveAsync(ToSettings(), CancellationToken.None).ConfigureAwait(true);
+            StatusText = string.Empty;
+            Saved?.Invoke();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = Strings.SettingsSaveFailed;
+        }
+    }
+
+    private static List<string> Split(string text) =>
+        [.. text.Split(_separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    // the two text labels the window binds to, kept here so the view holds no strings
+    public string GeneralTab => Strings.SettingsGeneralTab;
+
+    public string BrowserTab => Strings.SettingsBrowserTab;
+
+    public string GeneralPlaceholder => Strings.SettingsGeneralPlaceholder;
+
+    public string EnabledLabel => Strings.BrowserInterceptionEnabled;
+
+    public string ExtensionsLabel => Strings.BrowserExtensionsLabel;
+
+    public string MimeTypesLabel => Strings.BrowserMimeTypesLabel;
+
+    public string ExcludedSitesLabel => Strings.BrowserExcludedSitesLabel;
+
+    public string BypassKeyLabel => Strings.BrowserBypassKeyLabel;
+
+    public string MinSizeLabel => Strings.BrowserMinSizeLabel;
+
+    public string SaveLabel => Strings.SettingsSaveButton;
+
+    public string CancelLabel => Strings.SettingsCancelButton;
+}

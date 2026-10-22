@@ -41,4 +41,76 @@
     <value>Kasi main window</value>
     <comment>Name announced by screen readers for the main window.</comment>
   </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>Kasi settings</value>
+    <comment>Title of the Settings window.</comment>
+  </data>
+  <data name="SettingsAutomationName" xml:space="preserve">
+    <value>Kasi settings window</value>
+    <comment>Name announced by screen readers for the Settings window.</comment>
+  </data>
+  <data name="SettingsGeneralTab" xml:space="preserve">
+    <value>General</value>
+    <comment>Settings tab: general options.</comment>
+  </data>
+  <data name="SettingsBrowserTab" xml:space="preserve">
+    <value>Browser</value>
+    <comment>Settings tab: browser integration.</comment>
+  </data>
+  <data name="SettingsGeneralPlaceholder" xml:space="preserve">
+    <value>General options arrive with the main window.</value>
+    <comment>Shown on the General tab until it has content.</comment>
+  </data>
+  <data name="BrowserInterceptionEnabled" xml:space="preserve">
+    <value>Take downloads from the browser</value>
+    <comment>Check box: switch interception of browser downloads on or off.</comment>
+  </data>
+  <data name="BrowserExtensionsLabel" xml:space="preserve">
+    <value>File extensions (one per line, no dot)</value>
+    <comment>Label of the list of file extensions Kasi takes from the browser.</comment>
+  </data>
+  <data name="BrowserMimeTypesLabel" xml:space="preserve">
+    <value>MIME types (one per line, for example video/*)</value>
+    <comment>Label of the list of MIME types Kasi takes from the browser.</comment>
+  </data>
+  <data name="BrowserExcludedSitesLabel" xml:space="preserve">
+    <value>Sites the browser keeps (one per line; subdomains included)</value>
+    <comment>Label of the list of sites whose downloads are never taken.</comment>
+  </data>
+  <data name="BrowserBypassKeyLabel" xml:space="preserve">
+    <value>Hold this key while clicking to let the browser download</value>
+    <comment>Label of the bypass key choice.</comment>
+  </data>
+  <data name="BrowserMinSizeLabel" xml:space="preserve">
+    <value>Smallest file to take, in megabytes (0 takes any size)</value>
+    <comment>Label of the minimum size.</comment>
+  </data>
+  <data name="BypassKeyAlt" xml:space="preserve">
+    <value>Alt</value>
+    <comment>Bypass key name.</comment>
+  </data>
+  <data name="BypassKeyCtrl" xml:space="preserve">
+    <value>Ctrl</value>
+    <comment>Bypass key name.</comment>
+  </data>
+  <data name="BypassKeyShift" xml:space="preserve">
+    <value>Shift</value>
+    <comment>Bypass key name.</comment>
+  </data>
+  <data name="BypassKeyNone" xml:space="preserve">
+    <value>None (always take)</value>
+    <comment>Bypass key choice that turns the bypass off.</comment>
+  </data>
+  <data name="SettingsSaveButton" xml:space="preserve">
+    <value>Save</value>
+    <comment>Button that saves the settings.</comment>
+  </data>
+  <data name="SettingsCancelButton" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Button that closes the Settings window without saving.</comment>
+  </data>
+  <data name="SettingsSaveFailed" xml:space="preserve">
+    <value>The settings could not be saved.</value>
+    <comment>Shown when saving the settings file failed.</comment>
+  </data>
 </root>

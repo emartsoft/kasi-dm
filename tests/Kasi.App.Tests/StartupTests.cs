@@ -41,7 +41,8 @@ public class StartupTests
                 {
                     session = s;
                     return 0;
-                }),
+                },
+                browser: TestBrowser.New()),
             ct);
         try
         {
@@ -65,7 +66,7 @@ public class StartupTests
 
     [Fact]
     [Trait("TC", "TC-SYS-006")]
-    public async Task Until_the_real_handlers_land_rules_intercept_nothing_and_any_other_message_gets_an_error()
+    public async Task The_browser_pipe_answers_hello_with_the_populated_default_rules_and_media_messages_get_an_error_until_m3()
     {
         var ct = TestContext.Current.CancellationToken;
         var endpoints = TestEndpoints.New();
@@ -83,18 +84,19 @@ public class StartupTests
                     started.SetResult();
                     done.Wait();
                     return 0;
-                }),
+                },
+                browser: TestBrowser.New()),
             ct);
         await started.Task.WaitAsync(_connect, ct);
         await using var client = await KasiPipeClient.ConnectAsync(endpoints.BrowserPipe, _connect, ct);
 
         await client.SendAsync(Hello(), ct);
         var rules = await client.ReceiveAsync(ct);
-        await client.SendAsync(new OpenSettings { Id = "s1" }, ct);
+        await client.SendAsync(new CaptureMedia { Id = "m1", TabId = 1, Url = "https://example.com/a.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t" }, ct);
         var error = await client.ReceiveAsync(ct);
 
-        rules.Should().BeOfType<Rules>().Which.Enabled.Should().BeFalse();
-        error.Should().BeOfType<IpcError>().Which.Should().Match<IpcError>(e => e.Id == "s1" && e.Code == IpcErrorCode.Internal);
+        rules.Should().BeOfType<Rules>().Which.Should().Match<Rules>(r => r.Enabled && r.Extensions.Contains("zip") && r.MimeTypes.Count > 0);
+        error.Should().BeOfType<IpcError>().Which.Should().Match<IpcError>(e => e.Id == "m1" && e.Code == IpcErrorCode.Internal);
         done.Set();
         (await run).Should().Be(0);
         await session!.DisposeAsync();
@@ -122,7 +124,8 @@ public class StartupTests
                     started.SetResult();
                     done.Wait();
                     return 0;
-                }),
+                },
+                browser: TestBrowser.New()),
             ct);
         await started.Task.WaitAsync(_connect, ct);
         var secondBuilt = false;
@@ -185,7 +188,8 @@ public class StartupTests
                     started.SetResult();
                     done.Wait();
                     return 0;
-                }),
+                },
+                browser: TestBrowser.New()),
             ct);
         await started.Task.WaitAsync(_connect, ct);
 

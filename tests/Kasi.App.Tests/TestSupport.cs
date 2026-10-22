@@ -1,4 +1,5 @@
 using System.Security.Principal;
+using Kasi.App.Browser;
 using Kasi.App.Startup;
 using Microsoft.Extensions.Logging;
 
@@ -30,4 +31,20 @@ internal sealed class CapturingLogger : ILogger
             Lines.Add(formatter(state, exception));
         }
     }
+}
+
+internal static class TestBrowser
+{
+    /// <summary>Browser services whose settings file is a fresh temporary one, so a test never reads or writes a developer's real settings.</summary>
+    public static BrowserServices New(TimeProvider? time = null, ILogger? logger = null) => new(NewStore(), time, logger);
+
+    public static async Task<BrowserServices> NewAsync(BrowserSettings initial, TimeProvider? time = null, ILogger? logger = null)
+    {
+        var store = NewStore();
+        await store.SaveAsync(initial, CancellationToken.None);
+        return new BrowserServices(store, time, logger);
+    }
+
+    public static BrowserSettingsStore NewStore() =>
+        new(Path.Combine(Path.GetTempPath(), "kasi-test-" + Guid.NewGuid().ToString("N"), "browser-settings.json"));
 }
