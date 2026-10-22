@@ -44,6 +44,9 @@ export interface Harness {
   clear(): Promise<void>;
   setMode(mode: 'ack' | 'error' | 'silent', answerDelayMs?: number): Promise<void>;
   setRules(rules: HarnessRules): Promise<void>;
+  /** Closes the stub's pipe as a quitting Kasi would, and opens it again. */
+  stopPipe(): Promise<void>;
+  startPipe(): Promise<void>;
   sha256(seed: string, size: number): Promise<string>;
   stop(): Promise<void>;
 }
@@ -117,6 +120,12 @@ function api(admin: string): Omit<Harness, 'testServer' | 'stop'> {
     },
     setRules: async (rules) => {
       await send(`${admin}/_stub/rules`, 'POST', rules);
+    },
+    stopPipe: async () => {
+      await send(`${admin}/_stub/stop-pipe`, 'POST');
+    },
+    startPipe: async () => {
+      await send(`${admin}/_stub/start-pipe`, 'POST');
     },
     sha256: async (seed, size) =>
       (await (await fetch(`${admin}/_stub/sha256/${seed}/${String(size)}`)).text()).toLowerCase(),

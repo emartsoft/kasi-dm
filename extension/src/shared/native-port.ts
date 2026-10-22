@@ -21,6 +21,8 @@ export interface NativePortOptions {
   onRules?: (rules: Rules) => void;
   // An ack nobody is waiting for any more, normally for a request that timed out (plan 2.3).
   onLateAck?: (id: string) => void;
+  // A connection that was up is gone (Kasi quit, or the port died). Called in the same tick, before anything else reacts.
+  onLost?: () => void;
   logger?: Logger;
   newId?: () => string;
 }
@@ -56,6 +58,9 @@ export function createNativePort(options: NativePortOptions) {
   // Has the current port said anything yet? A port that dies silent is a host that is not there.
   let heard = false;
   let lastFailure: PortFailure | undefined;
+  // After a lost connection nothing reconnects on a timer: Kasi quit, and a timer would start it again (plan m2-5 decision 3).
+  // A download, the popup or a browser start is the reason to try again.
+  let lost = false;
   let backoff = BACKOFF_START_MS;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let ackTimeoutMs = 2000;
@@ -81,6 +86,12 @@ export function createNativePort(options: NativePortOptions) {
     for (const waiter of [...waiters]) waiter(ok);
   }
 
+  // The connection that was up is gone; the caller says whether the port is still open (an APP_* notice) or already dead.
+  function markLost(): void {
+    lost = true;
+    options.onLost?.();
+  }
+
   function handle(raw: unknown, current: PortLike): void {
     if (current !== port) return;
     const rules = parseRules(raw);
@@ -97,16 +108,25 @@ export function createNativePort(options: NativePortOptions) {
     const failure = error ? failureOf(error.code) : undefined;
     if (rules) {
       connected = true;
+      lost = false;
       lastFailure = undefined;
       ackTimeoutMs = rules.ackTimeoutMs;
       options.onRules?.(rules);
       wake(true);
     } else if (failure) {
+      const wasConnected = connected;
       connected = false;
       lastFailure = failure;
       settle(error?.id ?? '')?.reject(new NativeRequestError(error?.code ?? 'INTERNAL'));
       failAll('DISCONNECTED');
-      scheduleReconnect();
+      if (wasConnected) {
+        // The host exits after this notice; let go of its port so the next connect is a fresh host.
+        port = undefined;
+        current.disconnect();
+        markLost();
+      } else {
+        scheduleReconnect();
+      }
       wake(false);
     } else if (ack) {
       const entry = settle(ack.id);
@@ -137,6 +157,7 @@ export function createNativePort(options: NativePortOptions) {
 
   function connect(): void {
     retry = undefined;
+    lost = false;
     // The host outlives an APP_* error and tries Kasi again on the next message, so a retry is a fresh hello on the same port.
     if (port) {
       port.postMessage(hello());
@@ -159,14 +180,23 @@ export function createNativePort(options: NativePortOptions) {
     current.onDisconnect.addListener(() => {
       if (current !== port) return;
       log.info('Native host disconnected');
+      const wasConnected = connected;
       port = undefined;
       connected = false;
       if (!heard) lastFailure = 'host-missing';
       failAll('DISCONNECTED');
-      scheduleReconnect();
+      if (wasConnected) markLost();
+      if (!lost) scheduleReconnect();
       wake(false);
     });
     current.postMessage(hello());
+  }
+
+  // A download is waiting for Kasi: skip the remaining backoff. A hello already in flight (the host may be launching Kasi) is not repeated.
+  function reconnectNow(): void {
+    if (connected || (port && !heard)) return;
+    backoff = BACKOFF_START_MS;
+    connect();
   }
 
   return {
@@ -176,11 +206,10 @@ export function createNativePort(options: NativePortOptions) {
     isConnected: (): boolean => connected,
     lastFailure: (): PortFailure | undefined => lastFailure,
     ackTimeoutMs: (): number => ackTimeoutMs,
-    // A download is waiting for Kasi: skip the remaining backoff. A hello already in flight (the host may be launching Kasi) is not repeated.
-    reconnectNow: (): void => {
-      if (connected || (port && !heard)) return;
-      backoff = BACKOFF_START_MS;
-      connect();
+    reconnectNow,
+    // The popup is open: try again unless the user quit Kasi (opening the popup must not bring it back).
+    reconnectForStatus: (): void => {
+      if (lastFailure !== 'app-not-running') reconnectNow();
     },
     // True once Kasi has sent rules; false on timeout, or at once when no Kasi can answer (nothing registered, or not installed).
     whenConnected: (timeoutMs: number): Promise<boolean> => {

@@ -7,8 +7,10 @@ const title = document.querySelector<HTMLHeadingElement>('#title');
 const button = document.querySelector<HTMLButtonElement>('#open-settings');
 const status = document.querySelector<HTMLParagraphElement>('#status');
 const allow = document.querySelector<HTMLButtonElement>('#allow-sites');
+const note = document.querySelector<HTMLParagraphElement>('#note');
 
-if (title && button && status && allow) {
+if (title && button && status && allow && note) {
+  note.textContent = browser.i18n.getMessage('optionsNote');
   title.textContent = browser.i18n.getMessage('extensionName');
   button.textContent = browser.i18n.getMessage('openSettings');
   allow.textContent = browser.i18n.getMessage('allowAllSites');
