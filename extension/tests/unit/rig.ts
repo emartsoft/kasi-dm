@@ -193,7 +193,7 @@ export function rig(options: RigOptions = {}) {
       cancel: (id) => downloads.cancel(id),
       erase: (query) => downloads.erase(query),
       search: (query) => downloads.search(query),
-      ...(options.firefox ? { removeFile: (id) => downloads.removeFile(id) } : {}),
+      removeFile: (id) => downloads.removeFile(id),
     },
     port: native,
     getRules: provider.get,

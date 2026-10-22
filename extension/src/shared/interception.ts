@@ -31,7 +31,7 @@ export interface InterceptionDeps {
     cancel(id: number): Promise<void>;
     erase(query: { id: number }): Promise<unknown>;
     search(query: { id: number }): Promise<DownloadItemLike[]>;
-    // Firefox only: cancel can leave the part file behind.
+    // cancel does not delete a part file left by Firefox, nor a download that completed while paused (its bytes were all in).
     removeFile?(id: number): Promise<void>;
   };
   port: {
