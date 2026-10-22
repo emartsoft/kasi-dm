@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - 'extension/**'
+      - 'scripts/native-host/**'
       - 'src/Kasi.Ipc/**'
       - 'src/Kasi.NativeHost/**'
       - 'tests/Kasi.BrowserHarness/**'
@@ -67,7 +68,7 @@ jobs:
         shell: pwsh
         run: |
           $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
-          npm run test:e2e -- chromium
+          npm run test:e2e -- chromium allowlist -t chromium
 
       - name: Firefox
         if: github.event_name != 'pull_request'
@@ -76,4 +77,4 @@ jobs:
         run: |
           geckodriver --version
           $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
-          npm run test:e2e -- firefox
+          npm run test:e2e -- firefox allowlist -t firefox

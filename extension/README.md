@@ -16,7 +16,7 @@ npm test
 npm run build
 ```
 
-The build verifies both manifests and their packaged assets. `npm run build:chromium` and `npm run build:firefox` build one target for local work. Load the corresponding `dist` folder as an unpacked extension. The Firefox package has the Gecko ID `extension@kasi.martsoft.com`; Chromium does not include Firefox-only keys.
+The build verifies both manifests and their packaged assets. `npm run build:chromium` and `npm run build:firefox` build one target for local work. Load the corresponding `dist` folder as an unpacked extension. The Firefox package has the Gecko ID `kasi@martsoft.co.ke`; the store IDs of all three browsers are in `store-ids.json`, which the native host registration allow-lists (ADR 0017); Chromium does not include Firefox-only keys.
 
 ## Protocol
 
@@ -44,7 +44,7 @@ npm run smoke:chromium   # popup shows the not-connected state
 npm run smoke:firefox    # web-ext lint (AMO validator) on dist/firefox
 ```
 
-The end-to-end suites (M2.4c, `TC-BRW-001` to `004`) drive a real browser with the real Native AOT host and a stub Kasi (`tests/Kasi.BrowserHarness`); see ADR 0019. They need Windows and register the native host under HKCU for the browser under test (the previous value is restored), so they run only with `KASI_E2E=1`; without it, or without the pieces below, each suite is skipped with the reason printed.
+The end-to-end suites (M2.4c, `TC-BRW-001` to `004`, and `TC-BRW-007`, the allow-list in `tests/e2e/allowlist.e2e.test.ts`) drive a real browser with the real Native AOT host and a stub Kasi (`tests/Kasi.BrowserHarness`); see ADR 0019. They need Windows and register the native host under HKCU for the browser under test (the previous value is restored), so they run only with `KASI_E2E=1`; without it, or without the pieces below, each suite is skipped with the reason printed.
 
 ```powershell
 dotnet publish src/Kasi.NativeHost -c Release -r win-x64           # Native AOT needs the VS C++ tools, with vswhere on PATH
@@ -52,6 +52,7 @@ dotnet build tests/Kasi.BrowserHarness -c Release
 npm run build; npx playwright install chromium
 $env:KASI_E2E = '1'                                                # KASI_NATIVEHOST_AOT / KASI_HARNESS_DIR override the default paths
 npm run test:e2e -- chromium
+npm run test:e2e -- allowlist -t chromium  # TC-BRW-007 for one browser; use -t firefox for the other
 npm run test:e2e -- firefox     # needs geckodriver on PATH (or GECKODRIVER) and Firefox
 ```
 

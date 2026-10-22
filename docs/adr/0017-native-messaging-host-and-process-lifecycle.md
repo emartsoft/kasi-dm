@@ -61,6 +61,24 @@ extension and must treat them as untrusted.
     on the benchmark machine). The managed fuzz target runs the same relay code the AOT build compiles, which is why the process
     sample exists: it is the only place the trimmed build is exercised.
 
+11. **Allow-list and registration (M2.6, KASI-NFR-010, TC-BRW-007).** The browser, not the host, enforces who may start the host: a
+    Chromium manifest lists `allowed_origins` (`chrome-extension://<id>/`, exact ids, no wildcards) and a Firefox manifest lists
+    `allowed_extensions`; a message from any other extension never starts `Kasi.NativeHost.exe`. The ids live in one file,
+    `extension/store-ids.json` (Chrome Web Store, Edge Add-ons and the Firefox add-on `kasi@martsoft.co.ke`, which replaced the
+    scaffold's `extension@kasi.martsoft.com` before anything was published); `check-manifests` pins the Firefox manifest to it, and the
+    e2e helpers and the M2.7 packager read the same file. Chrome and Edge get different ids from their stores, so each browser has its
+    own list: Chrome and Chromium use the Chrome list, Edge uses the Edge list. `Register-NativeHost.ps1` allows the store ids plus any
+    developer ids passed with `-ChromeExtensionId`, `-EdgeExtensionId` and `-FirefoxExtensionId` (lists; the unpacked build's id is not
+    a store id), validates every id before it writes anything (`^[a-p]{32}$`, Firefox `^[A-Za-z0-9@._-]+$`), and its `-Unregister` removes
+    only the keys and manifest files it wrote and can be repeated. `-RegistryRoot` (default `HKCU:\Software`) and `-ManifestDirectory`
+    let `RegistrationScriptTests` run it under a private test root, so no test touches a real browser key. The manifest text stays in
+    `src/Kasi.NativeHost/Registration/com.martsoft.kasi.json`, which the M4 installer reuses; a test pins the script's output to it.
+    `TC-BRW-007` runs the browser itself (`extension/tests/e2e/allowlist.e2e.test.ts`): the host is registered for one extension id,
+    a copy with another id (another key in Chromium, another gecko id in Firefox) is loaded, and the test asserts the effects, never
+    the browser's error text: the stub Kasi receives no `hello`, no host process runs from the registered copy, and the popup shows
+    the port closed. The same suite first runs the allowed copy, which must connect and start the host, so silence cannot be a broken
+    harness.
+
 ## Consequences
 
 - The relay runs in a test process with fake streams and a fake pipe, so the failure policy is tested without a browser.

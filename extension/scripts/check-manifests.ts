@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const storeIds = JSON.parse(await readFile(resolve(root, 'store-ids.json'), 'utf8')) as Record<
+  'chrome' | 'edge' | 'firefox',
+  string[]
+>;
 const expectedPermissions = [
   'downloads',
   'cookies',
@@ -45,7 +49,7 @@ for (const target of ['chromium', 'firefox'] as const) {
       : JSON.stringify(background.scripts) !== JSON.stringify(['background.js']) ||
         'service_worker' in background ||
         typeof gecko?.strict_min_version !== 'string' ||
-        typeof gecko.id !== 'string';
+        gecko.id !== storeIds.firefox[0];
 
   if (invalidBackground) {
     throw new Error(`${target} manifest has an invalid background`);
@@ -70,6 +74,11 @@ for (const target of ['chromium', 'firefox'] as const) {
   for (const asset of assets) {
     await access(resolve(output, asset));
   }
+}
+
+for (const id of [...storeIds.chrome, ...storeIds.edge]) {
+  if (!/^[a-p]{32}$/.test(id))
+    throw new Error('store-ids.json holds an invalid Chromium extension id');
 }
 
 console.log('Chromium and Firefox manifests and packaged assets are valid.');

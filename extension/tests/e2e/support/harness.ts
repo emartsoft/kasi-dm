@@ -41,6 +41,8 @@ export interface Harness {
   admin: string;
   testServer: string;
   received(): Promise<Received[]>;
+  /** How many `hello` messages the stub has had from a native host. */
+  hellos(): Promise<number>;
   clear(): Promise<void>;
   setMode(mode: 'ack' | 'error' | 'silent', answerDelayMs?: number): Promise<void>;
   setRules(rules: HarnessRules): Promise<void>;
@@ -112,6 +114,7 @@ function api(admin: string): Omit<Harness, 'testServer' | 'stop'> {
   return {
     admin,
     received: () => json<Received[]>(`${admin}/_stub/received`),
+    hellos: async () => (await json<{ count: number }>(`${admin}/_stub/hellos`)).count,
     clear: async () => {
       await send(`${admin}/_stub/received`, 'DELETE');
     },

@@ -35,6 +35,7 @@ internal static class PageServer
         app.MapGet("/_stub/sha256/{seed}/{size:long}", (string seed, long size) => Results.Text(GeneratedContent.Sha256Hex(seed, size)));
         app.MapGet("/_stub/ready", () => Results.Ok(new { stub = stub.Running }));
         app.MapGet("/_stub/received", () => Results.Json(stub.Received, _json));
+        app.MapGet("/_stub/hellos", () => Results.Json(new { count = stub.Hellos }, _json));
         app.MapDelete("/_stub/received", () =>
         {
             stub.Clear();
