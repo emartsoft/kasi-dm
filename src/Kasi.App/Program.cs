@@ -1,19 +1,18 @@
 using Avalonia;
-using Microsoft.Extensions.Hosting;
+using Kasi.App.Startup;
 
 namespace Kasi.App;
 
 internal static class Program
 {
     [STAThread]
-    private static int Main(string[] args)
-    {
-        using var host = CompositionRoot.Build(args);
-        host.Start();
+    private static int Main(string[] args) =>
+        AppStartup.Run(
+            args,
+            AppEndpoints.ForCurrentUser(),
+            CompositionRoot.Build,
+            session => BuildAvaloniaApp(session.Host.Services, session.StartHidden, session.Relay).StartWithClassicDesktopLifetime(args));
 
-        return BuildAvaloniaApp(host.Services).StartWithClassicDesktopLifetime(args);
-    }
-
-    internal static AppBuilder BuildAvaloniaApp(IServiceProvider services) =>
-        AppBuilder.Configure(() => new App(services)).UsePlatformDetect();
+    internal static AppBuilder BuildAvaloniaApp(IServiceProvider services, bool startHidden = false, LaunchRelay? relay = null) =>
+        AppBuilder.Configure(() => new App(services, startHidden, relay)).UsePlatformDetect();
 }

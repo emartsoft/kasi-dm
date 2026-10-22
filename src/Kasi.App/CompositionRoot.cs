@@ -1,3 +1,4 @@
+using Kasi.App.Startup;
 using Kasi.App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,7 @@ internal static class CompositionRoot
         builder.Logging.ClearProviders(); // Serilog replaces this when logging lands; nothing may reach a console in a WinExe
 
         builder.Services.AddSingleton<MainWindowViewModel>();
+        builder.Services.AddSingleton<IAddDownloadService>(sp => sp.GetRequiredService<MainWindowViewModel>()); // PR 2.8d registers the Add dialog instead
 
         return builder.Build();
     }
