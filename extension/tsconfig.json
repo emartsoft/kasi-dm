@@ -16,6 +16,7 @@
     "scripts/**/*.ts",
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.e2e.config.ts",
     "tests/**/*.ts"
   ]
 }
