@@ -38,4 +38,39 @@ public sealed class RefetchBoundTests
         lost.Should().BeGreaterThan(FaultInjectionRunner.RefetchBound(_options, TimeSpan.FromSeconds(0.1)), "an instant kill may not lose that much");
         lost.Should().BeLessThanOrEqualTo(FaultInjectionRunner.RefetchBound(_options, TimeSpan.FromSeconds(2)), "the child ran on for two seconds before it was gone");
     }
+
+    [Fact]
+    public void A_slow_checkpoint_commit_adds_the_data_downloaded_while_it_ran()
+    {
+        var without = FaultInjectionRunner.RefetchBound(_options, TimeSpan.FromSeconds(0.1));
+        var slow = FaultInjectionRunner.RefetchBound(_options, TimeSpan.FromSeconds(0.1), TimeSpan.FromSeconds(1));
+
+        (slow - without).Should().Be(2 * MiB, "one more second of a 2 MiB/s download");
+    }
+
+    [Fact]
+    public void A_resume_that_starts_over_still_fails_with_a_slow_commit_allowed()
+    {
+        var bound = FaultInjectionRunner.RefetchBound(_options, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+
+        (60 * 2 * MiB).Should().BeGreaterThan(bound, "a minute of data lost is not a slow flush");
+    }
+
+    [Fact]
+    public void The_flush_latency_file_is_read_and_a_missing_or_partial_one_counts_as_zero()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"flush-{Guid.NewGuid():N}.latency");
+        FaultInjectionRunner.ReadFlushLatency(path).Should().Be(TimeSpan.Zero);
+        try
+        {
+            File.WriteAllText(path, "0.75");
+            FaultInjectionRunner.ReadFlushLatency(path).Should().Be(TimeSpan.FromSeconds(0.75));
+            File.WriteAllText(path, "");
+            FaultInjectionRunner.ReadFlushLatency(path).Should().Be(TimeSpan.Zero);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

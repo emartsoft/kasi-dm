@@ -219,6 +219,7 @@ internal sealed class FaultHarness : IAsyncDisposable
 /// <summary>Environment variables the harness sets on the child to arm its test hooks, and the child reads in <c>Program</c>.</summary>
 internal static class ChildEnvironment
 {
+    public const string FlushFile = "KASI_FAULT_FLUSH_FILE";
     public const string CommitMarker = "KASI_FAULT_COMMIT_MARKER";
     public const string CommitsBefore = "KASI_FAULT_COMMITS_BEFORE";
     public const string StallMilliseconds = "KASI_FAULT_STALL_MS";
