@@ -1,0 +1,79 @@
+name: Extension end to end
+
+# M2.4c (docs/plans/m2-4.md sections 3 and 4, ADR 0019): a real browser with the built extension, the real Native AOT native host and the
+# stub Kasi from tests/Kasi.BrowserHarness; TC-BRW-001 to 004. Nothing here touches the public internet except the browser and package
+# downloads; the test pages and files come from Kasi.TestServer on loopback.
+#   pull requests that touch the extension, the protocol, the host or the harness: Chromium only
+#   nightly and by hand: Chromium and Firefox (Firefox is driven through geckodriver, which the Windows runner image provides)
+# The run registers the host under HKCU for the browser under test and restores what was there; KASI_E2E=1 is the opt-in for that.
+
+on:
+  pull_request:
+    paths:
+      - 'extension/**'
+      - 'src/Kasi.Ipc/**'
+      - 'src/Kasi.NativeHost/**'
+      - 'tests/Kasi.BrowserHarness/**'
+      - 'tests/Kasi.TestServer/**'
+      - '.github/workflows/extension-e2e.yml'
+  schedule:
+    - cron: '45 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: extension-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  KASI_E2E: '1'
+
+jobs:
+  e2e:
+    name: ${{ github.event_name == 'pull_request' && 'Chromium' || 'Chromium and Firefox' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: extension/.nvmrc
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Publish the native host (Native AOT) and build the harness
+        run: |
+          dotnet publish src/Kasi.NativeHost/Kasi.NativeHost.csproj -c Release -r win-x64 -o artifacts/native-host --nologo
+          dotnet build tests/Kasi.BrowserHarness/Kasi.BrowserHarness.csproj -c Release --nologo
+
+      - name: Build the extension
+        working-directory: extension
+        run: |
+          npm ci
+          npm run build
+          npx playwright install chromium
+
+      - name: Chromium
+        working-directory: extension
+        shell: pwsh
+        run: |
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
+          npm run test:e2e -- chromium
+
+      - name: Firefox
+        if: github.event_name != 'pull_request'
+        working-directory: extension
+        shell: pwsh
+        run: |
+          geckodriver --version
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
+          npm run test:e2e -- firefox
