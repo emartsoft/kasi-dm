@@ -48,3 +48,10 @@ internal static class TestBrowser
     public static BrowserSettingsStore NewStore() =>
         new(Path.Combine(Path.GetTempPath(), "kasi-test-" + Guid.NewGuid().ToString("N"), "browser-settings.json"));
 }
+
+internal static class TestHosts
+{
+    /// <summary>The real composition root with a database of its own, so hosts started by parallel tests never share one file.</summary>
+    public static Microsoft.Extensions.Hosting.IHost Build(string[] args) =>
+        CompositionRoot.Build(args, Path.Combine(Path.GetTempPath(), "kasi-app-tests-" + Guid.NewGuid().ToString("N")));
+}

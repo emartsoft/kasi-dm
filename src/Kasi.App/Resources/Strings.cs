@@ -12,6 +12,16 @@ internal static class Strings
 
     public static string MainWindowAutomationName => Get(nameof(MainWindowAutomationName));
 
+    public static string JobListAutomationName => Get(nameof(JobListAutomationName));
+
+    public static string JobColumnName => Get(nameof(JobColumnName));
+
+    public static string JobColumnState => Get(nameof(JobColumnState));
+
+    public static string JobColumnProgress => Get(nameof(JobColumnProgress));
+
+    public static string JobColumnSize => Get(nameof(JobColumnSize));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

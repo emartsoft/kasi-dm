@@ -5,7 +5,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
-  <!-- Licences: Avalonia (+Desktop, Headless.XUnit) MIT; FluentAvaloniaUI MIT; CommunityToolkit.Mvvm MIT;
+  <!-- Licences: Avalonia (+Desktop, Controls.DataGrid, Headless.XUnit) MIT; FluentAvaloniaUI MIT; CommunityToolkit.Mvvm MIT;
        Microsoft.Extensions.Hosting MIT; MinVer MIT; Threading.Analyzers MIT; xunit.v3 Apache-2.0; xunit.runner.visualstudio Apache-2.0;
        AwesomeAssertions Apache-2.0;
        Microsoft.NET.Test.Sdk MIT; Microsoft.Data.Sqlite MIT (bundles SQLite, public domain); System.Security.Cryptography.ProtectedData MIT; Dapper Apache-2.0; FluentFTP MIT; FsCheck.Xunit.v3 BSD-3-Clause (3.4 and later need xunit.v3 4.x, which Avalonia.Headless.XUnit does not allow yet); Microsoft.Extensions.TimeProvider.Testing MIT; coverlet.collector MIT; BenchmarkDotNet MIT (bench only); Testcontainers MIT (tests only; Linux container conformance on the Ubuntu leg); SharpFuzz MIT (tests/Kasi.Fuzz only). -->
@@ -19,6 +19,7 @@
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
     <PackageVersion Include="Avalonia" Version="12.1.4" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.4" />
     <PackageVersion Include="FluentAvaloniaUI" Version="3.1.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />

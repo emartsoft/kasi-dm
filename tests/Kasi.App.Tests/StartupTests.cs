@@ -35,7 +35,7 @@ public class StartupTests
                     building.SetResult();
                     release.Wait(); // the engine is "slow"
                     built = true;
-                    return CompositionRoot.Build(args);
+                    return TestHosts.Build(args);
                 },
                 s =>
                 {
@@ -77,7 +77,7 @@ public class StartupTests
             () => AppStartup.Run(
                 [],
                 endpoints,
-                CompositionRoot.Build,
+                TestHosts.Build,
                 s =>
                 {
                     session = s;
@@ -116,7 +116,7 @@ public class StartupTests
             () => AppStartup.Run(
                 [],
                 endpoints,
-                CompositionRoot.Build,
+                TestHosts.Build,
                 s =>
                 {
                     first = s;
@@ -175,7 +175,7 @@ public class StartupTests
             () => AppStartup.Run(
                 [],
                 endpoints,
-                CompositionRoot.Build,
+                TestHosts.Build,
                 s =>
                 {
                     first = s;
