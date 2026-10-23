@@ -322,6 +322,39 @@ describe('[TC-BRW-002] native port: connected means Kasi answered', () => {
     expect(late).toHaveBeenCalledWith('a');
   });
 
+  it('hands a refreshLink from Kasi to its listener, and ignores a malformed one', () => {
+    const seen: string[] = [];
+    const manager = createNativePort({
+      connect: () => {
+        const p = new FakePort();
+        made.push(p);
+        return p;
+      },
+      client: 'chrome',
+      extensionVersion: '0.2.0',
+      logger: quiet,
+      onRefreshLink: (m) => seen.push(m.jobId),
+    });
+    made = [];
+    manager.start();
+    made[0]?.receive(rules);
+    made[0]?.receive({
+      v: 1,
+      id: 'k',
+      type: 'refreshLink',
+      jobId: 'j1',
+      referrerUrl: 'https://a.example.org/p',
+    });
+    made[0]?.receive({
+      v: 1,
+      id: 'k',
+      type: 'refreshLink',
+      jobId: 'j2',
+      referrerUrl: 'file:///etc/passwd',
+    });
+    expect(seen).toEqual(['j1']);
+  });
+
   it('keeps requests in the order they were made', () => {
     const manager = start();
     made[0]?.receive(rules);

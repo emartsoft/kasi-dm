@@ -1,6 +1,6 @@
 # 0020. Extension status, interception toggle, menus and the link batch
 
-- Status: Proposed (2.5a, status and the toggle; 2.5b, the menus and the link batch; 2.5c extends it with `refreshLink`)
+- Status: Proposed (2.5a, status and the toggle; 2.5b, the menus and the link batch; 2.5c, `refreshLink`)
 - Date: 2026-10-22
 - Requirements: KASI-BRW-006, KASI-BRW-004, KASI-BRW-005
 - Related: `docs/plans/m2-5.md`; ADR 0017, ADR 0019
@@ -22,6 +22,11 @@ BRW-006 asks for the connection status to turn red within 5 s. A poll cannot del
 - *Cookies* for a batch come from the page and from one representative URL per distinct origin, at most 50 origins; a page of links to hundreds of sites sends the cookies of the first ones. A single link sends the cookies for that URL. Nothing is logged but counts and codes.
 - *The test seam.* A native context menu cannot be clicked by Playwright or WebDriver, so the background also accepts a `kasi-menu-click` message carrying the data of a click and hands it to the same handler. It is accepted only from a page of this extension (`sender.url` under the extension's own origin): never from a content script, so never from a web page. A real right-click stays a manual row in `docs/qa/browser-interception.md`.
 - *`mime`.* A link click has no MIME type; `addDownload` carries `application/octet-stream` and Kasi resolves the real type and name from the response.
+
+**`refreshLink`** (M2.5c, TRD 6.6). Kasi sends `refreshLink {jobId, referrerUrl, matchHint?}` on the open pipe (never from a page). The extension opens `referrerUrl` in a background tab (`tabs.create`, no new permission) and registers a watch for the job *before* the tab exists, because a page can start its download before `create` returns. The watch is a claim on the `claims` seam of the interception, so it runs before the rules and before the pause: the refreshed download is never also handed to Kasi as a new job, and it is claimed even when the interception toggle is off.
+- *Matching.* With `matchHint` the first download whose file name or URL's last segment contains the hint (case-insensitive) is taken; without one, the first download. The file name is often not yet known when Chromium creates the download, so the URL counts too. With several watches open, the first one that matches wins.
+- *The answer.* The claimed download is cancelled, its file removed and the entry erased; its final URL and the cookies for it are sent as `linkRefreshed {jobId, url, cookies}`. A URL Kasi cannot take (a `blob:` for example) is dropped from the browser and nothing is sent. A refusal or timeout from Kasi is logged (counts and codes only) and not retried: Kasi's refresh dialog (M2.8d) decides what the user sees.
+- *Ending.* The watch ends with the first claim, after 60 s, or when the same job asks again; the tab is closed in every path. A page that starts no download sends nothing. The watch lives in the worker's memory: a worker restart within the 60 s drops it, which is acceptable because an open native port keeps the worker alive.
 
 ## Consequences
 

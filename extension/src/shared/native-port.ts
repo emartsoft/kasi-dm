@@ -1,6 +1,6 @@
-import type { Ack, Hello, Rules } from '../types/protocol';
+import type { Ack, Hello, RefreshLink, Rules } from '../types/protocol';
 import { createLogger, type Logger } from './logger';
-import { parseAck, parseError, parseRules } from './messages';
+import { parseAck, parseError, parseRefreshLink, parseRules } from './messages';
 
 export const NATIVE_HOST = 'com.martsoft.kasi';
 
@@ -23,6 +23,8 @@ export interface NativePortOptions {
   onLateAck?: (id: string) => void;
   // A connection that was up is gone (Kasi quit, or the port died). Called in the same tick, before anything else reacts.
   onLost?: () => void;
+  // Kasi wants a fresh link for a paused job (plan m2-5 2.5). Only a connected Kasi can say so.
+  onRefreshLink?: (message: RefreshLink) => void;
   logger?: Logger;
   newId?: () => string;
 }
@@ -94,6 +96,12 @@ export function createNativePort(options: NativePortOptions) {
 
   function handle(raw: unknown, current: PortLike): void {
     if (current !== port) return;
+    const refresh = parseRefreshLink(raw);
+    if (refresh) {
+      heard = true;
+      options.onRefreshLink?.(refresh);
+      return;
+    }
     const rules = parseRules(raw);
     const ack = rules ? undefined : parseAck(raw);
     const error = rules || ack ? undefined : parseError(raw);

@@ -43,12 +43,22 @@ export interface ReceivedBatch {
   cookies: { name: string; value: string; domain: string }[];
 }
 
+export interface ReceivedRefresh {
+  jobId: string;
+  url: string;
+  cookies: { name: string; value: string; domain: string }[];
+}
+
 export interface Harness {
   admin: string;
   testServer: string;
   received(): Promise<Received[]>;
   /** The `addBatch` messages the stub has had (the link picker's input). */
   receivedBatches(): Promise<ReceivedBatch[]>;
+  /** The `linkRefreshed` answers the stub has had. */
+  refreshed(): Promise<ReceivedRefresh[]>;
+  /** Kasi asks the extension for a fresh link (`refreshLink`). */
+  refreshLink(jobId: string, referrerUrl: string, matchHint?: string): Promise<void>;
   /** How many `hello` messages the stub has had from a native host. */
   hellos(): Promise<number>;
   clear(): Promise<void>;
@@ -123,6 +133,10 @@ function api(admin: string): Omit<Harness, 'testServer' | 'stop'> {
     admin,
     received: () => json<Received[]>(`${admin}/_stub/received`),
     receivedBatches: () => json<ReceivedBatch[]>(`${admin}/_stub/received-batches`),
+    refreshed: () => json<ReceivedRefresh[]>(`${admin}/_stub/refreshed`),
+    refreshLink: async (jobId, referrerUrl, matchHint) => {
+      await send(`${admin}/_stub/refresh-link`, 'POST', { jobId, referrerUrl, matchHint });
+    },
     hellos: async () => (await json<{ count: number }>(`${admin}/_stub/hellos`)).count,
     clear: async () => {
       await send(`${admin}/_stub/received`, 'DELETE');

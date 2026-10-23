@@ -270,6 +270,30 @@ export function defineScenarios(kit: BrowserKit): void {
       await pause(1000);
       expect(await driver.folder()).toEqual([]);
     });
+
+    it('[TC-BRW-004] refreshLink opens the page, takes its download and answers with the fresh URL and cookies; Kasi gets no new job', async () => {
+      await driver.addCookie(CANARY_NAME, CANARY_VALUE, harness.testServer);
+      await driver.open(home(harness));
+
+      await harness.refreshLink(
+        'job-refresh',
+        `${harness.admin}/pages/refresh/fresh/${String(SIZE)}`,
+      );
+
+      const [answer, ...rest] = await waitFor('the refreshed link', async () => {
+        const all = await harness.refreshed();
+        return all.length > 0 ? all : false;
+      });
+      expect(rest).toHaveLength(0);
+      expect(answer?.jobId).toBe('job-refresh');
+      expect(answer?.url).toBe(`${harness.testServer}/files/fresh/${String(SIZE)}`);
+      expect(answer?.cookies).toContainEqual(
+        expect.objectContaining({ name: CANARY_NAME, value: CANARY_VALUE }),
+      );
+      await pause(1000);
+      expect(await harness.received()).toEqual([]);
+      expect(await driver.folder()).toEqual([]);
+    });
   });
 
   suite(`end to end (${kit.family}): the host starts Kasi, then Kasi goes missing`, () => {

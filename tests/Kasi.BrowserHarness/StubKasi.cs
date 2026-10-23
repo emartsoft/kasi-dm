@@ -12,6 +12,9 @@ internal sealed record ReceivedCookie(string Name, string Value, string Domain);
 /// <summary>What the stub received for one <c>addBatch</c> (the link picker's input, TC-BRW-005).</summary>
 internal sealed record ReceivedBatch(string Referrer, IReadOnlyList<string> Urls, IReadOnlyList<ReceivedCookie> Cookies);
 
+/// <summary>What the stub received for one <c>linkRefreshed</c> (the answer to a <c>refreshLink</c>, M2.5c).</summary>
+internal sealed record ReceivedRefresh(string JobId, string Url, IReadOnlyList<ReceivedCookie> Cookies);
+
 /// <summary>
 /// Kasi as the browser protocol sees it: the real <see cref="KasiPipeServer"/> on the real per-user pipe (so the framing, the access list
 /// and the native host are all genuine), with a handler that answers <c>hello</c> with rules and <c>addDownload</c> as the mode says.
@@ -20,6 +23,7 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
 {
     private readonly ConcurrentQueue<ReceivedDownload> _received = new();
     private readonly ConcurrentQueue<ReceivedBatch> _batches = new();
+    private readonly ConcurrentQueue<ReceivedRefresh> _refreshed = new();
     private volatile string _mode = options.Mode;
     private volatile RulesOptions _rules = options.Rules;
     private int _answerDelayMs = options.AnswerDelayMs;
@@ -35,8 +39,11 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
 
     public IReadOnlyList<ReceivedBatch> Batches => [.. _batches];
 
+    public IReadOnlyList<ReceivedRefresh> Refreshed => [.. _refreshed];
+
     public void Clear()
     {
+        _refreshed.Clear();
         _received.Clear();
         _batches.Clear();
     }
@@ -73,6 +80,17 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
         }
     }
 
+    /// <summary>Asks the connected extension for a fresh link, as Kasi's refresh dialog will (M2.8d).</summary>
+    public async Task SendRefreshAsync(string jobId, string referrerUrl, string? matchHint)
+    {
+        if (_server is not null)
+        {
+            await _server.BroadcastAsync(
+                new RefreshLink { Id = Guid.NewGuid().ToString("N"), JobId = jobId, ReferrerUrl = referrerUrl, MatchHint = matchHint },
+                CancellationToken.None);
+        }
+    }
+
     public ValueTask DisposeAsync() => _server?.DisposeAsync() ?? ValueTask.CompletedTask;
 
     private async ValueTask<IpcMessage?> HandleAsync(IpcConnection connection, IpcMessage message, CancellationToken cancellationToken)
@@ -106,6 +124,12 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
                     batch.Referrer,
                     [.. batch.Links.Select(l => l.Url)],
                     [.. batch.Cookies.Select(c => new ReceivedCookie(c.Name, c.Value, c.Domain))]));
+                return new Ack { Id = message.Id, Ok = true };
+            case LinkRefreshed refreshed:
+                _refreshed.Enqueue(new ReceivedRefresh(
+                    refreshed.JobId,
+                    refreshed.Url,
+                    [.. refreshed.Cookies.Select(c => new ReceivedCookie(c.Name, c.Value, c.Domain))]));
                 return new Ack { Id = message.Id, Ok = true };
             default:
                 return new Ack { Id = message.Id, Ok = true };

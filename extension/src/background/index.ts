@@ -7,6 +7,7 @@ import { collectCookies, storeFor } from '../shared/cookies';
 import { createInterception, type DownloadItemLike } from '../shared/interception';
 import { collectPageLinks, parseRawAnchors, type LinkScope } from '../shared/link-collector';
 import { createMenus, parseMenuClick } from '../shared/menus';
+import { createRefreshLink } from '../shared/refresh-link';
 import { createRequestTracker } from '../shared/request-tracker';
 import { createRulesCache, createRulesProvider } from '../shared/rules-cache';
 import { INTERCEPTION_KEY, readInterceptionEnabled } from '../shared/settings';
@@ -43,6 +44,27 @@ function showDisconnected(): void {
   paintBadge();
 }
 
+// refreshLink (plan m2-5 2.5): a background tab on the referrer page, and a claim on the download it starts.
+const refresh = createRefreshLink({
+  tabs: {
+    create: (url) => browser.tabs.create({ url, active: false }),
+    remove: (tabId) => browser.tabs.remove(tabId),
+  },
+  downloads: {
+    cancel: (id) => browser.downloads.cancel(id),
+    erase: (query) => browser.downloads.erase(query),
+    removeFile: (id: number) => browser.downloads.removeFile(id),
+  },
+  cookiesFor: async (item) => {
+    const urls = [item.url, item.finalUrl ?? item.url];
+    const storeId = await storeFor(browser.cookies, item.incognito === true);
+    return collectCookies(browser.cookies, urls, storeId);
+  },
+  port: { request: (message) => nativePort.request(message) },
+  newId: () => crypto.randomUUID(),
+  logger,
+});
+
 const nativePort = createNativePort({
   connect: () => browser.runtime.connectNative(NATIVE_HOST),
   client: clientName(),
@@ -61,6 +83,9 @@ const nativePort = createNativePort({
     void interception.lateAck(id);
   },
   onLost: showDisconnected,
+  onRefreshLink: (message) => {
+    void refresh.start(message);
+  },
 });
 
 const interception = createInterception({
@@ -90,6 +115,7 @@ const interception = createInterception({
   newId: () => crypto.randomUUID(),
   onDisconnected: showDisconnected,
   logger,
+  claims: [(item) => refresh.claim(item)],
 });
 
 // Context menus (plan m2-5 2.4). The links of every frame come from scripting.executeScript, which needs no content-script message.
