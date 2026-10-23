@@ -25,6 +25,82 @@ public sealed class QueueRepository(SqliteConnectionFactory factory) : IQueueRep
         return [.. rows.Select(r => r.ToQueue())];
     }
 
+    public async Task<int> AddAsync(Queue queue, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(queue);
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        const string sql = """
+            INSERT INTO queue (id, name, max_parallel, connections, speed_limit_bps, quota_bytes, quota_reset, post_action, sort_order)
+            VALUES (NULLIF(@id, 0), @name, @maxParallel, @connections, @speedLimitBps, @quotaBytes, @quotaReset, @postAction, @sortOrder);
+            SELECT last_insert_rowid();
+            """;
+        var id = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+            sql,
+            new
+            {
+                id = queue.Id,
+                name = queue.Name,
+                maxParallel = queue.MaxParallel,
+                connections = queue.Connections,
+                speedLimitBps = queue.SpeedLimitBps,
+                quotaBytes = queue.QuotaBytes,
+                quotaReset = queue.QuotaReset is { } qr ? QuotaResetText.ToText(qr) : null,
+                postAction = queue.PostAction,
+                sortOrder = queue.SortOrder,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return checked((int)id);
+    }
+
+    public async Task<bool> UpdateAsync(Queue queue, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(queue);
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        const string sql = """
+            UPDATE queue
+            SET name = @name,
+                max_parallel = @maxParallel,
+                connections = @connections,
+                speed_limit_bps = @speedLimitBps,
+                quota_bytes = @quotaBytes,
+                quota_reset = @quotaReset,
+                post_action = @postAction,
+                sort_order = @sortOrder
+            WHERE id = @id;
+            """;
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new
+            {
+                id = queue.Id,
+                name = queue.Name,
+                maxParallel = queue.MaxParallel,
+                connections = queue.Connections,
+                speedLimitBps = queue.SpeedLimitBps,
+                quotaBytes = queue.QuotaBytes,
+                quotaReset = queue.QuotaReset is { } qr ? QuotaResetText.ToText(qr) : null,
+                postAction = queue.PostAction,
+                sortOrder = queue.SortOrder,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return affected > 0;
+    }
+
+    public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (id == 1)
+        {
+            throw new InvalidOperationException("The main queue (id = 1) cannot be deleted.");
+        }
+
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM queue WHERE id = @id;",
+            new { id },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return affected > 0;
+    }
+
 #pragma warning disable CA1812 // created by Dapper
     private sealed class Row
 #pragma warning restore CA1812

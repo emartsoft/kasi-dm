@@ -88,6 +88,16 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         return changed > 0;
     }
 
+    public async Task<bool> UpdateQueuePositionAsync(JobId id, int queueId, double queuePos, CancellationToken cancellationToken = default)
+    {
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE job SET queue_id = @queueId, queue_pos = @queuePos WHERE id = @id;",
+            new { id = id.ToString(), queueId, queuePos },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return changed > 0;
+    }
+
     public async Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default)
     {
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);

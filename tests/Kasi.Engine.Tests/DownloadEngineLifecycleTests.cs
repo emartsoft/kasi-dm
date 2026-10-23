@@ -861,6 +861,9 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         public Task<bool> UpdateUrlAsync(JobId id, string url, string? finalUrl, CancellationToken cancellationToken = default) =>
             inner.UpdateUrlAsync(id, url, finalUrl, cancellationToken);
 
+        public Task<bool> UpdateQueuePositionAsync(JobId id, int queueId, double queuePos, CancellationToken cancellationToken = default) =>
+            inner.UpdateQueuePositionAsync(id, queueId, queuePos, cancellationToken);
+
         public Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default) => inner.ResetProgressAsync(id, cancellationToken);
 
         public Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default) => inner.DeleteAsync(id, cancellationToken);

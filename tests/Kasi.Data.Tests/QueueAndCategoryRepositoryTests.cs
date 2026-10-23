@@ -67,6 +67,48 @@ public sealed class QueueAndCategoryRepositoryTests : IAsyncLifetime, IDisposabl
     }
 
     [Fact]
+    public async Task Add_and_update_and_delete_user_queues_work_as_expected()
+    {
+        var repo = new QueueRepository(_db.Factory);
+        var queue = new Queue
+        {
+            Id = 0,
+            Name = "Downloads",
+            MaxParallel = 3,
+            Connections = 8,
+            SpeedLimitBps = 100_000,
+            QuotaBytes = 500_000_000,
+            QuotaReset = QuotaReset.Daily,
+            PostAction = "sleep",
+            SortOrder = 2,
+        };
+
+        var id = await repo.AddAsync(queue, TempDatabase.Ct);
+        id.Should().BeGreaterThan(1);
+
+        var loaded = await repo.GetAsync(id, TempDatabase.Ct);
+        loaded.Should().BeEquivalentTo(queue with { Id = id });
+
+        var updated = queue with { Id = id, Name = "Renamed", MaxParallel = 1, QuotaReset = null };
+        (await repo.UpdateAsync(updated, TempDatabase.Ct)).Should().BeTrue();
+
+        var reloaded = await repo.GetAsync(id, TempDatabase.Ct);
+        reloaded.Should().BeEquivalentTo(updated);
+
+        (await repo.DeleteAsync(id, TempDatabase.Ct)).Should().BeTrue();
+        (await repo.GetAsync(id, TempDatabase.Ct)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Main_queue_cannot_be_deleted()
+    {
+        var repo = new QueueRepository(_db.Factory);
+        Func<Task> act = () => repo.DeleteAsync(1, TempDatabase.Ct);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*main queue*");
+    }
+
+    [Fact]
     public async Task The_default_categories_are_listed_in_id_order()
     {
         var categories = await new CategoryRepository(_db.Factory).ListAsync(TempDatabase.Ct);

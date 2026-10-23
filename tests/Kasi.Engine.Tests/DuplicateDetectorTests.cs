@@ -179,6 +179,9 @@ public sealed class DuplicateDetectorTests : IDisposable
         public Task<bool> UpdateUrlAsync(JobId id, string url, string? finalUrl, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<bool> UpdateQueuePositionAsync(JobId id, int queueId, double queuePos, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();

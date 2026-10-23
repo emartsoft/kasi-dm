@@ -35,7 +35,7 @@ public sealed class SchemaTests : IAsyncLifetime, IDisposable
             names.Add(reader.GetString(0));
         }
 
-        names.Should().Contain(["queue", "category", "job", "segment", "job_secret", "schema_version", "ix_job_queue", "ix_job_created"]);
+        names.Should().Contain(["queue", "category", "job", "segment", "job_secret", "schema_version", "queue_schedule", "ix_job_queue", "ix_job_created"]);
     }
 
     [Fact]
