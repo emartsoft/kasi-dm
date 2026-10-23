@@ -12,4 +12,6 @@ Not automated: a native tray icon and a real toast need an interactive Windows s
 | Speed limit | Choose 1 MB/s while downloading | The speed drops to about 1 MB/s; Unlimited restores it |
 | Quit | Choose Quit | The icon disappears and the process ends (check Task Manager); the browser extension shows "not connected" until the next download |
 | Completion toast | Let a download finish with Kasi hidden | A toast "Download complete" with the file name only; Open opens the file, Show in folder opens Explorer with the file selected |
+| Clipboard capture (off) | With the Settings box off, copy a link ending in .iso | Nothing happens |
+| Clipboard capture (on) | Tick "Offer to download a link when I copy one", copy a link ending in .iso in the browser's address bar | The Add download window opens with the link filled in; copying the same link again straight away does not open a second one; copying a sentence or a .html link does nothing |
 | Failure toast | Download from a URL that fails | A toast "Download failed" with the file name only |
