@@ -71,7 +71,9 @@ public class LinkPickerTests
         vm.SelectedCount.Should().Be(4);
         vm.FilterText = string.Empty;
         vm.Shown.Count(r => r.IsSelected).Should().Be(4, "links hidden by the filter keep their state");
+        vm.FilterText = "note"; // the four ticked links are hidden now
         vm.SelectNoneCommand.Execute(null);
+        vm.FilterText = string.Empty;
 
         vm.SelectedCount.Should().Be(0);
         vm.Shown.Should().OnlyContain(r => !r.IsSelected);
