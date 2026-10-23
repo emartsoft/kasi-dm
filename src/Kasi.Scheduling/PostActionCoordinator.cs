@@ -48,6 +48,9 @@ public sealed class PostActionCoordinator : IDisposable
 
     public event EventHandler? ExitRequested;
 
+    /// <summary>Raised when a post-action throws while running in the background.</summary>
+    public event EventHandler<Exception>? ActionFailed;
+
     public bool IsCountingDown => _countdownCts is not null && !_countdownCts.IsCancellationRequested;
 
     public int CountdownRemainingSeconds => _remainingSeconds;
@@ -91,7 +94,7 @@ public sealed class PostActionCoordinator : IDisposable
             case PostActionKind.Sleep:
             case PostActionKind.Hibernate:
             case PostActionKind.Shutdown:
-                await StartPowerCountdownAsync(config.Kind, cancellationToken).ConfigureAwait(false);
+                await StartPowerCountdownAsync(queueId, config, cancellationToken).ConfigureAwait(false);
                 break;
 
             case PostActionKind.ExitKasi:
@@ -129,14 +132,21 @@ public sealed class PostActionCoordinator : IDisposable
             {
                 await ExecuteForQueueAsync(queueId).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // Background post-action execution errors should not crash the runner
+                // A failing post-action must not crash the runner; report it instead of hiding it.
+                ActionFailed?.Invoke(this, ex);
             }
         });
     }
 
-    private async Task StartPowerCountdownAsync(PostActionKind action, CancellationToken cancellationToken)
+    private async Task<bool> AnyQueueRunningAsync(CancellationToken cancellationToken)
+    {
+        var allQueues = await _queueRepository.ListAsync(cancellationToken).ConfigureAwait(false);
+        return allQueues.Any(q => _runner.IsQueueRunning(q.Id));
+    }
+
+    private async Task StartPowerCountdownAsync(int queueId, PostActionConfig config, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -182,8 +192,14 @@ public sealed class PostActionCoordinator : IDisposable
                 return;
             }
 
-            if (!token.IsCancellationRequested)
+            if (!token.IsCancellationRequested && !config.ForceIfOtherQueuesBusy && await AnyQueueRunningAsync(token).ConfigureAwait(false))
             {
+                // Work started while the countdown ran: a power action now would cut it off.
+                ActionSkippedDueToBusyQueues?.Invoke(this, queueId);
+            }
+            else if (!token.IsCancellationRequested)
+            {
+                var action = config.Kind;
                 ActionExecuting?.Invoke(this, action);
                 switch (action)
                 {

@@ -10,20 +10,32 @@ public sealed class ProcessProgramRunner : IProgramRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(programPath);
 
-        string? finalArgs = arguments;
-        if (!string.IsNullOrEmpty(completedFilePath) && finalArgs is not null)
-        {
-            finalArgs = finalArgs.Replace("%1", completedFilePath, StringComparison.OrdinalIgnoreCase);
-        }
-
         var startInfo = new ProcessStartInfo
         {
             FileName = programPath,
-            Arguments = finalArgs ?? string.Empty,
+            Arguments = BuildArguments(arguments, completedFilePath),
             UseShellExecute = true,
         };
 
         Process.Start(startInfo);
         return Task.CompletedTask;
+    }
+
+    /// <summary>Replaces <c>%1</c> with the file path in quotes, so a path with spaces stays one argument.</summary>
+    public static string BuildArguments(string? arguments, string? completedFilePath)
+    {
+        if (arguments is null)
+        {
+            return string.Empty;
+        }
+
+        if (string.IsNullOrEmpty(completedFilePath))
+        {
+            return arguments;
+        }
+
+        return arguments
+            .Replace("\"%1\"", "%1", StringComparison.Ordinal)
+            .Replace("%1", $"\"{completedFilePath}\"", StringComparison.Ordinal);
     }
 }

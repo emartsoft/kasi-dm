@@ -184,6 +184,64 @@ public sealed class PostActionCoordinatorTests
         programRunner.ExecutedFilePath.Should().Be("C:\\Downloads\\Video\\video.mp4");
     }
 
+    [Fact]
+    [Trait("Requirement", "KASI-QUE-004")]
+    [Trait("TC", "TC-QUE-004")]
+    public async Task A_queue_that_starts_during_the_countdown_cancels_the_power_action()
+    {
+        var clock = new FakeTimeProvider();
+        var powerController = new FakePowerController();
+        var queueRepo = new InMemoryQueueRepository();
+        using var runner = new TestQueueRunner();
+        await queueRepo.AddAsync(new Queue { Id = 1, Name = "Main", PostAction = "shutdown", SortOrder = 0 }, Ct);
+        await queueRepo.AddAsync(new Queue { Id = 2, Name = "Other", PostAction = "none", SortOrder = 1 }, Ct);
+        using var coordinator = new PostActionCoordinator(runner, queueRepo, new InMemoryJobRepository(), powerController, new FakeProgramRunner(), clock);
+        var skipped = 0;
+        coordinator.ActionSkippedDueToBusyQueues += (_, _) => skipped++;
+
+        var actionTask = coordinator.ExecuteForQueueAsync(1, Ct);
+        clock.Advance(TimeSpan.FromSeconds(30));
+        await runner.StartQueueAsync(2, Ct);
+        clock.Advance(TimeSpan.FromSeconds(30));
+        await actionTask;
+
+        powerController.ShutdownCount.Should().Be(0, "new work started while the countdown ran");
+        skipped.Should().Be(1);
+    }
+
+    [Fact]
+    [Trait("Requirement", "KASI-QUE-004")]
+    public async Task A_post_action_that_throws_is_reported_not_swallowed()
+    {
+        var queueRepo = new InMemoryQueueRepository();
+        using var runner = new TestQueueRunner();
+        await queueRepo.AddAsync(new Queue { Id = 1, Name = "Main", PostAction = "run:C:\\tools\\x.exe", SortOrder = 0 }, Ct);
+        using var coordinator = new PostActionCoordinator(runner, queueRepo, new InMemoryJobRepository(), new FakePowerController(), new ThrowingProgramRunner());
+        var failed = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        coordinator.ActionFailed += (_, ex) => failed.TrySetResult(ex);
+
+        runner.Complete(1);
+
+        var ex = await failed.Task.WaitAsync(TimeSpan.FromSeconds(30), Ct);
+        ex.Should().BeOfType<InvalidOperationException>();
+    }
+
+    [Fact]
+    [Trait("Requirement", "KASI-QUE-004")]
+    public void The_completed_file_path_is_quoted_so_a_path_with_spaces_stays_one_argument()
+    {
+        ProcessProgramRunner.BuildArguments("--file %1", @"C:\My Videos\a b.mp4").Should().Be("--file \"C:\\My Videos\\a b.mp4\"");
+        ProcessProgramRunner.BuildArguments("--file \"%1\" -x", @"C:\a b.mp4").Should().Be("--file \"C:\\a b.mp4\" -x");
+        ProcessProgramRunner.BuildArguments("--none", @"C:\a.mp4").Should().Be("--none");
+        ProcessProgramRunner.BuildArguments(null, @"C:\a.mp4").Should().Be(string.Empty);
+    }
+
+    private sealed class ThrowingProgramRunner : IProgramRunner
+    {
+        public Task RunAsync(string programPath, string? arguments, string? completedFilePath = null, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("boom");
+    }
+
     private sealed class FakePowerController : IPowerController
     {
         public int SleepCount { get; private set; }
@@ -308,9 +366,9 @@ public sealed class PostActionCoordinatorTests
     {
         private readonly HashSet<int> _running = [];
 
-#pragma warning disable CS0067
         public event EventHandler<int>? QueueCompleted;
-#pragma warning restore CS0067
+
+        public void Complete(int queueId) => QueueCompleted?.Invoke(this, queueId);
 
         public bool IsQueueRunning(int queueId) => _running.Contains(queueId);
 

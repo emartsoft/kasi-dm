@@ -15,6 +15,7 @@ public sealed class QueueRunner(
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly ConcurrentDictionary<int, bool> _runningQueues = new();
     private readonly ConcurrentDictionary<JobId, int> _activeJobs = new();
+    private readonly ConcurrentDictionary<int, bool> _ranSinceStart = new();
 
     public event EventHandler<int>? QueueCompleted;
 
@@ -23,6 +24,7 @@ public sealed class QueueRunner(
 
     public async Task StartQueueAsync(int queueId, CancellationToken cancellationToken = default)
     {
+        _ranSinceStart.TryRemove(queueId, out _);
         _runningQueues[queueId] = true;
         await PumpQueueAsync(queueId, cancellationToken).ConfigureAwait(false);
     }
@@ -81,6 +83,11 @@ public sealed class QueueRunner(
                     {
                         queueId = job.QueueId;
                     }
+                }
+
+                if (queueId > 0 && newState != JobState.Paused)
+                {
+                    _ranSinceStart[queueId] = true;
                 }
 
                 if (newState == JobState.Failed && queueId > 0)
@@ -292,6 +299,7 @@ public sealed class QueueRunner(
             if (IsActiveState(j.State))
             {
                 _activeJobs.TryAdd(j.Id, queueId);
+                _ranSinceStart[queueId] = true;
             }
         }
 
@@ -315,6 +323,7 @@ public sealed class QueueRunner(
                 try
                 {
                     await jobControl.StartJobAsync(nextJob.Id, cancellationToken).ConfigureAwait(false);
+                    _ranSinceStart[queueId] = true;
                     availableSlots--;
                 }
                 catch
@@ -325,9 +334,11 @@ public sealed class QueueRunner(
             }
         }
 
-        bool hasPendingWork = jobs.Any(j => j.State == JobState.Queued || IsActiveState(j.State) || _activeJobs.ContainsKey(j.Id));
-        if (!hasPendingWork && jobs.Count > 0)
+        // A paused job is work the user has set aside, not work that is done; a queue that ran nothing has not completed.
+        bool hasPendingWork = jobs.Any(j => j.State is JobState.Queued or JobState.Paused || IsActiveState(j.State) || _activeJobs.ContainsKey(j.Id));
+        if (!hasPendingWork && _ranSinceStart.TryRemove(queueId, out _))
         {
+            _runningQueues[queueId] = false;
             QueueCompleted?.Invoke(this, queueId);
         }
     }

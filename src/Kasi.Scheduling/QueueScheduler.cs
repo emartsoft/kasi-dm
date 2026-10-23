@@ -12,6 +12,7 @@ public sealed class QueueScheduler : IDisposable
     private readonly IQueueScheduleRepository _scheduleRepository;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Dictionary<int, bool> _wasActive = [];
     private ITimer? _timer;
 
     public QueueScheduler(
@@ -23,6 +24,9 @@ public sealed class QueueScheduler : IDisposable
         _scheduleRepository = scheduleRepository;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
+
+    /// <summary>Raised when a periodic evaluation throws; the timer keeps running.</summary>
+    public event EventHandler<Exception>? EvaluationFailed;
 
     /// <summary>Starts periodic schedule evaluation and checks for currently active windows.</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -55,7 +59,11 @@ public sealed class QueueScheduler : IDisposable
                 bool active = ScheduleEvaluator.IsActive(schedule, now);
                 bool isRunning = _runner.IsQueueRunning(schedule.QueueId);
 
-                if (active && !isRunning)
+                // Start only when the window opens (or on the first look), so a queue the user stopped by hand inside its window stays stopped.
+                bool opened = active && (!_wasActive.TryGetValue(schedule.QueueId, out var was) || !was);
+                _wasActive[schedule.QueueId] = active;
+
+                if (opened && !isRunning)
                 {
                     await _runner.StartQueueAsync(schedule.QueueId, cancellationToken).ConfigureAwait(false);
                 }
@@ -83,9 +91,10 @@ public sealed class QueueScheduler : IDisposable
         {
             await EvaluateAllSchedulesAsync().ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-            // Background timer tick errors should not crash the process
+            // A failing tick must not crash the process; report it and try again on the next tick.
+            EvaluationFailed?.Invoke(this, ex);
         }
     }
 }

@@ -94,6 +94,38 @@ public sealed class QueueSchedulerTests
         }
     }
 
+    [Fact]
+    [Trait("Requirement", "KASI-QUE-003")]
+    public async Task A_queue_the_user_stopped_inside_its_window_stays_stopped_until_the_next_window()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 24, 2, 0, 0, TimeSpan.Zero));
+        var schedule = new QueueSchedule
+        {
+            QueueId = 1,
+            IsEnabled = true,
+            StartTime = new TimeOnly(23, 0),
+            StopTime = new TimeOnly(6, 0),
+            DaysOfWeek = DaysOfWeek.All,
+        };
+        using var runner = new TestQueueRunner();
+        using var scheduler = new QueueScheduler(runner, new InMemoryScheduleRepository([schedule]), clock);
+        await scheduler.StartAsync(Ct);
+        runner.IsQueueRunning(1).Should().BeTrue();
+
+        await runner.StopQueueAsync(1, Ct);
+        clock.Advance(TimeSpan.FromMinutes(30));
+        await scheduler.EvaluateAllSchedulesAsync(Ct);
+
+        runner.IsQueueRunning(1).Should().BeFalse("the user stopped it; the window is still open but the scheduler must not fight that");
+
+        clock.Advance(TimeSpan.FromHours(4)); // 06:30, window closed
+        await scheduler.EvaluateAllSchedulesAsync(Ct);
+        clock.Advance(TimeSpan.FromHours(17)); // 23:30, next window
+        await scheduler.EvaluateAllSchedulesAsync(Ct);
+
+        runner.IsQueueRunning(1).Should().BeTrue();
+    }
+
     private sealed class InMemoryScheduleRepository(IEnumerable<QueueSchedule> initial) : IQueueScheduleRepository
     {
         private readonly List<QueueSchedule> _items = [.. initial];

@@ -8,7 +8,6 @@ namespace Kasi.Scheduling;
 public sealed partial class WindowsPowerController : IPowerController
 {
     private const uint ShutdownPoweroff = 0x00000008;
-    private const uint ShutdownForceOthers = 0x00000001;
 
     [LibraryImport("powrprof.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -55,7 +54,7 @@ public sealed partial class WindowsPowerController : IPowerController
     {
         if (OperatingSystem.IsWindows())
         {
-            uint result = InitiateShutdown(machineName: null, message: null, gracePeriod: 0, shutdownFlags: ShutdownPoweroff | ShutdownForceOthers, reason: 0);
+            uint result = InitiateShutdown(machineName: null, message: null, gracePeriod: 0, shutdownFlags: ShutdownPoweroff, reason: 0);
             if (result != 0)
             {
                 throw new Win32Exception(checked((int)result));

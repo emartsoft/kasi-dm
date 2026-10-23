@@ -47,3 +47,10 @@ TRD 10 requires:
 - Reordering is $O(1)$ database writes without table-wide renumbering.
 - Time evaluation is 100% deterministic and testable using `FakeTimeProvider` without wall-clock sleep delays.
 - System power actions are isolated behind interfaces, guarding against unintended host machine shutdowns during testing.
+
+## Review amendments
+
+- A queue reports completion only after it ran something since it was started, never while a job is queued, active or paused, and it stops being "running" when it reports it, so an idle queue cannot fire a post-action and a finished one is not counted as busy.
+- The 60-second countdown checks again when it expires: if any queue is running (and the action is not forced), the power action is skipped.
+- The scheduler starts a queue when its window opens (or at the first look), not on every tick inside the window, so a queue stopped by hand stays stopped.
+- Shutdown no longer forces other applications closed. `%1` is replaced by the file path in quotes. Background failures of post-actions and scheduler ticks are raised as `ActionFailed` and `EvaluationFailed` instead of being swallowed.
