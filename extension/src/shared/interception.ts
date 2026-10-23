@@ -50,7 +50,7 @@ export interface InterceptionDeps {
   hasHostPermission(): Promise<boolean>;
   isPost(...urls: string[]): Promise<boolean>;
   hops(url: string): Promise<string[]>;
-  bypassHeld(key: Rules['bypassKey'], urlHashes: string[]): Promise<boolean>;
+  bypassHeld(key: Rules['bypassKey'], urlHashes: () => Promise<string[]>): Promise<boolean>;
   cookiesFor(item: DownloadItemLike): Promise<Cookie[]>;
   userAgent: string;
   newId(): string;
@@ -112,8 +112,11 @@ export function createInterception(deps: InterceptionDeps) {
     const hashes = await Promise.all(
       [item.url, item.finalUrl ?? item.url].map((url) => hashUrl(url)),
     );
-    const chain = await deps.hops(item.finalUrl ?? item.url);
-    if (await deps.bypassHeld(rules.bypassKey, [...hashes, ...chain])) {
+    const urlHashes = async (): Promise<string[]> => [
+      ...hashes,
+      ...(await deps.hops(item.finalUrl ?? item.url)),
+    ];
+    if (await deps.bypassHeld(rules.bypassKey, urlHashes)) {
       await resumeIfPaused(item.id);
       return;
     }

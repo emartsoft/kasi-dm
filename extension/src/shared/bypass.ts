@@ -40,6 +40,8 @@ interface ModifierRecord {
   hrefHash?: string;
 }
 
+export type UrlHashes = () => Promise<string[]>;
+
 export interface BypassOptions {
   area: StorageAreaLike;
   now?: () => number;
@@ -60,11 +62,12 @@ export function createBypass(options: BypassOptions) {
     return last;
   }
 
-  // `urlHashes`: hashes of the download's URL, final URL and the redirect hops that led to it.
-  async function held(key: Rules['bypassKey'], urlHashes: string[]): Promise<boolean> {
+  // `urlHashes`: hashes of the download's URL, final URL and the redirect hops that led to it. Asked on every look because
+  // Firefox can report a hop (webRequest) a few ms after the download was created.
+  async function held(key: Rules['bypassKey'], urlHashes: UrlHashes): Promise<boolean> {
     const record = await current();
     if (!record || !bypassHeld(key, record)) return false;
-    const fromLink = record.hrefHash !== undefined && urlHashes.includes(record.hrefHash);
+    const fromLink = record.hrefHash !== undefined && (await urlHashes()).includes(record.hrefHash);
     return now() - record.at <= (fromLink ? LINK_FRESH_MS : OTHER_FRESH_MS);
   }
 
@@ -77,7 +80,7 @@ export function createBypass(options: BypassOptions) {
       await options.area.set({ [KEY]: record });
     },
     // The message and the first byte race on a fast local server, so a miss waits a short grace and looks again.
-    check: async (key: Rules['bypassKey'], urlHashes: string[]): Promise<boolean> => {
+    check: async (key: Rules['bypassKey'], urlHashes: UrlHashes): Promise<boolean> => {
       if (key === 'none') return false;
       if (await held(key, urlHashes)) return true;
       const record = await current();

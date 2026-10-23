@@ -126,6 +126,21 @@ describe('[TC-BRW-003] the bypass key keeps the browser download', () => {
     expect(r.port().requests()).toHaveLength(0);
   });
 
+  it('looks for the redirect hop again after the grace: Firefox reports it just after the download is created', async () => {
+    const r = rig({ realGrace: true });
+    r.online();
+    await r.bypass.record(held({ alt: true }, 'https://files.example.org/slow?id=1'));
+    await vi.advanceTimersByTimeAsync(OTHER_FRESH_MS + 20); // the slow server answered its 302 only now
+    const done = r.start(r.add());
+    await settle();
+    expect(r.downloads.calls).toEqual(['pause:1']);
+    await r.tracker.onRedirect('https://files.example.org/slow?id=1', LINK); // webRequest is a few ms behind downloads
+    await vi.advanceTimersByTimeAsync(GRACE_MS);
+    await done;
+    expect(r.downloads.calls).toEqual(['pause:1', 'resume:1']);
+    expect(r.port().requests()).toHaveLength(0);
+  });
+
   it('intercepts when nothing arrives within the grace', async () => {
     const r = rig({ realGrace: true });
     r.online();
@@ -142,7 +157,7 @@ describe('[TC-BRW-003] the bypass key keeps the browser download', () => {
     const area = memoryArea();
     await createBypass({ area }).record(held({ alt: true }, LINK));
     const restarted = createBypass({ area, sleep: () => Promise.resolve() });
-    expect(await restarted.check('alt', [])).toBe(true);
+    expect(await restarted.check('alt', () => Promise.resolve([]))).toBe(true);
   });
 });
 
