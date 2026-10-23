@@ -57,8 +57,10 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
         IUiSettings ui,
         IConfirmHost confirm,
         IShell shell,
-        SpeedLimitState limit)
+        SpeedLimitState limit,
+        ColumnLayoutViewModel layout)
     {
+        Layout = layout;
         Jobs = jobs;
         Sidebar = sidebar;
         _service = service;
@@ -81,6 +83,9 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     public JobListViewModel Jobs { get; }
 
     public SidebarViewModel Sidebar { get; }
+
+    /// <summary>The grid's column layout and sort, restored when the window opens and saved as the user changes them.</summary>
+    public ColumnLayoutViewModel Layout { get; }
 
     public IReadOnlyList<SpeedPreset> SpeedPresets { get; }
 

@@ -1,12 +1,15 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Browser;
+using Kasi.App.Engine;
 using Kasi.App.Resources;
 using Kasi.Ipc.Messages;
 
 namespace Kasi.App.ViewModels;
 
 internal sealed record BypassKeyChoice(BypassKey Key, string Label);
+
+internal sealed record ThemeChoice(ThemePreference Preference, string Label);
 
 /// <summary>
 /// The Settings window's Browser section (the skeleton of M2.8b): the rules Kasi pushes to the extension. Text lists hold one entry per
@@ -19,6 +22,10 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private static readonly char[] _separators = ['\r', '\n', ',', ';'];
 
     private readonly IBrowserSettings _store;
+    private readonly IUiSettings? _ui;
+
+    [ObservableProperty]
+    private ThemeChoice _selectedTheme;
 
     [ObservableProperty]
     private bool _enabled;
@@ -50,9 +57,17 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _selectedTab;
 
-    public SettingsViewModel(IBrowserSettings store)
+    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null)
     {
         _store = store;
+        _ui = ui;
+        Themes =
+        [
+            new(ThemePreference.System, Strings.ThemeSystem),
+            new(ThemePreference.Light, Strings.ThemeLight),
+            new(ThemePreference.Dark, Strings.ThemeDark),
+        ];
+        _selectedTheme = Themes.First(t => t.Preference == (ui?.Current.Theme ?? ThemePreference.System));
         BypassKeys =
         [
             new(BypassKey.Alt, Strings.BypassKeyAlt),
@@ -65,6 +80,10 @@ internal sealed partial class SettingsViewModel : ObservableObject
     }
 
     public IReadOnlyList<BypassKeyChoice> BypassKeys { get; }
+
+    public IReadOnlyList<ThemeChoice> Themes { get; }
+
+    public string ThemeLabel => Strings.ThemeLabel;
 
     public string Title => Strings.SettingsTitle;
 
@@ -107,6 +126,11 @@ internal sealed partial class SettingsViewModel : ObservableObject
         try
         {
             await _store.SaveAsync(ToSettings(), CancellationToken.None).ConfigureAwait(true);
+            if (_ui is not null && _ui.Current.Theme != SelectedTheme.Preference)
+            {
+                await _ui.SaveAsync(_ui.Current with { Theme = SelectedTheme.Preference }).ConfigureAwait(true);
+            }
+
             StatusText = string.Empty;
             Saved?.Invoke();
         }

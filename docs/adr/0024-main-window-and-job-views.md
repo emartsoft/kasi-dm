@@ -1,6 +1,6 @@
 # ADR 0024: Main window and job views
 
-- Status: Proposed (M2.9a; 9b to 9d extend it)
+- Status: Proposed (M2.9a and 9b; 9c and 9d extend it)
 - Requirements: KASI-UI-001, KASI-UI-008, KASI-UI-010, KASI-NFR-006 (groundwork)
 - Plan: `docs/plans/m2-9.md`
 
@@ -22,8 +22,16 @@ After M2.8 the main window was a four-column list. The wireframes and TRD 12.2 c
 
 **Visual check.** The window was run for real against a seeded database and photographed. Two defects only a real run shows were fixed: FluentAvalonia's theme leaves the DataGrid's header text black on the dark window (a style sets it), and the Fluent `ProgressBar` has a 200 px minimum width that pushed the percent under the bar.
 
+**Layout, sort and theme** (M2.9b, KASI-UI-006, KASI-UI-007). `ui-settings.json` (next to the database, written through a temporary file, defaults on a missing or unreadable file, an older file without the new fields loads with defaults) now also holds the theme override, the column layout and the sort. `ColumnLayoutViewModel` hands the grid the saved layout over the defaults and checks everything it hands out: an unknown column or a duplicate in the file is ignored, a width outside 40 to 1200 pixels falls back to the default, display places are made contiguous, and the name column can never be hidden (it is how a row is recognised and read out); a sort on an unknown column is ignored. The name column's width is never saved, so it keeps taking the room that is left. The window applies the layout when it opens and saves it when the user reorders, sorts or hides a column from the grid's context menu ("Columns", with "Reset columns") and when it closes, so widths dragged since the last event are kept too.
+
+**The grid's sort survives the list changing.** The first version replaced the list object whenever a filter or a state change altered what is shown, and a DataGrid forgets its sort with its list. `Visible` is now one `BulkObservableCollection` for the life of the window: a large change is one reset, a handful of changes are single adds and removes (so a selection survives a row leaving the Active view), and an unchanged result raises nothing.
+
+**Theme.** The Settings window's General tab has a Theme list: Follow Windows (the default; Avalonia's default variant, which follows the setting live), Light and Dark. Saving writes the override; the app applies the saved theme at start and again whenever it changes, and the preference is stored by name. `TC-UI-005`: the default follows Windows, the override persists across a restart.
+
+**Visual check.** Run for real with a seeded layout and `"theme": "Light"`: the Category column came first, Speed and Time left were hidden, the grid was sorted by Size, largest first, with the sort arrow, and the window was light.
+
 ## Consequences
 
 - Filtering and counting are O(n) per change, measured as fast at 10,000 rows; the test uses a generous bound and the spec's 100 ms is checked in 9d with a real budget.
 - The delete confirmation setting lives in a new small JSON file; 9b adds the column layout and theme to it.
-- Mica, the details window, saved layout and the theme override are the later PRs of M2.9.
+- Mica and the details window are the later PRs of M2.9.

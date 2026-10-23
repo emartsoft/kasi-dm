@@ -258,6 +258,18 @@ internal static class Strings
 
     public static string DeleteButton => Get(nameof(DeleteButton));
 
+    public static string ColumnsMenu => Get(nameof(ColumnsMenu));
+
+    public static string ColumnsReset => Get(nameof(ColumnsReset));
+
+    public static string ThemeLabel => Get(nameof(ThemeLabel));
+
+    public static string ThemeSystem => Get(nameof(ThemeSystem));
+
+    public static string ThemeLight => Get(nameof(ThemeLight));
+
+    public static string ThemeDark => Get(nameof(ThemeDark));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

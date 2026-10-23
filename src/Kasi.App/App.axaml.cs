@@ -52,6 +52,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
             }
 
             _ = StartJobListAsync();
+            ApplyTheme();
             services.GetRequiredService<ConfirmHostProxy>().Inner = new AvaloniaConfirmHost(() => _window);
             StartStatusPoll();
             if (shell)
@@ -123,6 +124,14 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         }
     }
 
+    // the saved theme now, and again whenever Settings saves a new one
+    private void ApplyTheme()
+    {
+        var ui = services.GetRequiredService<IUiSettings>();
+        ThemeApplier.Apply(this, ui.Current.Theme);
+        ui.Changed += changed => Dispatcher.UIThread.Post(() => ThemeApplier.Apply(this, changed.Theme));
+    }
+
     // the status bar's one thing without an event: whether a browser extension is connected
     private void StartStatusPoll()
     {
@@ -145,7 +154,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     {
         if (_settings is not { IsVisible: true })
         {
-            var model = new SettingsViewModel(settings);
+            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>());
             _settings = new SettingsWindow { DataContext = model };
             model.Saved += _settings.Close;
             _settings.Show();

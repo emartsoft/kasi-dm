@@ -23,9 +23,15 @@ internal sealed class MemoryUiSettings : IUiSettings
 {
     public UiSettings Current { get; private set; } = new();
 
+    /// <summary>Sets the settings without a save (no event), as if they had been on disk before the run.</summary>
+    public void Set(UiSettings settings) => Current = settings;
+
+    public event Action<UiSettings>? Changed;
+
     public Task SaveAsync(UiSettings settings, CancellationToken cancellationToken = default)
     {
         Current = settings;
+        Changed?.Invoke(settings);
         return Task.CompletedTask;
     }
 }
@@ -70,7 +76,7 @@ internal sealed class MainRig : IAsyncDisposable
         var confirm = new FakeConfirm();
         var ui = new MemoryUiSettings();
         var shell = new ShellSpy();
-        var model = new MainWindowViewModel(list, service, sidebar, ui, confirm, shell, new SpeedLimitState(service));
+        var model = new MainWindowViewModel(list, service, sidebar, ui, confirm, shell, new SpeedLimitState(service), new ColumnLayoutViewModel(ui));
         await list.StartAsync(TestContext.Current.CancellationToken);
         await sidebar.LoadAsync(TestContext.Current.CancellationToken);
         return new MainRig { Model = model, List = list, Sidebar = sidebar, Service = service, Confirm = confirm, Ui = ui, Shell = shell };

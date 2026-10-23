@@ -533,6 +533,30 @@
     <value>Delete</value>
     <comment>Confirms the deletion.</comment>
   </data>
+  <data name="ColumnsMenu" xml:space="preserve">
+    <value>Columns</value>
+    <comment>Context menu: choose which grid columns show.</comment>
+  </data>
+  <data name="ColumnsReset" xml:space="preserve">
+    <value>Reset columns</value>
+    <comment>Context menu item that restores the default columns and sort order.</comment>
+  </data>
+  <data name="ThemeLabel" xml:space="preserve">
+    <value>Theme</value>
+    <comment>Label of the theme list in Settings, General.</comment>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>Follow Windows</value>
+    <comment>Theme choice: use the Windows light or dark setting.</comment>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Light</value>
+    <comment>Theme choice.</comment>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Dark</value>
+    <comment>Theme choice.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

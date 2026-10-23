@@ -18,7 +18,16 @@
     </StackPanel>
     <TabControl SelectedIndex="{Binding SelectedTab}">
       <TabItem Header="{Binding GeneralTab}" AutomationProperties.Name="{Binding GeneralTab}">
-        <TextBlock Text="{Binding GeneralPlaceholder}" Margin="0,12,0,0" TextWrapping="Wrap" />
+        <StackPanel Spacing="8" Margin="0,12,0,0">
+          <TextBlock Text="{Binding ThemeLabel}" />
+          <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" AutomationProperties.Name="{Binding ThemeLabel}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ThemeChoice">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
       </TabItem>
       <TabItem Header="{Binding BrowserTab}" AutomationProperties.Name="{Binding BrowserTab}">
         <ScrollViewer>

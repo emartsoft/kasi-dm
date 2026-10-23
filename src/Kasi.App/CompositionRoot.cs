@@ -33,6 +33,7 @@ internal static class CompositionRoot
         builder.Services.AddSingleton<IConfirmHost>(sp => sp.GetRequiredService<ConfirmHostProxy>());
         builder.Services.AddSingleton<JobListViewModel>();
         builder.Services.AddSingleton<SidebarViewModel>();
+        builder.Services.AddSingleton<ColumnLayoutViewModel>();
         builder.Services.AddSingleton<MainWindowViewModel>();
         builder.Services.AddSingleton<IAddDownloadService>(sp => sp.GetRequiredService<MainWindowViewModel>()); // PR 2.8d-2 registers the Add dialog instead
 
