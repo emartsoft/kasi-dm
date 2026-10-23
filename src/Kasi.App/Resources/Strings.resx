@@ -309,6 +309,10 @@
     <value>Show in folder</value>
     <comment>Toast button that shows the downloaded file in its folder.</comment>
   </data>
+  <data name="BrowserClipboardCapture" xml:space="preserve">
+    <value>Offer to download a link when I copy one (uses the file types above)</value>
+    <comment>Check box in Settings, Browser. Off by default.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Kasi.App.Browser;
+using Kasi.App.Clipboard;
 using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Resources;
@@ -29,6 +30,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     private TrayIconViewModel? _tray;
     private TrayIcon? _trayIcon;
     private IDisposable? _toastClicks;
+    private ClipboardWatcher? _clipboard;
     private bool _quitting;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -68,6 +70,13 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                     ReportAddFault);
                 _add.Watch();
                 services.GetRequiredService<MainWindowViewModel>().RefreshLinkHandler = _add.RequestRefresh;
+                if (shell)
+                {
+                    // a copied download link opens the Add dialog; the watcher listens only while the setting is on
+                    _clipboard = new ClipboardWatcher(browser.Settings, new Win32ClipboardSource(), link => _add.RequestAdd([link]));
+                    _clipboard.Start();
+                }
+
                 browser.Intake.Attach(_add, action => Dispatcher.UIThread.Post(action));
                 browser.SettingsLauncher.Attach(section => Dispatcher.UIThread.Post(() => ShowSettings(browser.Settings, section)));
             }
@@ -141,6 +150,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     {
         _quitting = true;
         _toastClicks?.Dispose();
+        _clipboard?.Dispose();
         _trayIcon?.Dispose(); // so the icon does not stay in the notification area until the mouse passes over it
         _desktop!.Shutdown();
     }

@@ -25,6 +25,9 @@ internal sealed record BrowserSettings
 
     public bool Enabled { get; init; } = true;
 
+    /// <summary>Offer to download a link when one is copied (KASI-BRW-007). Off until the user turns it on; while off the clipboard is not read.</summary>
+    public bool ClipboardCapture { get; init; }
+
     /// <summary>Open the Add download window for a download the browser handed over; off adds it at once with the defaults.</summary>
     public bool ShowAddDialog { get; init; } = true;
 

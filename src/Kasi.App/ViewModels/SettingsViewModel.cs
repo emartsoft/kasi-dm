@@ -27,6 +27,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private bool _showAddDialog;
 
     [ObservableProperty]
+    private bool _clipboardCapture;
+
+    [ObservableProperty]
     private string _extensionsText = string.Empty;
 
     [ObservableProperty]
@@ -74,6 +77,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     {
         Enabled = settings.Enabled;
         ShowAddDialog = settings.ShowAddDialog;
+        ClipboardCapture = settings.ClipboardCapture;
         ExtensionsText = string.Join(Environment.NewLine, settings.Extensions);
         MimeTypesText = string.Join(Environment.NewLine, settings.MimeTypes);
         ExcludedSitesText = string.Join(Environment.NewLine, settings.ExcludedSites);
@@ -88,6 +92,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     {
         Enabled = Enabled,
         ShowAddDialog = ShowAddDialog,
+        ClipboardCapture = ClipboardCapture,
         Extensions = Split(ExtensionsText),
         MimeTypes = Split(MimeTypesText),
         ExcludedSites = Split(ExcludedSitesText),
@@ -122,6 +127,8 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public string GeneralPlaceholder => Strings.SettingsGeneralPlaceholder;
 
     public string EnabledLabel => Strings.BrowserInterceptionEnabled;
+
+    public string ClipboardCaptureLabel => Strings.BrowserClipboardCapture;
 
     public string ShowAddDialogLabel => Strings.BrowserShowAddDialog;
 
