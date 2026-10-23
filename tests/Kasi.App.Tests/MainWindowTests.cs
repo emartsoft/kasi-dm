@@ -20,14 +20,16 @@ public class MainWindowTests
     }
 
     [AvaloniaFact]
-    public void Main_window_opens_empty_with_a_title_and_an_automation_name()
+    public void Main_window_opens_with_an_empty_job_list_a_title_and_an_automation_name()
     {
         var window = Open();
 
         window.IsVisible.Should().BeTrue();
         window.Title.Should().Be("Kasi");
         AutomationProperties.GetName(window).Should().Be("Kasi main window");
-        window.Content.Should().BeNull();
+        var list = window.Content.Should().BeOfType<Avalonia.Controls.DataGrid>().Subject;
+        AutomationProperties.GetName(list).Should().Be("Downloads");
+        list.Columns.Select(c => c.Header).Should().Equal("Name", "Status", "Progress", "Size");
     }
 
     [AvaloniaTheory]

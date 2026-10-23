@@ -19,6 +19,7 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" />
     <PackageReference Include="FluentAvaloniaUI" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />

@@ -9,6 +9,7 @@ using Kasi.App.ViewModels;
 using Kasi.App.Views;
 using Kasi.Ipc.Messages;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Kasi.App;
 
@@ -30,6 +31,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                 ShowMainWindow();
             }
 
+            _ = StartJobListAsync();
             relay?.Attach(request => Dispatcher.UIThread.Post(() => OnLaunchRequest(request)));
             if (browser is not null)
             {
@@ -40,6 +42,23 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    // The engine started with the host, before the UI; the list loads what it holds and follows it. A failure leaves the list empty.
+    private async Task StartJobListAsync()
+    {
+        try
+        {
+            await services.GetRequiredService<JobListViewModel>().StartAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // the type only: the message may name a path
+            if (services.GetService<ILoggerFactory>() is { } factory)
+            {
+                AppLog.JobListFailed(factory.CreateLogger<App>(), ex.GetType().Name);
+            }
+        }
     }
 
     private void OnLaunchRequest(AppArguments request)

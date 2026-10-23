@@ -41,6 +41,26 @@
     <value>Kasi main window</value>
     <comment>Name announced by screen readers for the main window.</comment>
   </data>
+  <data name="JobListAutomationName" xml:space="preserve">
+    <value>Downloads</value>
+    <comment>Name announced by screen readers for the list of downloads.</comment>
+  </data>
+  <data name="JobColumnName" xml:space="preserve">
+    <value>Name</value>
+    <comment>Column header: file name of a download.</comment>
+  </data>
+  <data name="JobColumnState" xml:space="preserve">
+    <value>Status</value>
+    <comment>Column header: state of a download.</comment>
+  </data>
+  <data name="JobColumnProgress" xml:space="preserve">
+    <value>Progress</value>
+    <comment>Column header: percent done.</comment>
+  </data>
+  <data name="JobColumnSize" xml:space="preserve">
+    <value>Size</value>
+    <comment>Column header: total size of a download.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

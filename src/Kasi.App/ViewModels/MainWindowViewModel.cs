@@ -6,8 +6,10 @@ using Kasi.App.Startup;
 
 namespace Kasi.App.ViewModels;
 
-internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownloadService, IBrowserRequestSink
+internal sealed partial class MainWindowViewModel(JobListViewModel jobs) : ObservableObject, IAddDownloadService, IBrowserRequestSink
 {
+    public JobListViewModel Jobs { get; } = jobs;
+
     public string Title => Strings.AppTitle;
 
     public string AutomationName => Strings.MainWindowAutomationName;
