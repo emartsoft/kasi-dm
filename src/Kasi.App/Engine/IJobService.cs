@@ -63,6 +63,15 @@ internal interface IJobService
     /// </summary>
     Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default);
 
+    /// <summary>The cap shared by all transfers in bytes per second; null means unlimited.</summary>
+    long? SpeedLimit { get; set; }
+
+    /// <summary>Pauses every transfer that is running or starting (as the user, so nothing resumes it by itself).</summary>
+    Task PauseAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Resumes every download the user (or a restart or a lost network) paused. A download paused for want of access needs a fresh link first and is left alone.</summary>
+    Task ResumeAllAsync(CancellationToken cancellationToken = default);
+
     Task PauseAsync(JobId id, CancellationToken cancellationToken = default);
 
     Task ResumeAsync(JobId id, CancellationToken cancellationToken = default);

@@ -2,10 +2,14 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Kasi.App.Browser;
 using Kasi.App.Engine;
+using Kasi.App.Notifications;
+using Kasi.App.Resources;
 using Kasi.App.Startup;
+using Kasi.App.Tray;
 using Kasi.App.ViewModels;
 using Kasi.App.Views;
 using Kasi.Ipc.Messages;
@@ -14,12 +18,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Kasi.App;
 
-internal sealed class App(IServiceProvider services, bool startHidden = false, LaunchRelay? relay = null, BrowserServices? browser = null) : Application
+#pragma warning disable CA1001 // the tray model lives as long as the process; Quit ends the process
+/// <param name="shell">True in the real app: the tray icon, close-to-tray and toasts. Tests leave it off (a headless platform has no tray).</param>
+internal sealed class App(IServiceProvider services, bool startHidden = false, LaunchRelay? relay = null, BrowserServices? browser = null, bool shell = false) : Application, IAppLifetime
 {
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private MainWindow? _window;
     private SettingsWindow? _settings;
     private AddCoordinator? _add;
+    private TrayIconViewModel? _tray;
+    private TrayIcon? _trayIcon;
+    private IDisposable? _toastClicks;
+    private bool _quitting;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -28,12 +38,23 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _desktop = desktop;
+            if (shell)
+            {
+                // closing the window hides it; only Quit ends Kasi, so a browser can always reach it
+                desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            }
+
             if (!startHidden)
             {
                 ShowMainWindow();
             }
 
             _ = StartJobListAsync();
+            if (shell)
+            {
+                StartShell();
+            }
+
             relay?.Attach(request => Dispatcher.UIThread.Post(() => OnLaunchRequest(request)));
             if (browser is not null)
             {
@@ -114,12 +135,99 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         _settings.Activate();
     }
 
+    void IAppLifetime.ShowMainWindow() => ShowMainWindow();
+
+    void IAppLifetime.Quit()
+    {
+        _quitting = true;
+        _toastClicks?.Dispose();
+        _trayIcon?.Dispose(); // so the icon does not stay in the notification area until the mouse passes over it
+        _desktop!.Shutdown();
+    }
+
+    // The tray menu, the toasts and their clicks. The logic is in TrayIconViewModel, CompletionNotifier and NotificationRouter (all tested);
+    // this only gives them an icon and a toast surface.
+    private void StartShell()
+    {
+        var jobs = services.GetRequiredService<IJobService>();
+        _tray = new TrayIconViewModel(jobs, this);
+        _tray.Start();
+        _trayIcon = BuildTrayIcon(_tray);
+        TrayIcon.SetIcons(this, [_trayIcon]);
+        new CompletionNotifier(jobs, new WindowsToastService(), ReportAddFault).Watch();
+        _toastClicks = WindowsToastService.Activate(new NotificationRouter(jobs, new WindowsShell()));
+    }
+
+    private TrayIcon BuildTrayIcon(TrayIconViewModel model)
+    {
+        var limits = new NativeMenu();
+        var presets = model.SpeedPresets
+            .Select(preset => new NativeMenuItem(preset.Label)
+            {
+                ToggleType = MenuItemToggleType.Radio,
+                IsChecked = preset == model.SelectedPreset,
+                Command = model.SetSpeedLimitCommand,
+                CommandParameter = preset,
+            })
+            .ToList();
+        presets.ForEach(limits.Add);
+        var menu = new NativeMenu
+        {
+            new NativeMenuItem(model.OpenLabel) { Command = model.OpenCommand },
+            new NativeMenuItemSeparator(),
+            new NativeMenuItem(model.PauseAllLabel) { Command = model.PauseAllCommand },
+            new NativeMenuItem(model.ResumeAllLabel) { Command = model.ResumeAllCommand },
+            new NativeMenuItem(model.SpeedLimitLabel) { Menu = limits },
+            new NativeMenuItemSeparator(),
+            new NativeMenuItem(model.QuitLabel) { Command = model.QuitCommand },
+        };
+        using var icon = AssetLoader.Open(new Uri("avares://Kasi.App/Assets/kasi.png"));
+        var trayIcon = new TrayIcon { Icon = new WindowIcon(icon), ToolTipText = model.ToolTip, Menu = menu };
+        trayIcon.Clicked += (_, _) => ShowMainWindow();
+        model.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TrayIconViewModel.ToolTip))
+            {
+                trayIcon.ToolTipText = model.ToolTip;
+            }
+            else if (e.PropertyName == nameof(TrayIconViewModel.SelectedPreset))
+            {
+                for (var i = 0; i < presets.Count; i++)
+                {
+                    presets[i].IsChecked = model.SpeedPresets[i] == model.SelectedPreset;
+                }
+            }
+        };
+        return trayIcon;
+    }
+
+    private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_quitting || _window is null)
+        {
+            return;
+        }
+
+        e.Cancel = true; // to the tray, not out of the process
+        _window.Hide();
+    }
+
     private void ShowMainWindow()
     {
-        if (_window is not { IsVisible: true })
+        if (_window is null)
         {
             _window = new MainWindow { DataContext = services.GetRequiredService<MainWindowViewModel>() };
+            _window.Closed += (_, _) => _window = null;
+            if (shell)
+            {
+                _window.Closing += OnMainWindowClosing;
+            }
+
             _desktop!.MainWindow = _window;
+        }
+
+        if (!_window.IsVisible)
+        {
             _window.Show();
         }
 
@@ -131,3 +239,4 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         _window.Activate();
     }
 }
+#pragma warning restore CA1001

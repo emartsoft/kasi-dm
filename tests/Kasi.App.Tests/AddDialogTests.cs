@@ -73,6 +73,24 @@ internal sealed class RecordingJobService : IJobService
         return Task.FromResult(new LinkRefreshResult(RefreshProblem));
     }
 
+    public long? SpeedLimit { get; set; }
+
+    public int PauseAlls { get; private set; }
+
+    public int ResumeAlls { get; private set; }
+
+    public Task PauseAllAsync(CancellationToken cancellationToken = default)
+    {
+        PauseAlls++;
+        return Task.CompletedTask;
+    }
+
+    public Task ResumeAllAsync(CancellationToken cancellationToken = default)
+    {
+        ResumeAlls++;
+        return Task.CompletedTask;
+    }
+
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => Task.CompletedTask;

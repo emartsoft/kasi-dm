@@ -122,6 +122,30 @@ internal static class Strings
 
     public static string MenuRefreshLink => Get(nameof(MenuRefreshLink));
 
+    public static string TrayOpen => Get(nameof(TrayOpen));
+
+    public static string TrayPauseAll => Get(nameof(TrayPauseAll));
+
+    public static string TrayResumeAll => Get(nameof(TrayResumeAll));
+
+    public static string TraySpeedLimit => Get(nameof(TraySpeedLimit));
+
+    public static string TrayUnlimited => Get(nameof(TrayUnlimited));
+
+    public static string TrayLimitPreset => Get(nameof(TrayLimitPreset));
+
+    public static string TrayQuit => Get(nameof(TrayQuit));
+
+    public static string TrayToolTipSpeed => Get(nameof(TrayToolTipSpeed));
+
+    public static string ToastCompleted => Get(nameof(ToastCompleted));
+
+    public static string ToastFailed => Get(nameof(ToastFailed));
+
+    public static string ToastOpenFile => Get(nameof(ToastOpenFile));
+
+    public static string ToastOpenFolder => Get(nameof(ToastOpenFolder));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

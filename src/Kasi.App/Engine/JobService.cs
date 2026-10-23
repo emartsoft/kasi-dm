@@ -11,6 +11,7 @@ internal sealed class JobService(
     IQueueRepository queues,
     string downloadsFolder,
     IJobSecretRepository? secrets = null,
+    BandwidthLimiter? bandwidth = null,
     TimeProvider? timeProvider = null) : IJobService
 {
     private static readonly TimeSpan _resumeWait = TimeSpan.FromSeconds(20);
@@ -153,6 +154,47 @@ internal sealed class JobService(
         finally
         {
             engine.EventRaised -= OnEvent;
+        }
+    }
+
+    public long? SpeedLimit
+    {
+        get => bandwidth?.GlobalBytesPerSecond;
+        set => bandwidth?.SetGlobalRate(value);
+    }
+
+    public async Task PauseAllAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var job in await jobs.ListAsync(cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            if (job.State is JobState.Downloading or JobState.Probing or JobState.Retrying)
+            {
+                await TryAsync(() => engine.PauseJobAsync(job.Id, cancellationToken)).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task ResumeAllAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var job in await jobs.ListAsync(state: JobState.Paused, cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            if (job.PauseReason != PauseReason.AuthRequired)
+            {
+                await TryAsync(() => engine.ResumeJobAsync(job.Id, cancellationToken)).ConfigureAwait(false);
+            }
+        }
+    }
+
+    // one job that changed state meanwhile must not stop the rest
+    private static async Task TryAsync(Func<Task> action)
+    {
+        try
+        {
+            await action().ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            // it was no longer in the state we saw
         }
     }
 

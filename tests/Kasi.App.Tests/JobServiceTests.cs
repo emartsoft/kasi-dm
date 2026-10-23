@@ -14,6 +14,7 @@ public sealed class JobServiceTests : IAsyncLifetime
     private DownloadEngine _engine = null!;
     private JobService _service = null!;
     private JobSecretRepository _secrets = null!;
+    private BandwidthLimiter _limiter = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -23,9 +24,9 @@ public sealed class JobServiceTests : IAsyncLifetime
         _checkpoints.Start();
         var jobs = new JobRepository(factory);
         _secrets = new JobSecretRepository(factory);
-        _engine = new DownloadEngine(jobs, new SegmentRepository(factory), _checkpoints, new BandwidthLimiter());
+        _engine = new DownloadEngine(jobs, new SegmentRepository(factory), _checkpoints, _limiter = new BandwidthLimiter());
         await _engine.StartAsync(TestContext.Current.CancellationToken);
-        _service = new JobService(_engine, jobs, new CategoryRepository(factory), new QueueRepository(factory), Path.Combine(_root, "Downloads"), _secrets);
+        _service = new JobService(_engine, jobs, new CategoryRepository(factory), new QueueRepository(factory), Path.Combine(_root, "Downloads"), _secrets, _limiter);
     }
 
     public async ValueTask DisposeAsync()
@@ -196,6 +197,30 @@ public sealed class JobServiceTests : IAsyncLifetime
         var act = () => _service.RefreshLinkAsync(added.Job!.Id, url, [], ct);
 
         await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public void The_speed_limit_is_the_engines_shared_cap()
+    {
+        _service.SpeedLimit.Should().BeNull();
+
+        _service.SpeedLimit = 5_000_000;
+        _limiter.GlobalBytesPerSecond.Should().Be(5_000_000);
+        _service.SpeedLimit = null;
+
+        _limiter.GlobalBytesPerSecond.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Pause_all_and_resume_all_leave_jobs_that_are_neither_running_nor_paused_alone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var added = await _service.AddAsync(Request(), cancellationToken: ct);
+
+        await _service.PauseAllAsync(ct);
+        await _service.ResumeAllAsync(ct);
+
+        (await _service.GetAsync(added.Job!.Id, ct))!.State.Should().Be(JobState.Queued);
     }
 
     [Fact]
