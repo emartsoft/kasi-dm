@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M2 — Browser integration, queues, categories, main UI (TRD section 16; plan.md section 5).** M2.1a protocol contracts are merged and the M2.3a extension scaffold and M2.3b extension behaviour (native port manager, logger, CI, smoke), the M2.4 interception logic and the M2.4c end-to-end harness are implemented; the real Kasi side (M2.8) and the desktop UI follow. The M1 engine gate still awaits owner benchmark and fault-injection evidence. M0 is closed except the owner items in plan.md section 3.2. Update this line when the phase changes.
+**M2 — Browser integration, queues, categories, main UI (TRD section 16; plan.md section 5).** M2.1 to M2.8 are implemented and merged (protocol and pipe, native host, extension with interception, menus, link batch and link refresh, store IDs, the store packages, and the desktop app core: engine hosting, Add dialog, link picker, refresh dialog, tray, toasts, clipboard capture); open are the owner's store submissions, a FlaUI suite and the real-Kasi browser legs. M2.9 (main window and job views) to M2.13 are next. The M1 engine gate still awaits owner benchmark and fault-injection evidence. M0 is closed except the owner items in plan.md section 3.2. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 
