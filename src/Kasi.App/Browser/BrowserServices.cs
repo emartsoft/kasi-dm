@@ -15,7 +15,8 @@ internal sealed class BrowserServices
         Settings = settings;
         Intake = new BrowserIntake();
         SettingsLauncher = new SettingsLauncher();
-        Handler = new BrowserMessageHandler(settings, Intake, SettingsLauncher, time, logger);
+        Refreshes = new RefreshBroker(time);
+        Handler = new BrowserMessageHandler(settings, Intake, SettingsLauncher, time, logger, Refreshes);
         Logger = logger ?? NullLogger.Instance;
     }
 
@@ -26,6 +27,9 @@ internal sealed class BrowserServices
     public SettingsLauncher SettingsLauncher { get; }
 
     public BrowserMessageHandler Handler { get; }
+
+    /// <summary>Asks the connected browsers for a fresh link (TRD 6.6); bound to the pipe by start-up.</summary>
+    public RefreshBroker Refreshes { get; }
 
     private ILogger Logger { get; }
 

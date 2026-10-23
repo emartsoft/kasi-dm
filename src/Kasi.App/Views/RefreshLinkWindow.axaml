@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.ViewModels"
+        x:Class="Kasi.App.Views.RefreshLinkWindow"
+        x:DataType="vm:RefreshLinkViewModel"
+        Title="{Binding Title}"
+        AutomationProperties.Name="{Binding AutomationName}"
+        Width="480"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="16" Spacing="12">
+    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" AutomationProperties.Name="{Binding StatusText}" />
+    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsWaiting}" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="{Binding StartLabel}" Command="{Binding StartCommand}" IsDefault="True" AutomationProperties.Name="{Binding StartLabel}" />
+      <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" IsVisible="{Binding !IsFinished}" AutomationProperties.Name="{Binding CancelLabel}" />
+      <Button Content="{Binding CloseLabel}" Command="{Binding CancelCommand}" IsVisible="{Binding IsFinished}" AutomationProperties.Name="{Binding CloseLabel}" />
+    </StackPanel>
+  </StackPanel>
+</Window>

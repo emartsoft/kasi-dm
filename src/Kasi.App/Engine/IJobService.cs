@@ -24,6 +24,19 @@ internal sealed record NewDownload(
 /// <summary>The outcome of an add. <see cref="Job"/> is null when a duplicate needs a decision first (nothing was added).</summary>
 internal sealed record AddResult(DuplicateCheckResult Check, Job? Job);
 
+internal enum RefreshProblem
+{
+    None,
+    /// <summary>The job cannot take a new link now: not paused, not HTTP, or no checkpoint to validate against.</summary>
+    NotResumable,
+    /// <summary>The new link serves another file; the job stays paused.</summary>
+    Rejected,
+    Failed,
+}
+
+/// <summary>How a link refresh went. <see cref="Problem"/> none means the transfer resumed from its saved bytes.</summary>
+internal sealed record LinkRefreshResult(RefreshProblem Problem);
+
 /// <summary>
 /// The UI's one way into the engine and the stores (TRD 5.2 facade). Dialogs and the job list depend on this, not on the engine, so
 /// they are tested against a fake; <see cref="JobService"/> is the real one.
@@ -41,6 +54,14 @@ internal interface IJobService
 
     /// <summary>Adds (and, when asked, starts) a job. Without a resolution a duplicate is reported and nothing is added.</summary>
     Task<AddResult> AddAsync(NewDownload request, DuplicateAction? resolution = null, CancellationToken cancellationToken = default);
+
+    Task<Job?> GetAsync(JobId id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gives a paused job a fresh link and the cookies that go with it, and returns once the transfer is running again (or was refused),
+    /// not when it ends. The transfer carries on after the caller stops waiting.
+    /// </summary>
+    Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default);
 
     Task PauseAsync(JobId id, CancellationToken cancellationToken = default);
 

@@ -26,6 +26,11 @@ public class JobListViewModelTests
         public Task<AddResult> AddAsync(NewDownload request, DuplicateAction? resolution = null, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<Job?> GetAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();

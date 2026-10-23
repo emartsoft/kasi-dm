@@ -96,6 +96,32 @@ internal static class Strings
 
     public static string PickerFailed => Get(nameof(PickerFailed));
 
+    public static string RefreshTitle => Get(nameof(RefreshTitle));
+
+    public static string RefreshAutomationName => Get(nameof(RefreshAutomationName));
+
+    public static string RefreshAsk => Get(nameof(RefreshAsk));
+
+    public static string RefreshStart => Get(nameof(RefreshStart));
+
+    public static string RefreshWaiting => Get(nameof(RefreshWaiting));
+
+    public static string RefreshDone => Get(nameof(RefreshDone));
+
+    public static string RefreshNoReferrer => Get(nameof(RefreshNoReferrer));
+
+    public static string RefreshNoBrowser => Get(nameof(RefreshNoBrowser));
+
+    public static string RefreshTimedOut => Get(nameof(RefreshTimedOut));
+
+    public static string RefreshRejected => Get(nameof(RefreshRejected));
+
+    public static string RefreshFailed => Get(nameof(RefreshFailed));
+
+    public static string RefreshClose => Get(nameof(RefreshClose));
+
+    public static string MenuRefreshLink => Get(nameof(MenuRefreshLink));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

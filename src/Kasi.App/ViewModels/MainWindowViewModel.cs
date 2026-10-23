@@ -1,14 +1,32 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Browser;
 using Kasi.App.Resources;
 using Kasi.App.Startup;
+using Kasi.Core;
 
 namespace Kasi.App.ViewModels;
 
 internal sealed partial class MainWindowViewModel(JobListViewModel jobs) : ObservableObject, IAddDownloadService, IBrowserRequestSink
 {
     public JobListViewModel Jobs { get; } = jobs;
+
+    /// <summary>Set by the app once the dialogs exist: asks for a fresh link for a job.</summary>
+    public Action<JobId>? RefreshLinkHandler { get; set; }
+
+    /// <summary>The row the user has selected in the list.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RefreshLinkCommand))]
+    private JobRowViewModel? _selectedRow;
+
+    public string RefreshLinkLabel => Strings.MenuRefreshLink;
+
+    // only a paused download has a link worth replacing
+    [RelayCommand(CanExecute = nameof(CanRefreshLink))]
+    private void RefreshLink() => RefreshLinkHandler?.Invoke(SelectedRow!.Id);
+
+    private bool CanRefreshLink() => SelectedRow is { State: "Paused" };
 
     public string Title => Strings.AppTitle;
 
