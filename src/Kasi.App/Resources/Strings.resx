@@ -261,6 +261,54 @@
     <value>Refresh link...</value>
     <comment>Menu item on a paused download.</comment>
   </data>
+  <data name="TrayOpen" xml:space="preserve">
+    <value>Open Kasi</value>
+    <comment>Tray menu item that shows the main window.</comment>
+  </data>
+  <data name="TrayPauseAll" xml:space="preserve">
+    <value>Pause all</value>
+    <comment>Tray menu item.</comment>
+  </data>
+  <data name="TrayResumeAll" xml:space="preserve">
+    <value>Resume all</value>
+    <comment>Tray menu item.</comment>
+  </data>
+  <data name="TraySpeedLimit" xml:space="preserve">
+    <value>Speed limit</value>
+    <comment>Tray submenu with the speed limit presets.</comment>
+  </data>
+  <data name="TrayUnlimited" xml:space="preserve">
+    <value>Unlimited</value>
+    <comment>Speed limit preset: no limit.</comment>
+  </data>
+  <data name="TrayLimitPreset" xml:space="preserve">
+    <value>{0} MB/s</value>
+    <comment>Speed limit preset; {0} is a number of megabytes per second.</comment>
+  </data>
+  <data name="TrayQuit" xml:space="preserve">
+    <value>Quit</value>
+    <comment>Tray menu item that ends Kasi.</comment>
+  </data>
+  <data name="TrayToolTipSpeed" xml:space="preserve">
+    <value>Kasi - {0}/s</value>
+    <comment>Tray tooltip while downloading; {0} is the total speed such as 3.2 MB.</comment>
+  </data>
+  <data name="ToastCompleted" xml:space="preserve">
+    <value>Download complete</value>
+    <comment>Title of the toast shown when a download finishes.</comment>
+  </data>
+  <data name="ToastFailed" xml:space="preserve">
+    <value>Download failed</value>
+    <comment>Title of the toast shown when a download fails.</comment>
+  </data>
+  <data name="ToastOpenFile" xml:space="preserve">
+    <value>Open</value>
+    <comment>Toast button that opens the downloaded file.</comment>
+  </data>
+  <data name="ToastOpenFolder" xml:space="preserve">
+    <value>Show in folder</value>
+    <comment>Toast button that shows the downloaded file in its folder.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

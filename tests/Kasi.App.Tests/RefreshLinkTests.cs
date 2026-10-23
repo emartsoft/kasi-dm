@@ -407,6 +407,16 @@ public class RefreshTriggerTests
 
         public Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default) => _inner.RefreshLinkAsync(id, url, cookies, cancellationToken);
 
+        public long? SpeedLimit
+        {
+            get => _inner.SpeedLimit;
+            set => _inner.SpeedLimit = value;
+        }
+
+        public Task PauseAllAsync(CancellationToken cancellationToken = default) => _inner.PauseAllAsync(cancellationToken);
+
+        public Task ResumeAllAsync(CancellationToken cancellationToken = default) => _inner.ResumeAllAsync(cancellationToken);
+
         public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => _inner.PauseAsync(id, cancellationToken);
 
         public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => _inner.ResumeAsync(id, cancellationToken);

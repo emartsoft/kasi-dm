@@ -47,7 +47,7 @@
           </DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>
-      <TextBox Grid.Column="2" Text="{Binding ChecksumHex}" Watermark="{Binding ChecksumHexLabel}" AutomationProperties.Name="{Binding ChecksumHexLabel}" />
+      <TextBox Grid.Column="2" Text="{Binding ChecksumHex}" PlaceholderText="{Binding ChecksumHexLabel}" AutomationProperties.Name="{Binding ChecksumHexLabel}" />
     </Grid>
     <CheckBox Content="{Binding RememberLabel}" IsChecked="{Binding RememberForSite}" AutomationProperties.Name="{Binding RememberLabel}" />
     <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.Name="{Binding Error}" />

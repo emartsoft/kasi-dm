@@ -31,6 +31,12 @@ public class JobListViewModelTests
         public Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public long? SpeedLimit { get; set; }
+
+        public Task PauseAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task ResumeAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => throw new NotSupportedException();

@@ -58,7 +58,8 @@ internal static class CompositionRoot
             sp.GetRequiredService<ICategoryRepository>(),
             sp.GetRequiredService<IQueueRepository>(),
             AppPaths.DownloadsFolder(),
-            sp.GetRequiredService<IJobSecretRepository>()));
+            sp.GetRequiredService<IJobSecretRepository>(),
+            sp.GetRequiredService<BandwidthLimiter>()));
         services.AddSingleton<IHostedService, EngineLifetime>();
     }
 }
