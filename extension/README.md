@@ -35,6 +35,10 @@ The build verifies both manifests and their packaged assets. `npm run build:chro
 - **Firefox permissions:** Firefox lets users deny or revoke `<all_urls>`, so the popup and options show "needs permission" with an **Allow Kasi on all sites** button until it is granted.
 - **Firefox data consent:** the manifest declares `data_collection_permissions: { required: ["none"] }` (see ADR 0018), which is why `strict_min_version` is 140.
 
+## Packaging (M2.7)
+
+`npm run package` builds both targets and writes `dist/packages/kasi-extension-chromium-<version>.zip`, `kasi-extension-firefox-<version>.zip` and `kasi-extension-source-<version>.zip` (the source package for Mozilla, made from tracked files by `git archive`, so commit first). It refuses a manifest with a `key`, an `update_url` or a local address, a source map, tests or `node_modules` in a package, or a version that is not `package.json`'s (ADR 0022). Add `-- --skip-build` to reuse `dist`. The listing text, the permission justifications (checked against the manifest by `tests/unit/store-docs.test.ts`), the data-usage answers and the reviewer notes are in `docs/store`; the privacy policy is `docs/legal/privacy-policy.md`. `KASI_E2E=1 KASI_STORE_ASSETS=1 npm run test:e2e -- store-assets` regenerates the screenshots and promo tiles from the real extension.
+
 ## Tests
 
 `npm test` runs Vitest (`tests/unit`). No test contacts the public internet. The browser smoke runs nightly (`.github/workflows/nightly-extension-smoke.yml`) or by hand:
