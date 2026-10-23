@@ -169,6 +169,46 @@
     <value>Show the Add download window for downloads taken from the browser</value>
     <comment>Check box in Settings, Browser.</comment>
   </data>
+  <data name="PickerTitle" xml:space="preserve">
+    <value>Choose links to download</value>
+    <comment>Title of the link picker window.</comment>
+  </data>
+  <data name="PickerAutomationName" xml:space="preserve">
+    <value>Link picker window</value>
+    <comment>Name announced by screen readers for the link picker window.</comment>
+  </data>
+  <data name="PickerFilterLabel" xml:space="preserve">
+    <value>Filter by name or address</value>
+    <comment>Label of the text filter box.</comment>
+  </data>
+  <data name="PickerExtensionLabel" xml:space="preserve">
+    <value>File type</value>
+    <comment>Label of the file type list.</comment>
+  </data>
+  <data name="PickerAllExtensions" xml:space="preserve">
+    <value>All types</value>
+    <comment>The file type list entry that shows every link.</comment>
+  </data>
+  <data name="PickerSelectAll" xml:space="preserve">
+    <value>Select shown</value>
+    <comment>Button: tick every link that is shown.</comment>
+  </data>
+  <data name="PickerSelectNone" xml:space="preserve">
+    <value>Select none</value>
+    <comment>Button: clear every tick.</comment>
+  </data>
+  <data name="PickerSummary" xml:space="preserve">
+    <value>{0} of {1} selected, {2} shown</value>
+    <comment>{0} selected links, {1} links in total, {2} links matching the filter.</comment>
+  </data>
+  <data name="PickerAdd" xml:space="preserve">
+    <value>Add selected</value>
+    <comment>Button that adds the ticked links as downloads.</comment>
+  </data>
+  <data name="PickerFailed" xml:space="preserve">
+    <value>{0} link(s) could not be added.</value>
+    <comment>{0} is the number of links that failed.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

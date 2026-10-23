@@ -12,6 +12,9 @@ internal interface IAddDialogHost
     /// <summary>Shows the Add dialog and returns when it closes.</summary>
     Task ShowAddAsync(AddDownloadViewModel dialog);
 
+    /// <summary>Shows the link picker and returns when it closes.</summary>
+    Task ShowPickerAsync(LinkPickerViewModel picker);
+
     /// <summary>Shows the duplicate prompt; null when the user cancels.</summary>
     Task<DuplicateAction?> AskDuplicateAsync(DuplicateCheckResult check);
 }
@@ -19,14 +22,13 @@ internal interface IAddDialogHost
 /// <summary>
 /// Where a link ends up as a job: from a second launch with URLs and from the browser. One Add dialog is open at a time; the rest wait
 /// their turn. A browser download opens the dialog unless the user switched that off (decision 5 of the M2.8 plan), in which case it is
-/// added at once with the defaults and a duplicate gets a new name. Link batches go on to the picker (<paramref name="picker"/>).
+/// added at once with the defaults and a duplicate gets a new name. A link batch opens the link picker the same way.
 /// </summary>
 internal sealed class AddCoordinator(
     IJobService jobs,
     ISiteDefaults sites,
     IBrowserSettings settings,
     IAddDialogHost host,
-    IBrowserRequestSink picker,
     Action<Exception>? onFault = null) : IBrowserRequestSink, IAddDownloadService
 {
     private readonly Lock _gate = new();
@@ -44,7 +46,16 @@ internal sealed class AddCoordinator(
         Run(settings.Current.ShowAddDialog ? () => OpenAsync(draft) : () => AddDirectAsync(draft));
     }
 
-    public void ShowPicker(BrowserBatch batch) => picker.ShowPicker(batch);
+    public void ShowPicker(BrowserBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        Run(async () =>
+        {
+            var picker = new LinkPickerViewModel(batch, jobs);
+            await picker.LoadAsync().ConfigureAwait(false);
+            await host.ShowPickerAsync(picker).ConfigureAwait(false);
+        });
+    }
 
     public void RequestAdd(IReadOnlyList<string> urls)
     {

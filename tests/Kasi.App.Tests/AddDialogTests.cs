@@ -328,16 +328,19 @@ public class AddCoordinatorTests
 #pragma warning restore VSTHRD003
         }
 
+        public List<LinkPickerViewModel> Pickers { get; } = [];
+
+        public Task ShowPickerAsync(LinkPickerViewModel picker)
+        {
+            lock (Pickers)
+            {
+                Pickers.Add(picker);
+            }
+
+            return Task.CompletedTask;
+        }
+
         public Task<DuplicateAction?> AskDuplicateAsync(DuplicateCheckResult check) => Task.FromResult<DuplicateAction?>(null);
-    }
-
-    private sealed class PickerSink : IBrowserRequestSink
-    {
-        public List<BrowserBatch> Batches { get; } = [];
-
-        public void ShowAdd(BrowserDownload download) => throw new NotSupportedException();
-
-        public void ShowPicker(BrowserBatch batch) => Batches.Add(batch);
     }
 
     private sealed class FixedSettings(BrowserSettings current) : IBrowserSettings
@@ -375,7 +378,7 @@ public class AddCoordinatorTests
     {
         var jobs = new RecordingJobService();
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings()), host, new PickerSink());
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings()), host);
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => host.Shown.Count == 1);
@@ -392,7 +395,7 @@ public class AddCoordinatorTests
     public async Task Dialogs_open_one_at_a_time_in_the_order_asked()
     {
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host, new PickerSink());
+        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host);
 
         coordinator.RequestAdd(["https://files.example.org/one.zip", "https://files.example.org/two.zip"]);
         await WaitUntilAsync(() => host.Shown.Count == 1);
@@ -409,7 +412,7 @@ public class AddCoordinatorTests
     {
         var jobs = new RecordingJobService();
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host, new PickerSink());
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host);
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => jobs.Adds.Count == 1);
@@ -428,7 +431,7 @@ public class AddCoordinatorTests
     {
         var jobs = new RecordingJobService();
         jobs.Conflicts.Enqueue(new DuplicateCheckResult(null, true, false, "pack (1).zip", [DuplicateAction.AutoRename]));
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), new FakeHost(), new PickerSink());
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), new FakeHost());
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => jobs.Adds.Count == 2);
@@ -442,7 +445,7 @@ public class AddCoordinatorTests
         var host = new FakeHost();
         var faults = new List<Exception>();
         var jobs = new RecordingJobService { QueueList = [] };
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host, new PickerSink(), faults.Add);
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host, faults.Add);
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => faults.Count == 1);
@@ -454,15 +457,17 @@ public class AddCoordinatorTests
     }
 
     [Fact]
-    public void A_batch_goes_to_the_picker()
+    public async Task A_batch_opens_the_link_picker_with_its_links()
     {
-        var picker = new PickerSink();
-        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), new FakeHost(), picker);
-        var batch = new BrowserBatch("https://files.example.org/", [], [], "Agent/1.0");
+        var host = new FakeHost();
+        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host);
+        var batch = new BrowserBatch("https://files.example.org/", [new IpcLink { Url = "https://files.example.org/a.zip" }], [], "Agent/1.0");
 
         coordinator.ShowPicker(batch);
+        await WaitUntilAsync(() => host.Pickers.Count == 1);
 
-        picker.Batches.Should().ContainSingle().Which.Should().BeSameAs(batch);
+        host.Pickers[0].TotalCount.Should().Be(1);
+        host.Pickers[0].Categories.Should().NotBeEmpty("the picker is loaded before it is shown");
     }
 }
 
