@@ -74,6 +74,15 @@ for (const target of ['chromium', 'firefox'] as const) {
   for (const asset of assets) {
     await access(resolve(output, asset));
   }
+
+  // The stores read the icon sizes from the files: each icon must be a PNG of the size its manifest key claims.
+  for (const [size, file] of Object.entries(icons)) {
+    const png = await readFile(resolve(output, file));
+    const isPng = png.subarray(1, 4).toString('latin1') === 'PNG';
+    if (!isPng || png.readUInt32BE(16) !== Number(size) || png.readUInt32BE(20) !== Number(size)) {
+      throw new Error(`${target} icon ${file} is not a ${size}x${size} PNG`);
+    }
+  }
 }
 
 for (const id of [...storeIds.chrome, ...storeIds.edge]) {
