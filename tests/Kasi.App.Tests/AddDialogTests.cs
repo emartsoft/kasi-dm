@@ -27,7 +27,7 @@ internal sealed class RecordingJobService : IJobService
     public event Action<EngineEvent>? EventRaised;
 #pragma warning restore CS0067
 
-    public Task<IReadOnlyList<Job>> ListAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Job>>([]);
+    public Task<IReadOnlyList<Job>> ListAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Job>>([.. Stored.Values]);
 
     public Task<IReadOnlyList<Category>> CategoriesAsync(CancellationToken cancellationToken = default) => Task.FromResult(CategoryList);
 
@@ -91,11 +91,40 @@ internal sealed class RecordingJobService : IJobService
         return Task.CompletedTask;
     }
 
-    public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public List<JobId> Calls { get; } = [];
 
-    public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task StartAsync(JobId id, CancellationToken cancellationToken = default)
+    {
+        Calls.Add(id);
+        Started.Add(id);
+        return Task.CompletedTask;
+    }
 
-    public Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public List<JobId> Started { get; } = [];
+
+    public List<JobId> Paused { get; } = [];
+
+    public List<JobId> Resumed { get; } = [];
+
+    public List<(JobId Id, bool DeleteFiles)> Cancelled { get; } = [];
+
+    public Task PauseAsync(JobId id, CancellationToken cancellationToken = default)
+    {
+        Paused.Add(id);
+        return Task.CompletedTask;
+    }
+
+    public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default)
+    {
+        Resumed.Add(id);
+        return Task.CompletedTask;
+    }
+
+    public Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default)
+    {
+        Cancelled.Add((id, deleteFiles));
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class MemorySites : ISiteDefaults

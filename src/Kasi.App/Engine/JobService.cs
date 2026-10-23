@@ -198,6 +198,8 @@ internal sealed class JobService(
         }
     }
 
+    public Task StartAsync(JobId id, CancellationToken cancellationToken = default) => engine.StartJobAsync(id, cancellationToken);
+
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => engine.PauseJobAsync(id, cancellationToken);
 
     public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => engine.ResumeJobAsync(id, cancellationToken);

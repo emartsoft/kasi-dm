@@ -125,6 +125,9 @@ internal sealed class AddCoordinator(
         });
     }
 
+    /// <summary>The toolbar's Add URL: an empty Add download window.</summary>
+    public void RequestAddBlank() => Run(() => OpenAsync(new AddDownloadDraft(string.Empty)));
+
     public void RequestAdd(IReadOnlyList<string> urls)
     {
         foreach (var url in urls)

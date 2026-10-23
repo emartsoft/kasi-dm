@@ -1,4 +1,5 @@
 using Kasi.App.Engine;
+using Kasi.App.Notifications;
 using Kasi.App.Startup;
 using Kasi.App.ViewModels;
 using Kasi.Core;
@@ -21,8 +22,17 @@ internal static class CompositionRoot
         var builder = Host.CreateApplicationBuilder(args);
         builder.Logging.ClearProviders(); // Serilog replaces this when logging lands; nothing may reach a console in a WinExe
 
-        AddEngine(builder.Services, dataFolder);
+        var database = dataFolder is null
+            ? AppPaths.DatabasePath(Environment.GetEnvironmentVariable(AppEndpoints.TestSuffixVariable))
+            : Path.Combine(dataFolder, "kasi.db");
+        AddEngine(builder.Services, database);
+        builder.Services.AddSingleton<IUiSettings>(_ => new UiSettingsStore(Path.Combine(Path.GetDirectoryName(database)!, "ui-settings.json")));
+        builder.Services.AddSingleton(sp => new SpeedLimitState(sp.GetRequiredService<IJobService>()));
+        builder.Services.AddSingleton<IShell, WindowsShell>();
+        builder.Services.AddSingleton<ConfirmHostProxy>();
+        builder.Services.AddSingleton<IConfirmHost>(sp => sp.GetRequiredService<ConfirmHostProxy>());
         builder.Services.AddSingleton<JobListViewModel>();
+        builder.Services.AddSingleton<SidebarViewModel>();
         builder.Services.AddSingleton<MainWindowViewModel>();
         builder.Services.AddSingleton<IAddDownloadService>(sp => sp.GetRequiredService<MainWindowViewModel>()); // PR 2.8d-2 registers the Add dialog instead
 
@@ -30,11 +40,8 @@ internal static class CompositionRoot
     }
 
     // Nothing here touches the disk until the host starts: the connection factory only remembers the path.
-    private static void AddEngine(IServiceCollection services, string? dataFolder)
+    private static void AddEngine(IServiceCollection services, string database)
     {
-        var database = dataFolder is null
-            ? AppPaths.DatabasePath(Environment.GetEnvironmentVariable(AppEndpoints.TestSuffixVariable))
-            : Path.Combine(dataFolder, "kasi.db");
         services.AddSingleton(_ => new SqliteConnectionFactory(database));
         services.AddSingleton<ISiteDefaults>(_ => new SiteDefaultsStore(Path.Combine(Path.GetDirectoryName(database)!, "site-defaults.json")));
         services.AddSingleton<MigrationRunner>(sp => new MigrationRunner(sp.GetRequiredService<SqliteConnectionFactory>()));

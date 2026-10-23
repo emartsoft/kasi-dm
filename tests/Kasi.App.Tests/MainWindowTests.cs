@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Automation;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using Kasi.App.ViewModels;
 using Kasi.App.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,16 +22,40 @@ public class MainWindowTests
     }
 
     [AvaloniaFact]
-    public void Main_window_opens_with_an_empty_job_list_a_title_and_an_automation_name()
+    public void Main_window_opens_with_a_toolbar_a_sidebar_an_empty_job_list_and_a_status_bar_all_with_names()
     {
         var window = Open();
 
         window.IsVisible.Should().BeTrue();
         window.Title.Should().Be("Kasi");
         AutomationProperties.GetName(window).Should().Be("Kasi main window");
-        var list = window.Content.Should().BeOfType<Avalonia.Controls.DataGrid>().Subject;
-        AutomationProperties.GetName(list).Should().Be("Downloads");
-        list.Columns.Select(c => c.Header).Should().Equal("Name", "Status", "Progress", "Size");
+        var grid = window.GetVisualDescendants().OfType<DataGrid>().Single();
+        AutomationProperties.GetName(grid).Should().Be("Downloads");
+        grid.Columns.Select(c => c.Header).Should().Equal("Name", "Size", "Progress", "Speed", "Time left", "Status", "Date added", "Category");
+        var buttons = window.GetVisualDescendants().OfType<Button>().Select(b => AutomationProperties.GetName(b)).ToList();
+        buttons.Should().Contain(["Add URL", "Resume", "Pause", "Stop", "Delete", "Delete completed", "Start queue", "Stop queue", "Scheduler", "Settings"]);
+        window.GetVisualDescendants().OfType<TextBox>().Should().Contain(t => AutomationProperties.GetName(t) == "Search downloads");
+        window.GetVisualDescendants().OfType<ListBox>().Should().Contain(l => AutomationProperties.GetName(l) == "Filters");
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).Should().Contain("Speed limit: Unlimited");
+    }
+
+    [AvaloniaFact]
+    public void The_keyboard_shortcuts_of_the_interaction_rules_are_bound()
+    {
+        var window = Open();
+
+        window.KeyBindings.Select(k => k.Gesture.ToString()).Should().Contain(["Ctrl+N", "Ctrl+F"]);
+        var grid = window.GetVisualDescendants().OfType<DataGrid>().Single();
+        grid.KeyBindings.Select(k => k.Gesture.ToString()).Should().Contain(["Space", "Delete", "F5", "Return"]);
+    }
+
+    [AvaloniaFact]
+    public void The_queue_buttons_are_shown_but_off_until_the_scheduler_exists()
+    {
+        var window = Open();
+
+        var queue = window.GetVisualDescendants().OfType<Button>().Where(b => AutomationProperties.GetName(b) is "Start queue" or "Stop queue" or "Scheduler").ToList();
+        queue.Should().HaveCount(3).And.OnlyContain(b => !b.IsEffectivelyEnabled);
     }
 
     [AvaloniaTheory]

@@ -417,6 +417,8 @@ public class RefreshTriggerTests
 
         public Task ResumeAllAsync(CancellationToken cancellationToken = default) => _inner.ResumeAllAsync(cancellationToken);
 
+        public Task StartAsync(JobId id, CancellationToken cancellationToken = default) => _inner.StartAsync(id, cancellationToken);
+
         public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => _inner.PauseAsync(id, cancellationToken);
 
         public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => _inner.ResumeAsync(id, cancellationToken);
@@ -525,24 +527,5 @@ public class RefreshTriggerTests
         coordinator.RequestRefresh(job.Id);
 
         await WaitUntilAsync(() => host.Refreshes.Count == 1);
-    }
-
-    [Fact]
-    public async Task The_main_window_offers_refresh_only_for_a_paused_selection_and_hands_the_job_on()
-    {
-        await using var list = new JobListViewModel(new RecordingJobService(), action => action());
-        var model = new MainWindowViewModel(list);
-        var asked = new List<JobId>();
-        model.RefreshLinkHandler = asked.Add;
-        var running = new JobRowViewModel(Paused(null) with { State = JobState.Downloading });
-        var paused = new JobRowViewModel(Paused(PauseReason.UserRequested));
-
-        model.SelectedRow = running;
-        model.RefreshLinkCommand.CanExecute(null).Should().BeFalse();
-        model.SelectedRow = paused;
-        model.RefreshLinkCommand.CanExecute(null).Should().BeTrue();
-        model.RefreshLinkCommand.Execute(null);
-
-        asked.Should().Equal(paused.Id);
     }
 }

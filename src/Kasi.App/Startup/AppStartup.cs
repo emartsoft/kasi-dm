@@ -72,6 +72,7 @@ internal static class AppStartup
         {
             browserPipe.Start();
             browser.Refreshes.Bind(new PipeRefreshChannel(browserPipe));
+            browser.ConnectedHosts = () => browserPipe.Connections.Count;
             handOffPipe.Start();
         }
         catch (IOException)
