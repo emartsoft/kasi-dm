@@ -146,6 +146,8 @@ internal static class Strings
 
     public static string ToastOpenFolder => Get(nameof(ToastOpenFolder));
 
+    public static string BrowserClipboardCapture => Get(nameof(BrowserClipboardCapture));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));
