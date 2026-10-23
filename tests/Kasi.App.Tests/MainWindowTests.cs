@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Kasi.App.ViewModels;
@@ -47,6 +49,61 @@ public class MainWindowTests
         window.KeyBindings.Select(k => k.Gesture.ToString()).Should().Contain(["Ctrl+N", "Ctrl+F"]);
         var grid = window.GetVisualDescendants().OfType<DataGrid>().Single();
         grid.KeyBindings.Select(k => k.Gesture.ToString()).Should().Contain(["Space", "Delete", "F5", "Return"]);
+    }
+
+    [AvaloniaFact]
+    [Trait("TC", "TC-UI-007")]
+    [Trait("Requirement", "KASI-UI-010")]
+    public void Pressing_escape_in_search_box_clears_text_and_focuses_grid()
+    {
+        var window = Open();
+        var searchBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => AutomationProperties.GetName(t) == "Search downloads");
+        var grid = window.GetVisualDescendants().OfType<DataGrid>().Single();
+
+        searchBox.Text = "testing";
+        searchBox.RaiseEvent(new KeyEventArgs
+        {
+            RoutedEvent = InputElement.KeyDownEvent,
+            Key = Key.Escape,
+        });
+
+        searchBox.Text.Should().BeEmpty();
+        grid.IsFocused.Should().BeTrue();
+    }
+
+    [AvaloniaFact]
+    [Trait("TC", "TC-UI-007")]
+    [Trait("Requirement", "KASI-UI-010")]
+    public void Context_menu_items_have_accessible_automation_names()
+    {
+        var window = Open();
+        var grid = window.GetVisualDescendants().OfType<DataGrid>().Single();
+        grid.ContextMenu.Should().NotBeNull();
+        var menuItems = grid.ContextMenu!.Items.OfType<MenuItem>().ToList();
+        menuItems.Select(m => AutomationProperties.GetName(m)).Should().Contain(["Details...", "Resume", "Pause", "Delete", "Columns"]);
+    }
+
+    [AvaloniaFact]
+    [Trait("Requirement", "KASI-UI-006")]
+    public void Main_window_has_mica_transparency_hint_and_fallback_configured()
+    {
+        var window = Open();
+
+        window.TransparencyLevelHint.Should().Contain([WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.None]);
+        window.TransparencyBackgroundFallback.Should().NotBeNull();
+    }
+
+    [AvaloniaFact]
+    [Trait("Requirement", "KASI-UI-006")]
+    public void When_mica_transparency_is_active_window_background_is_transparent()
+    {
+        var window = Open();
+
+        window.OnTransparencyLevelChanged(WindowTransparencyLevel.Mica);
+        window.Background.Should().Be(Brushes.Transparent);
+
+        window.OnTransparencyLevelChanged(WindowTransparencyLevel.None);
+        window.Background.Should().NotBe(Brushes.Transparent);
     }
 
     [AvaloniaFact]

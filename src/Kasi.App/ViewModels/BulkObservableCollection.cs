@@ -17,16 +17,51 @@ internal sealed class BulkObservableCollection<T> : ObservableCollection<T>
     public void ReplaceAll(IReadOnlyList<T> items)
     {
         ArgumentNullException.ThrowIfNull(items);
-        if (Count == items.Count && items.Select((item, i) => ReferenceEquals(item, this[i])).All(same => same))
+        if (Count == items.Count)
         {
+            var same = true;
+            for (var i = 0; i < Count; i++)
+            {
+                if (!ReferenceEquals(this[i], items[i]))
+                {
+                    same = false;
+                    break;
+                }
+            }
+
+            if (same)
+            {
+                return;
+            }
+        }
+
+        if (Math.Abs(Count - items.Count) > MaxIndividualChanges)
+        {
+            ResetTo(items);
             return;
         }
 
         var wanted = new HashSet<T>(items, ReferenceEqualityComparer.Instance as IEqualityComparer<T>);
         var present = new HashSet<T>(this, ReferenceEqualityComparer.Instance as IEqualityComparer<T>);
-        var removals = this.Count(item => !wanted.Contains(item));
-        var additions = items.Count(item => !present.Contains(item));
-        if (removals + additions <= MaxIndividualChanges && removals + additions > 0 && AlreadyInOrder(items, present))
+        var removals = 0;
+        for (var i = 0; i < Count; i++)
+        {
+            if (!wanted.Contains(this[i]))
+            {
+                removals++;
+            }
+        }
+
+        var additions = 0;
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (!present.Contains(items[i]))
+            {
+                additions++;
+            }
+        }
+
+        if (removals + additions <= MaxIndividualChanges && removals + additions > 0 && AlreadyInOrder(items, present, wanted))
         {
             for (var i = Count - 1; i >= 0; i--)
             {
@@ -47,6 +82,11 @@ internal sealed class BulkObservableCollection<T> : ObservableCollection<T>
             return;
         }
 
+        ResetTo(items);
+    }
+
+    private void ResetTo(IReadOnlyList<T> items)
+    {
         Items.Clear();
         foreach (var item in items)
         {
@@ -59,10 +99,43 @@ internal sealed class BulkObservableCollection<T> : ObservableCollection<T>
     }
 
     // the one-by-one path assumes what stays keeps its relative order
-    private bool AlreadyInOrder(IReadOnlyList<T> items, HashSet<T> present)
+    private bool AlreadyInOrder(IReadOnlyList<T> items, HashSet<T> present, HashSet<T> wanted)
     {
-        var kept = items.Where(present.Contains).ToList();
-        var current = this.Where(item => kept.Contains(item)).ToList();
-        return kept.Count == current.Count && kept.Zip(current).All(pair => ReferenceEquals(pair.First, pair.Second));
+        var i = 0;
+        var j = 0;
+        while (i < Count && j < items.Count)
+        {
+            if (!wanted.Contains(this[i]))
+            {
+                i++;
+                continue;
+            }
+
+            if (!present.Contains(items[j]))
+            {
+                j++;
+                continue;
+            }
+
+            if (!ReferenceEquals(this[i], items[j]))
+            {
+                return false;
+            }
+
+            i++;
+            j++;
+        }
+
+        while (i < Count && !wanted.Contains(this[i]))
+        {
+            i++;
+        }
+
+        while (j < items.Count && !present.Contains(items[j]))
+        {
+            j++;
+        }
+
+        return i == Count && j == items.Count;
     }
 }

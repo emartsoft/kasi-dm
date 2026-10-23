@@ -205,6 +205,88 @@ public class JobListViewModelTests
     }
 
     [Fact]
+    [Trait("TC", "TC-UI-006")]
+    [Trait("Requirement", "KASI-NFR-006")]
+    public async Task Filtering_ten_thousand_jobs_stays_under_the_one_hundred_millisecond_budget()
+    {
+        var jobs = Enumerable.Range(0, 10_000)
+            .Select(i => TestJobs.New($"file{i:D5}.{(i % 2 == 0 ? "zip" : "iso")}", i % 5 == 0 ? JobState.Downloading : JobState.Completed, category: 1 + (i % 8)))
+            .ToArray();
+        var (list, _, _) = await StartAsync(jobs);
+
+        // Warm up JIT
+        list.SearchText = "file000";
+        list.SearchText = string.Empty;
+
+        var watch = Stopwatch.StartNew();
+        list.SearchText = "file099";
+        watch.Stop();
+        var searchElapsed = watch.Elapsed;
+
+        watch.Restart();
+        list.SetFilter(new JobFilter(StatusFilter.Active, CategoryId: 1));
+        watch.Stop();
+        var sidebarElapsed = watch.Elapsed;
+
+        watch.Restart();
+        list.SetFilter(new JobFilter(StatusFilter.All));
+        watch.Stop();
+        var resetElapsed = watch.Elapsed;
+
+        searchElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(100), "filtering 10,000 jobs by search text must meet KASI-NFR-006");
+        sidebarElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(100), "filtering 10,000 jobs by status and category must meet KASI-NFR-006");
+        resetElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(100), "resetting 10,000 jobs to All must meet KASI-NFR-006");
+        await list.DisposeAsync();
+    }
+
+    [Fact]
+    [Trait("TC", "TC-UI-006")]
+    [Trait("Requirement", "KASI-NFR-006")]
+    public async Task Twenty_active_job_updates_apply_under_the_sixteen_millisecond_frame_budget()
+    {
+        var activeJobs = Enumerable.Range(0, 20)
+            .Select(i => TestJobs.New($"active{i:D2}.zip", JobState.Downloading, total: 10_000_000, done: i * 100_000))
+            .ToArray();
+        var otherJobs = Enumerable.Range(0, 9_980)
+            .Select(i => TestJobs.New($"stored{i:D5}.iso", JobState.Completed, total: 5_000_000, done: 5_000_000))
+            .ToArray();
+        var allJobs = activeJobs.Concat(otherJobs).ToArray();
+
+        var service = new EventingJobService();
+        foreach (var job in allJobs)
+        {
+            service.Stored[job.Id] = job;
+        }
+
+        var clock = new FakeTimeProvider();
+        TimeSpan uiDispatchDuration = TimeSpan.Zero;
+        var list = new JobListViewModel(service, action =>
+        {
+            var sw = Stopwatch.StartNew();
+            action();
+            sw.Stop();
+            uiDispatchDuration += sw.Elapsed;
+        }, clock);
+        await list.StartAsync(TestContext.Current.CancellationToken);
+
+        // Reset measurement after initial load
+        uiDispatchDuration = TimeSpan.Zero;
+
+        // Post progress updates for 20 active jobs
+        for (var i = 0; i < activeJobs.Length; i++)
+        {
+            service.Raise(new JobProgressed(activeJobs[i].Id, (i + 1) * 200_000, 10_000_000, 1_048_576));
+        }
+
+        clock.Advance(JobListViewModel.ProgressPeriod);
+        await WaitForAsync(() => list.TotalSpeedText.Length > 0);
+
+        uiDispatchDuration.Should().BeLessThan(TimeSpan.FromMilliseconds(16), "applying progress for 20 active jobs must not drop a frame (16 ms)");
+        list.TotalSpeedText.Should().Contain("MB/s total");
+        await list.DisposeAsync();
+    }
+
+    [Fact]
     public async Task The_total_speed_adds_up_the_moving_jobs_once_per_tick()
     {
         var a = TestJobs.New("a.zip", JobState.Downloading);

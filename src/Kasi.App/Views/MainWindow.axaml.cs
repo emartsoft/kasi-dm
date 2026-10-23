@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Kasi.App.Resources;
 using Kasi.App.ViewModels;
@@ -38,12 +40,43 @@ internal sealed partial class MainWindow : Window
             }
         };
 
+        SearchBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                SearchBox.Text = string.Empty;
+                Grid.Focus(NavigationMethod.Unspecified);
+                e.Handled = true;
+            }
+        };
+
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ActualTransparencyLevelProperty)
+            {
+                OnTransparencyLevelChanged(ActualTransparencyLevel);
+            }
+        };
+        OnTransparencyLevelChanged(ActualTransparencyLevel);
+
         // the grid sorts and reorders itself; what the user chose is saved after it has happened
         Grid.ColumnReordered += (_, _) => Dispatcher.UIThread.Post(SaveLayout);
         Grid.Sorting += (_, _) => Dispatcher.UIThread.Post(SaveLayout);
         Opened += (_, _) => ApplyLayout(); // the grid has its view of the rows only once it is on screen: the sort goes on then
         Closing += (_, _) => SaveLayout();
         ColumnsMenu.SubmenuOpened += (_, _) => BuildColumnsMenu();
+    }
+
+    internal void OnTransparencyLevelChanged(WindowTransparencyLevel level)
+    {
+        if (level == WindowTransparencyLevel.Mica)
+        {
+            Background = Brushes.Transparent;
+        }
+        else
+        {
+            ClearValue(BackgroundProperty);
+        }
     }
 
     private ColumnLayoutViewModel? Layout => (DataContext as MainWindowViewModel)?.Layout;
