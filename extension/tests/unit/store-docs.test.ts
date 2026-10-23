@@ -4,9 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const doc = (path: string): string =>
-  readFileSync(new URL(`../../../docs/${path}`, import.meta.url), 'utf8').replaceAll('
-', '
-'); // a Windows checkout has CRLF
+  readFileSync(new URL(`../../../docs/${path}`, import.meta.url), 'utf8').replaceAll('\r\n', '\n'); // a Windows checkout has CRLF
 const json = (url: string): unknown =>
   JSON.parse(readFileSync(new URL(url, import.meta.url), 'utf8'));
 
