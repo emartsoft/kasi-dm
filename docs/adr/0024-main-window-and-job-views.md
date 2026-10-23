@@ -1,6 +1,6 @@
 # ADR 0024: Main window and job views
 
-- Status: Proposed (M2.9a and 9b; 9c and 9d extend it)
+- Status: Proposed (M2.9a to 9c; 9d extends it)
 - Requirements: KASI-UI-001, KASI-UI-008, KASI-UI-010, KASI-NFR-006 (groundwork)
 - Plan: `docs/plans/m2-9.md`
 
@@ -30,8 +30,14 @@ After M2.8 the main window was a four-column list. The wireframes and TRD 12.2 c
 
 **Visual check.** Run for real with a seeded layout and `"theme": "Light"`: the Category column came first, Speed and Time left were hidden, the grid was sorted by Size, largest first, with the sort arrow, and the window was light.
 
+**Details window and the engine events behind it** (M2.9c, KASI-UI-003). Two events in `Kasi.Core`, raised by the engine on the scheduler's own pulse (never per chunk): `SegmentsProgressed` (every segment with the bytes received so far, and each live connection with its range and speed) at most four times a second while a job transfers, and `JobLogged` (a short line built from numbers and fixed words: the probe result, a connection's retry, a split, the connection count; never an address, a header or a path, and a test checks that). The per-connection speed is the lease cursor's movement over the time since the last snapshot. The scheduler grew a `GetLeaseSnapshot()` for the connections, and the runner an internal `Log` option for the probe and retry lines.
+
+`DetailsViewModel` follows those events for one job and applies every snapshot at once, so the segment map moves at least as often as the engine publishes (four a second, checked in an engine test against a throttled server, and in the view model by counting the changes it makes). It shows the file, the address **without its query or fragment** (a query can carry a token, and the window can be screenshotted), where it is saved, the numbers the list row already has, a connection table, and the log tail (newest first, the last hundred, state changes included). `SegmentMapControl` draws the map itself, one rectangle per segment as wide as the segment is long, so thousands of segments cost one render. Refresh link, Open folder, Pause or Resume and Close are buttons; one details window per download, and asking again brings the open one forward. Double-click, Enter or the context menu's "Details..." opens it for a running download.
+
+**Visual check.** The window was run for real with a seeded 12-segment, 8-connection snapshot (captured by asking only that window to paint itself): the map, the table and the log drew correctly, and the missing table headings found that way were added.
+
 ## Consequences
 
 - Filtering and counting are O(n) per change, measured as fast at 10,000 rows; the test uses a generous bound and the spec's 100 ms is checked in 9d with a real budget.
 - The delete confirmation setting lives in a new small JSON file; 9b adds the column layout and theme to it.
-- Mica and the details window are the later PRs of M2.9.
+- Mica is the later PR of M2.9.

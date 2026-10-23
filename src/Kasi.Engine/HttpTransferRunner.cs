@@ -114,6 +114,9 @@ public sealed class HttpTransferRunner
             }
 
             var fileName = ResolveFileName(probe.FileName, settings.OverrideFileName);
+            settings.Log?.Invoke(probe.RangesSupported
+                ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Probe: ranges supported, {(probe.TotalBytes is { } known ? known.ToString(System.Globalization.CultureInfo.InvariantCulture) + " bytes" : "size unknown")}")
+                : "Probe: ranges not supported, one connection");
             if (settings.CheckpointJobId is { } checkpointJob && settings.JobRepository is { } jobs)
             {
                 try
@@ -1054,6 +1057,7 @@ public sealed class HttpTransferRunner
                 if (decision.Retry)
                 {
                     state.CountRetry();
+                    options.Log?.Invoke(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Connection {workerId + 1}: retry {failedAttempts} after {failure.Failure.Kind}"));
                     if (decision.ReduceConnections && throttleGate.Enter(decision.Delay))
                     {
                         scheduler.ReduceAllowedConnections();

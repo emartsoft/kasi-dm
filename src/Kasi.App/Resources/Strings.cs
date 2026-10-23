@@ -270,6 +270,54 @@ internal static class Strings
 
     public static string ThemeDark => Get(nameof(ThemeDark));
 
+    public static string DetailsTitle => Get(nameof(DetailsTitle));
+
+    public static string DetailsAutomationName => Get(nameof(DetailsAutomationName));
+
+    public static string DetailsDownloaded => Get(nameof(DetailsDownloaded));
+
+    public static string DetailsSpeed => Get(nameof(DetailsSpeed));
+
+    public static string DetailsTimeLeft => Get(nameof(DetailsTimeLeft));
+
+    public static string DetailsResume => Get(nameof(DetailsResume));
+
+    public static string DetailsResumeSupported => Get(nameof(DetailsResumeSupported));
+
+    public static string DetailsResumeNotSupported => Get(nameof(DetailsResumeNotSupported));
+
+    public static string DetailsSavingTo => Get(nameof(DetailsSavingTo));
+
+    public static string DetailsSegmentMap => Get(nameof(DetailsSegmentMap));
+
+    public static string DetailsMapSummary => Get(nameof(DetailsMapSummary));
+
+    public static string DetailsMapHint => Get(nameof(DetailsMapHint));
+
+    public static string DetailsColConnection => Get(nameof(DetailsColConnection));
+
+    public static string DetailsColRange => Get(nameof(DetailsColRange));
+
+    public static string DetailsColSpeed => Get(nameof(DetailsColSpeed));
+
+    public static string DetailsColState => Get(nameof(DetailsColState));
+
+    public static string DetailsReceiving => Get(nameof(DetailsReceiving));
+
+    public static string DetailsLog => Get(nameof(DetailsLog));
+
+    public static string DetailsRefreshLink => Get(nameof(DetailsRefreshLink));
+
+    public static string DetailsOpenFolder => Get(nameof(DetailsOpenFolder));
+
+    public static string DetailsPause => Get(nameof(DetailsPause));
+
+    public static string DetailsResumeButton => Get(nameof(DetailsResumeButton));
+
+    public static string DetailsClose => Get(nameof(DetailsClose));
+
+    public static string MenuDetails => Get(nameof(MenuDetails));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

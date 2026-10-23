@@ -76,6 +76,9 @@ public sealed record HttpTransferOptions
     /// <summary>Test-only observation hook, called on each scheduler pulse; production leaves it null.</summary>
     internal Action<SegmentScheduler>? SchedulerTick { get; init; }
 
+    /// <summary>Called with a short line (numbers and fixed words only) when the runner decides something worth showing: the probe result, a retry.</summary>
+    internal Action<string>? Log { get; init; }
+
     internal RequestScope? Scope { get; init; }
 
     /// <summary>Called after the part file is sealed and before the published checksum is computed; the facade shows Verifying.</summary>

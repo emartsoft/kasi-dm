@@ -566,6 +566,76 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("TC", "TC-UI-002")]
+    public async Task A_running_job_publishes_its_segments_and_connections_while_it_transfers()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        const int Size = 3 * 1024 * 1024;
+        var job = harness.NewJob($"/files/shape/{Size}", "shape.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with
+        {
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = harness.Host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 512 * 1024 }) },
+        };
+        var shapes = new ConcurrentQueue<SegmentsProgressed>();
+        harness.Engine.EventRaised += e =>
+        {
+            if (e is SegmentsProgressed shape && shape.Id == job.Id)
+            {
+                shapes.Enqueue(shape);
+            }
+        };
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+        await Task.Delay(200, ct); // the dispatcher is asynchronous
+
+        var all = shapes.ToList();
+        all.Count.Should().BeGreaterThan(2, "the shape is published several times while a multi-second transfer runs, not once per second");
+        foreach (var shape in all)
+        {
+            shape.Segments.Sum(x => x.Length).Should().Be(Size, "the segments always cover the whole file");
+            shape.Segments.Should().OnlyContain(x => x.Written >= 0 && x.Written <= x.Length);
+            shape.Connections.Count.Should().BeLessThanOrEqualTo(4);
+            shape.Connections.Should().OnlyContain(c => c.Start >= 0 && c.End <= Size && c.BytesPerSecond >= 0);
+        }
+
+        all.Select(x => x.Segments.Sum(y => y.Written)).Should().BeInAscendingOrder("bytes only move forward");
+        all.Should().Contain(x => x.Connections.Count > 1, "four connections were allowed");
+        all.SelectMany(x => x.Connections).Should().Contain(c => c.BytesPerSecond > 0, "a moving connection reports a speed");
+    }
+
+    [Fact]
+    public async Task The_job_log_tells_the_probe_result_and_the_connection_count_without_an_address()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        const int Size = 2 * 1024 * 1024;
+        var job = harness.NewJob($"/files/log/{Size}", "log.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with
+        {
+            RequestHeaders = new Dictionary<string, string> { [ChaosRegistry.HeaderName] = harness.Host.Chaos.Register(new ChaosProfile { ThrottleBytesPerSecond = 512 * 1024 }) },
+        };
+        var lines = new ConcurrentQueue<string>();
+        harness.Engine.EventRaised += e =>
+        {
+            if (e is JobLogged logged && logged.Id == job.Id)
+            {
+                lines.Enqueue(logged.Line);
+            }
+        };
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+        await Task.Delay(200, ct);
+
+        var log = lines.ToList();
+        log.Should().Contain(l => l.StartsWith("Probe: ranges supported, 2097152 bytes", StringComparison.Ordinal));
+        log.Should().Contain(l => l.StartsWith("Connections: ", StringComparison.Ordinal));
+        log.Should().OnlyContain(l => !l.Contains("http", StringComparison.OrdinalIgnoreCase) && !l.Contains(harness.Folder, StringComparison.OrdinalIgnoreCase) && !l.Contains("127.0.0.1", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task The_engine_refuses_a_transition_the_state_machine_does_not_allow()
     {
         var ct = TestContext.Current.CancellationToken;

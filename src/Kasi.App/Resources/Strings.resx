@@ -557,6 +557,102 @@
     <value>Dark</value>
     <comment>Theme choice.</comment>
   </data>
+  <data name="DetailsTitle" xml:space="preserve">
+    <value>Download details</value>
+    <comment>Title of the details window.</comment>
+  </data>
+  <data name="DetailsAutomationName" xml:space="preserve">
+    <value>Download details window</value>
+    <comment>Name announced by screen readers for the details window.</comment>
+  </data>
+  <data name="DetailsDownloaded" xml:space="preserve">
+    <value>Downloaded</value>
+    <comment>Label: bytes received of the total.</comment>
+  </data>
+  <data name="DetailsSpeed" xml:space="preserve">
+    <value>Speed</value>
+    <comment>Label.</comment>
+  </data>
+  <data name="DetailsTimeLeft" xml:space="preserve">
+    <value>Time left</value>
+    <comment>Label.</comment>
+  </data>
+  <data name="DetailsResume" xml:space="preserve">
+    <value>Resume</value>
+    <comment>Label: whether the server allows resuming.</comment>
+  </data>
+  <data name="DetailsResumeSupported" xml:space="preserve">
+    <value>Supported</value>
+    <comment>The server allows resuming.</comment>
+  </data>
+  <data name="DetailsResumeNotSupported" xml:space="preserve">
+    <value>Not supported</value>
+    <comment>The server does not allow resuming.</comment>
+  </data>
+  <data name="DetailsSavingTo" xml:space="preserve">
+    <value>Saving to {0}</value>
+    <comment>{0} is a folder.</comment>
+  </data>
+  <data name="DetailsSegmentMap" xml:space="preserve">
+    <value>Segment map</value>
+    <comment>Heading.</comment>
+  </data>
+  <data name="DetailsMapSummary" xml:space="preserve">
+    <value>{0} connections, {1}% complete</value>
+    <comment>{0} connections in use, {1} percent written.</comment>
+  </data>
+  <data name="DetailsMapHint" xml:space="preserve">
+    <value>Each block is one segment; the filled part is written to disk. Blocks split as connections free up.</value>
+    <comment>Explains the segment map.</comment>
+  </data>
+  <data name="DetailsColConnection" xml:space="preserve">
+    <value>Connection</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="DetailsColRange" xml:space="preserve">
+    <value>Byte range</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="DetailsColSpeed" xml:space="preserve">
+    <value>Speed</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="DetailsColState" xml:space="preserve">
+    <value>State</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="DetailsReceiving" xml:space="preserve">
+    <value>Receiving</value>
+    <comment>A connection that is receiving data.</comment>
+  </data>
+  <data name="DetailsLog" xml:space="preserve">
+    <value>Log</value>
+    <comment>Heading of the log lines.</comment>
+  </data>
+  <data name="DetailsRefreshLink" xml:space="preserve">
+    <value>Refresh link</value>
+    <comment>Button.</comment>
+  </data>
+  <data name="DetailsOpenFolder" xml:space="preserve">
+    <value>Open folder</value>
+    <comment>Button.</comment>
+  </data>
+  <data name="DetailsPause" xml:space="preserve">
+    <value>Pause</value>
+    <comment>Button.</comment>
+  </data>
+  <data name="DetailsResumeButton" xml:space="preserve">
+    <value>Resume</value>
+    <comment>Button.</comment>
+  </data>
+  <data name="DetailsClose" xml:space="preserve">
+    <value>Close</value>
+    <comment>Button.</comment>
+  </data>
+  <data name="MenuDetails" xml:space="preserve">
+    <value>Details...</value>
+    <comment>Menu item on a download.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

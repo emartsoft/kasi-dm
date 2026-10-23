@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.ViewModels"
+        xmlns:views="using:Kasi.App.Views"
+        x:Class="Kasi.App.Views.DetailsWindow"
+        x:DataType="vm:DetailsViewModel"
+        Title="{Binding Title}"
+        AutomationProperties.Name="{Binding AutomationName}"
+        Width="760"
+        Height="640"
+        MinWidth="560"
+        MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+      <Button Content="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />
+      <Button Content="{Binding OpenFolderLabel}" Command="{Binding OpenFolderCommand}" AutomationProperties.Name="{Binding OpenFolderLabel}" />
+      <Button Content="{Binding PauseOrResumeLabel}" Command="{Binding PauseOrResumeCommand}" AutomationProperties.Name="{Binding PauseOrResumeLabel}" />
+      <Button Content="{Binding CloseLabel}" Command="{Binding CloseCommand}" IsCancel="True" AutomationProperties.Name="{Binding CloseLabel}" />
+    </StackPanel>
+    <ScrollViewer>
+      <StackPanel Spacing="10">
+        <TextBlock Text="{Binding Row.FileName}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.Name="{Binding Row.FileName}" />
+        <TextBlock Text="{Binding Address}" Opacity="0.7" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Address}" />
+        <TextBlock Text="{Binding SavingToText}" Opacity="0.7" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding SavingToText}" />
+        <ProgressBar Value="{Binding Row.Percent}" Minimum="0" Maximum="100" MinWidth="0" AutomationProperties.Name="{Binding Row.State}" />
+        <Grid ColumnDefinitions="*,*,*,*">
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="{Binding DownloadedLabel}" Opacity="0.65" FontSize="12" />
+            <TextBlock Text="{Binding Row.Downloaded}" AutomationProperties.Name="{Binding Row.Downloaded}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1">
+            <TextBlock Text="{Binding SpeedLabel}" Opacity="0.65" FontSize="12" />
+            <TextBlock Text="{Binding Row.Speed}" AutomationProperties.Name="{Binding Row.Speed}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <TextBlock Text="{Binding TimeLeftLabel}" Opacity="0.65" FontSize="12" />
+            <TextBlock Text="{Binding Row.TimeLeft}" AutomationProperties.Name="{Binding Row.TimeLeft}" />
+          </StackPanel>
+          <StackPanel Grid.Column="3">
+            <TextBlock Text="{Binding ResumeLabel}" Opacity="0.65" FontSize="12" />
+            <TextBlock Text="{Binding ResumeSupportText}" AutomationProperties.Name="{Binding ResumeSupportText}" />
+          </StackPanel>
+        </Grid>
+        <TextBlock Text="{Binding MapLabel}" FontWeight="SemiBold" />
+        <views:SegmentMapControl Segments="{Binding Segments}" FillBrush="{DynamicResource AccentFillColorDefaultBrush}" TrackBrush="{DynamicResource ControlStrokeColorDefaultBrush}" AutomationProperties.Name="{Binding MapSummaryText}" />
+        <TextBlock Text="{Binding MapSummaryText}" Opacity="0.8" AutomationProperties.Name="{Binding MapSummaryText}" />
+        <TextBlock Text="{Binding MapHint}" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="90,*,110,*" Opacity="0.65">
+          <TextBlock Grid.Column="0" Text="{Binding ConnectionColumn}" FontSize="12" />
+          <TextBlock Grid.Column="1" Text="{Binding RangeColumn}" FontSize="12" />
+          <TextBlock Grid.Column="2" Text="{Binding SpeedColumn}" FontSize="12" />
+          <TextBlock Grid.Column="3" Text="{Binding StateColumn}" FontSize="12" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Connections}" AutomationProperties.Name="{Binding MapLabel}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ConnectionRow">
+              <Grid ColumnDefinitions="90,*,110,*" Margin="0,2">
+                <TextBlock Grid.Column="0" Text="{Binding Connection}" />
+                <TextBlock Grid.Column="1" Text="{Binding Range}" />
+                <TextBlock Grid.Column="2" Text="{Binding Speed}" />
+                <TextBlock Grid.Column="3" Text="{Binding State}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding LogLabel}" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Log}" AutomationProperties.Name="{Binding LogLabel}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

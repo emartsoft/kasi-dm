@@ -42,9 +42,9 @@ internal sealed class ShellSpy : IShell
 
     public void OpenFile(string path) => Opened.Add(path);
 
-    public void ShowInFolder(string path)
-    {
-    }
+    public List<string> Shown { get; } = [];
+
+    public void ShowInFolder(string path) => Shown.Add(path);
 }
 
 internal sealed class MainRig : IAsyncDisposable
