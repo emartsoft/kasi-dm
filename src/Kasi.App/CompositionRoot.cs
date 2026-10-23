@@ -36,6 +36,7 @@ internal static class CompositionRoot
             ? AppPaths.DatabasePath(Environment.GetEnvironmentVariable(AppEndpoints.TestSuffixVariable))
             : Path.Combine(dataFolder, "kasi.db");
         services.AddSingleton(_ => new SqliteConnectionFactory(database));
+        services.AddSingleton<ISiteDefaults>(_ => new SiteDefaultsStore(Path.Combine(Path.GetDirectoryName(database)!, "site-defaults.json")));
         services.AddSingleton<MigrationRunner>(sp => new MigrationRunner(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobRepository>(sp => new JobRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ISegmentRepository>(sp => new SegmentRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
@@ -56,7 +57,8 @@ internal static class CompositionRoot
             sp.GetRequiredService<IJobRepository>(),
             sp.GetRequiredService<ICategoryRepository>(),
             sp.GetRequiredService<IQueueRepository>(),
-            AppPaths.DownloadsFolder()));
+            AppPaths.DownloadsFolder(),
+            sp.GetRequiredService<IJobSecretRepository>()));
         services.AddSingleton<IHostedService, EngineLifetime>();
     }
 }

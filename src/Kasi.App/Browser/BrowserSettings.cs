@@ -25,6 +25,9 @@ internal sealed record BrowserSettings
 
     public bool Enabled { get; init; } = true;
 
+    /// <summary>Open the Add download window for a download the browser handed over; off adds it at once with the defaults.</summary>
+    public bool ShowAddDialog { get; init; } = true;
+
     public IReadOnlyList<string> Extensions { get; init; } = DefaultExtensions;
 
     public IReadOnlyList<string> MimeTypes { get; init; } = DefaultMimeTypes;

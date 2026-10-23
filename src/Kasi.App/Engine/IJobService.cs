@@ -12,7 +12,14 @@ internal sealed record NewDownload(
     string? Folder = null,
     string? Referrer = null,
     int? Connections = null,
-    bool StartNow = true);
+    bool StartNow = true,
+    string? ChecksumAlgorithm = null,
+    string? Checksum = null,
+    IReadOnlyList<JobCookie>? Cookies = null,
+    string? UserAgent = null)
+{
+    public override string ToString() => nameof(NewDownload); // the URL and cookies are secrets (CLAUDE.md rule 3)
+}
 
 /// <summary>The outcome of an add. <see cref="Job"/> is null when a duplicate needs a decision first (nothing was added).</summary>
 internal sealed record AddResult(DuplicateCheckResult Check, Job? Job);

@@ -61,6 +61,114 @@
     <value>Size</value>
     <comment>Column header: total size of a download.</comment>
   </data>
+  <data name="AddTitle" xml:space="preserve">
+    <value>Add download</value>
+    <comment>Title of the Add download window.</comment>
+  </data>
+  <data name="AddAutomationName" xml:space="preserve">
+    <value>Add download window</value>
+    <comment>Name announced by screen readers for the Add download window.</comment>
+  </data>
+  <data name="AddUrlLabel" xml:space="preserve">
+    <value>Link</value>
+    <comment>Label of the URL box in the Add download window.</comment>
+  </data>
+  <data name="AddFileNameLabel" xml:space="preserve">
+    <value>Save as</value>
+    <comment>Label of the file name box.</comment>
+  </data>
+  <data name="AddFolderLabel" xml:space="preserve">
+    <value>Folder (empty: the category folder)</value>
+    <comment>Label of the folder box.</comment>
+  </data>
+  <data name="AddCategoryLabel" xml:space="preserve">
+    <value>Category</value>
+    <comment>Label of the category list.</comment>
+  </data>
+  <data name="AddQueueLabel" xml:space="preserve">
+    <value>Queue</value>
+    <comment>Label of the queue list.</comment>
+  </data>
+  <data name="AddConnectionsLabel" xml:space="preserve">
+    <value>Connections (empty: the default)</value>
+    <comment>Label of the connections box.</comment>
+  </data>
+  <data name="AddStartNowLabel" xml:space="preserve">
+    <value>Start now</value>
+    <comment>Check box: start the download at once instead of leaving it queued.</comment>
+  </data>
+  <data name="AddChecksumLabel" xml:space="preserve">
+    <value>Checksum</value>
+    <comment>Label of the checksum algorithm list.</comment>
+  </data>
+  <data name="AddChecksumHexLabel" xml:space="preserve">
+    <value>Expected value (hexadecimal)</value>
+    <comment>Label of the expected checksum box.</comment>
+  </data>
+  <data name="AddChecksumNone" xml:space="preserve">
+    <value>None</value>
+    <comment>No checksum is checked.</comment>
+  </data>
+  <data name="AddRememberLabel" xml:space="preserve">
+    <value>Remember category and folder for this site</value>
+    <comment>Check box in the Add download window.</comment>
+  </data>
+  <data name="AddAddButton" xml:space="preserve">
+    <value>Add</value>
+    <comment>Button that adds the download.</comment>
+  </data>
+  <data name="AddCancelButton" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Button that closes a window without doing anything.</comment>
+  </data>
+  <data name="AddErrorUrl" xml:space="preserve">
+    <value>Enter a link that starts with http, https, ftp or ftps.</value>
+    <comment>Shown when the link is not valid.</comment>
+  </data>
+  <data name="AddErrorFileName" xml:space="preserve">
+    <value>Enter a file name without folders or characters Windows does not allow.</value>
+    <comment>Shown when the file name is not valid.</comment>
+  </data>
+  <data name="AddErrorQueue" xml:space="preserve">
+    <value>Choose a queue.</value>
+    <comment>Shown when no queue is selected.</comment>
+  </data>
+  <data name="AddErrorConnections" xml:space="preserve">
+    <value>Connections must be a whole number from 1 to {0}.</value>
+    <comment>{0} is the largest allowed number.</comment>
+  </data>
+  <data name="AddErrorChecksum" xml:space="preserve">
+    <value>Choose an algorithm and enter a matching hexadecimal value, or choose None.</value>
+    <comment>Shown when the checksum is incomplete or the wrong length.</comment>
+  </data>
+  <data name="AddErrorFailed" xml:space="preserve">
+    <value>The download could not be added.</value>
+    <comment>Shown when adding fails.</comment>
+  </data>
+  <data name="DuplicateTitle" xml:space="preserve">
+    <value>File already exists</value>
+    <comment>Title of the duplicate prompt.</comment>
+  </data>
+  <data name="DuplicateMessage" xml:space="preserve">
+    <value>A download or a file with this name already exists. What should Kasi do?</value>
+    <comment>Body of the duplicate prompt.</comment>
+  </data>
+  <data name="DuplicateResume" xml:space="preserve">
+    <value>Resume the existing download</value>
+    <comment>Duplicate prompt choice.</comment>
+  </data>
+  <data name="DuplicateOverwrite" xml:space="preserve">
+    <value>Replace the existing file</value>
+    <comment>Duplicate prompt choice.</comment>
+  </data>
+  <data name="DuplicateRename" xml:space="preserve">
+    <value>Keep both: save as {0}</value>
+    <comment>{0} is the new file name.</comment>
+  </data>
+  <data name="BrowserShowAddDialog" xml:space="preserve">
+    <value>Show the Add download window for downloads taken from the browser</value>
+    <comment>Check box in Settings, Browser.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>
