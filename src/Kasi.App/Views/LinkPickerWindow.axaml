@@ -1,0 +1,74 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.ViewModels"
+        xmlns:core="using:Kasi.Core"
+        x:Class="Kasi.App.Views.LinkPickerWindow"
+        x:DataType="vm:LinkPickerViewModel"
+        Title="{Binding Title}"
+        AutomationProperties.Name="{Binding AutomationName}"
+        Width="760"
+        Height="640"
+        MinWidth="560"
+        MinHeight="440"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <Grid ColumnDefinitions="*,12,*,12,*" RowDefinitions="Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding CategoryLabel}" />
+        <ComboBox Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" AutomationProperties.Name="{Binding CategoryLabel}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="core:Category">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Column="2" Text="{Binding QueueLabel}" />
+        <ComboBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" AutomationProperties.Name="{Binding QueueLabel}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="core:Queue">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Column="4" Text="{Binding FolderLabel}" />
+        <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding Folder}" AutomationProperties.Name="{Binding FolderLabel}" />
+      </Grid>
+      <CheckBox Content="{Binding StartNowLabel}" IsChecked="{Binding StartNow}" AutomationProperties.Name="{Binding StartNowLabel}" />
+      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.Name="{Binding Error}" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsDefault="True" AutomationProperties.Name="{Binding AddLabel}" />
+        <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
+      </StackPanel>
+    </StackPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,12,200" RowDefinitions="Auto,Auto" Margin="0,0,0,8">
+      <TextBlock Grid.Column="0" Text="{Binding FilterLabel}" />
+      <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding FilterText}" AutomationProperties.Name="{Binding FilterLabel}" />
+      <TextBlock Grid.Column="2" Text="{Binding ExtensionLabel}" />
+      <ComboBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Extensions}" SelectedItem="{Binding SelectedExtension}" AutomationProperties.Name="{Binding ExtensionLabel}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ExtensionChoice">
+            <TextBlock Text="{Binding Label}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+    </Grid>
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <Button Content="{Binding SelectAllLabel}" Command="{Binding SelectAllCommand}" AutomationProperties.Name="{Binding SelectAllLabel}" />
+      <Button Content="{Binding SelectNoneLabel}" Command="{Binding SelectNoneCommand}" AutomationProperties.Name="{Binding SelectNoneLabel}" />
+      <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Summary}" />
+    </StackPanel>
+    <!-- a ListBox virtualises its rows, so 100,000 links are only as heavy as the rows on screen -->
+    <ListBox ItemsSource="{Binding Shown}" AutomationProperties.Name="{Binding FilterLabel}">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:LinkRowViewModel">
+          <CheckBox IsChecked="{Binding IsSelected}" AutomationProperties.Name="{Binding FileName}">
+            <StackPanel>
+              <TextBlock Text="{Binding FileName}" />
+              <TextBlock Text="{Binding Url}" FontSize="11" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </CheckBox>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</Window>

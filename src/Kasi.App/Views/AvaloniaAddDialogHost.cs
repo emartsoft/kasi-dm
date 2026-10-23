@@ -25,6 +25,19 @@ internal sealed class AvaloniaAddDialogHost : IAddDialogHost
         dialog.Closed -= Close;
     });
 
+    public Task ShowPickerAsync(LinkPickerViewModel picker) => Dispatcher.UIThread.InvokeAsync(async () =>
+    {
+        var window = new LinkPickerWindow { DataContext = picker };
+        var closed = new TaskCompletionSource();
+        void Close() => window.Close();
+        picker.Closed += Close;
+        window.Closed += (_, _) => closed.TrySetResult();
+        window.Show();
+        window.Activate();
+        await closed.Task.ConfigureAwait(true);
+        picker.Closed -= Close;
+    });
+
     public Task<DuplicateAction?> AskDuplicateAsync(DuplicateCheckResult check) => Dispatcher.UIThread.InvokeAsync(async () =>
     {
         var model = new DuplicatePromptViewModel(check);

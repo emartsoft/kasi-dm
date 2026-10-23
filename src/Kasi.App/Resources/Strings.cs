@@ -76,6 +76,26 @@ internal static class Strings
 
     public static string BrowserShowAddDialog => Get(nameof(BrowserShowAddDialog));
 
+    public static string PickerTitle => Get(nameof(PickerTitle));
+
+    public static string PickerAutomationName => Get(nameof(PickerAutomationName));
+
+    public static string PickerFilterLabel => Get(nameof(PickerFilterLabel));
+
+    public static string PickerExtensionLabel => Get(nameof(PickerExtensionLabel));
+
+    public static string PickerAllExtensions => Get(nameof(PickerAllExtensions));
+
+    public static string PickerSelectAll => Get(nameof(PickerSelectAll));
+
+    public static string PickerSelectNone => Get(nameof(PickerSelectNone));
+
+    public static string PickerSummary => Get(nameof(PickerSummary));
+
+    public static string PickerAdd => Get(nameof(PickerAdd));
+
+    public static string PickerFailed => Get(nameof(PickerFailed));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

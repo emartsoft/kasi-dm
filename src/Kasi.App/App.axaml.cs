@@ -43,7 +43,6 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                     services.GetRequiredService<ISiteDefaults>(),
                     browser.Settings,
                     new AvaloniaAddDialogHost(),
-                    new WindowSink(services.GetRequiredService<MainWindowViewModel>(), ShowMainWindow),
                     ReportAddFault);
                 browser.Intake.Attach(_add, action => Dispatcher.UIThread.Post(action));
                 browser.SettingsLauncher.Attach(section => Dispatcher.UIThread.Post(() => ShowSettings(browser.Settings, section)));
@@ -127,21 +126,5 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         }
 
         _window.Activate();
-    }
-
-    /// <summary>Hands a browser request to the main window's view model and brings the window up (the dialogs of PR 2.8d replace this).</summary>
-    private sealed class WindowSink(IBrowserRequestSink inner, Action raise) : IBrowserRequestSink
-    {
-        public void ShowAdd(BrowserDownload download)
-        {
-            inner.ShowAdd(download);
-            raise();
-        }
-
-        public void ShowPicker(BrowserBatch batch)
-        {
-            inner.ShowPicker(batch);
-            raise();
-        }
     }
 }
