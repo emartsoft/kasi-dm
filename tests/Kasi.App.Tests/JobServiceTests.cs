@@ -174,6 +174,31 @@ public sealed class JobServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_link_refresh_for_a_job_that_is_not_paused_is_refused_without_touching_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var added = await _service.AddAsync(Request(), cancellationToken: ct);
+
+        var result = await _service.RefreshLinkAsync(added.Job!.Id, "https://files.example.org/new.zip", [], ct);
+
+        result.Problem.Should().Be(RefreshProblem.NotResumable);
+        (await _service.GetAsync(added.Job.Id, ct))!.State.Should().Be(JobState.Queued);
+    }
+
+    [Theory]
+    [InlineData("ftp://files.example.org/new.zip")]
+    [InlineData("not a url")]
+    public async Task A_refreshed_link_must_be_http_or_https(string url)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var added = await _service.AddAsync(Request(), cancellationToken: ct);
+
+        var act = () => _service.RefreshLinkAsync(added.Job!.Id, url, [], ct);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
     public async Task An_ftp_link_becomes_an_ftp_job()
     {
         var result = await _service.AddAsync(Request(url: "ftp://files.example.org/pack.zip"), cancellationToken: TestContext.Current.CancellationToken);

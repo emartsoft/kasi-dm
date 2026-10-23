@@ -12,6 +12,9 @@ internal interface IAddDialogHost
     /// <summary>Shows the Add dialog and returns when it closes.</summary>
     Task ShowAddAsync(AddDownloadViewModel dialog);
 
+    /// <summary>Shows the refresh-link dialog and returns when it closes.</summary>
+    Task ShowRefreshAsync(RefreshLinkViewModel dialog);
+
     /// <summary>Shows the link picker and returns when it closes.</summary>
     Task ShowPickerAsync(LinkPickerViewModel picker);
 
@@ -29,9 +32,11 @@ internal sealed class AddCoordinator(
     ISiteDefaults sites,
     IBrowserSettings settings,
     IAddDialogHost host,
+    ILinkRefresher refresher,
     Action<Exception>? onFault = null) : IBrowserRequestSink, IAddDownloadService
 {
     private readonly Lock _gate = new();
+    private readonly HashSet<JobId> _asked = [];
     private Task _tail = Task.CompletedTask;
 
     public void ShowAdd(BrowserDownload download)
@@ -44,6 +49,69 @@ internal sealed class AddCoordinator(
             [.. download.Cookies.Select(c => new JobCookie { Name = c.Name, Value = c.Value, Domain = c.Domain, Path = c.Path, Secure = c.Secure, HttpOnly = c.HttpOnly })],
             download.UserAgent);
         Run(settings.Current.ShowAddDialog ? () => OpenAsync(draft) : () => AddDirectAsync(draft));
+    }
+
+    /// <summary>
+    /// Opens the refresh-link dialog for a job. Used for the menu item and, through <see cref="Watch"/>, for a download the server turned
+    /// away (a 401 or 403 pauses it as <see cref="PauseReason.AuthRequired"/>, which is how an expired signed link shows).
+    /// </summary>
+    public void RequestRefresh(JobId id)
+    {
+        Run(async () =>
+        {
+            var job = await jobs.GetAsync(id).ConfigureAwait(false);
+            if (job is not null)
+            {
+                await host.ShowRefreshAsync(new RefreshLinkViewModel(id, job.FileName, refresher)).ConfigureAwait(false);
+            }
+        });
+    }
+
+    /// <summary>Starts offering a refresh for every download that pauses for want of access. Asks about a job once until it runs again.</summary>
+    public void Watch()
+    {
+        jobs.EventRaised += OnEngineEvent;
+    }
+
+    private void OnEngineEvent(EngineEvent engineEvent)
+    {
+        switch (engineEvent)
+        {
+            case JobStateChanged { To: JobState.Paused } paused:
+                _ = OfferRefreshAsync(paused.Id);
+                break;
+            case JobStateChanged { From: JobState.Paused } resumed:
+                lock (_asked)
+                {
+                    _asked.Remove(resumed.Id);
+                }
+
+                break;
+        }
+    }
+
+    private async Task OfferRefreshAsync(JobId id)
+    {
+        try
+        {
+            var job = await jobs.GetAsync(id).ConfigureAwait(false);
+            if (job is { Kind: JobKind.Http, PauseReason: PauseReason.AuthRequired } && !string.IsNullOrEmpty(job.Referrer))
+            {
+                lock (_asked)
+                {
+                    if (!_asked.Add(id))
+                    {
+                        return;
+                    }
+                }
+
+                RequestRefresh(id);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            onFault?.Invoke(ex);
+        }
     }
 
     public void ShowPicker(BrowserBatch batch)

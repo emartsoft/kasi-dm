@@ -15,7 +15,13 @@
             AutoGenerateColumns="False"
             IsReadOnly="True"
             CanUserSortColumns="False"
+            SelectedItem="{Binding SelectedRow}"
             AutomationProperties.Name="{x:Static res:Strings.JobListAutomationName}">
+    <DataGrid.ContextMenu>
+      <ContextMenu>
+        <MenuItem Header="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />
+      </ContextMenu>
+    </DataGrid.ContextMenu>
     <DataGrid.Columns>
       <DataGridTextColumn Header="{x:Static res:Strings.JobColumnName}" Binding="{Binding FileName}" Width="*" />
       <DataGridTextColumn Header="{x:Static res:Strings.JobColumnState}" Binding="{Binding State}" Width="120" />

@@ -59,6 +59,20 @@ internal sealed class RecordingJobService : IJobService
         return Task.FromResult(new AddResult(new DuplicateCheckResult(null, false, false, request.FileName, []), job));
     }
 
+    public Dictionary<JobId, Job> Stored { get; } = [];
+
+    public List<(JobId Id, string Url, IReadOnlyList<JobCookie> Cookies)> Refreshes { get; } = [];
+
+    public RefreshProblem RefreshProblem { get; set; }
+
+    public Task<Job?> GetAsync(JobId id, CancellationToken cancellationToken = default) => Task.FromResult(Stored.GetValueOrDefault(id));
+
+    public Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default)
+    {
+        Refreshes.Add((id, url, cookies));
+        return Task.FromResult(new LinkRefreshResult(RefreshProblem));
+    }
+
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -328,6 +342,18 @@ public class AddCoordinatorTests
 #pragma warning restore VSTHRD003
         }
 
+        public List<RefreshLinkViewModel> Refreshes { get; } = [];
+
+        public Task ShowRefreshAsync(RefreshLinkViewModel dialog)
+        {
+            lock (Refreshes)
+            {
+                Refreshes.Add(dialog);
+            }
+
+            return Task.CompletedTask;
+        }
+
         public List<LinkPickerViewModel> Pickers { get; } = [];
 
         public Task ShowPickerAsync(LinkPickerViewModel picker)
@@ -378,7 +404,7 @@ public class AddCoordinatorTests
     {
         var jobs = new RecordingJobService();
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings()), host);
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings()), host, new NoRefresher());
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => host.Shown.Count == 1);
@@ -395,7 +421,7 @@ public class AddCoordinatorTests
     public async Task Dialogs_open_one_at_a_time_in_the_order_asked()
     {
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host);
+        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host, new NoRefresher());
 
         coordinator.RequestAdd(["https://files.example.org/one.zip", "https://files.example.org/two.zip"]);
         await WaitUntilAsync(() => host.Shown.Count == 1);
@@ -412,7 +438,7 @@ public class AddCoordinatorTests
     {
         var jobs = new RecordingJobService();
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host);
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host, new NoRefresher());
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => jobs.Adds.Count == 1);
@@ -431,7 +457,7 @@ public class AddCoordinatorTests
     {
         var jobs = new RecordingJobService();
         jobs.Conflicts.Enqueue(new DuplicateCheckResult(null, true, false, "pack (1).zip", [DuplicateAction.AutoRename]));
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), new FakeHost());
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), new FakeHost(), new NoRefresher());
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => jobs.Adds.Count == 2);
@@ -445,7 +471,7 @@ public class AddCoordinatorTests
         var host = new FakeHost();
         var faults = new List<Exception>();
         var jobs = new RecordingJobService { QueueList = [] };
-        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host, faults.Add);
+        var coordinator = new AddCoordinator(jobs, new MemorySites(), new FixedSettings(new BrowserSettings { ShowAddDialog = false }), host, new NoRefresher(), faults.Add);
 
         coordinator.ShowAdd(Download());
         await WaitUntilAsync(() => faults.Count == 1);
@@ -460,7 +486,7 @@ public class AddCoordinatorTests
     public async Task A_batch_opens_the_link_picker_with_its_links()
     {
         var host = new FakeHost();
-        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host);
+        var coordinator = new AddCoordinator(new RecordingJobService(), new MemorySites(), new FixedSettings(new BrowserSettings()), host, new NoRefresher());
         var batch = new BrowserBatch("https://files.example.org/", [new IpcLink { Url = "https://files.example.org/a.zip" }], [], "Agent/1.0");
 
         coordinator.ShowPicker(batch);

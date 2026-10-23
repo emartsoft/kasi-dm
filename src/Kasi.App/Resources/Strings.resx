@@ -209,6 +209,58 @@
     <value>{0} link(s) could not be added.</value>
     <comment>{0} is the number of links that failed.</comment>
   </data>
+  <data name="RefreshTitle" xml:space="preserve">
+    <value>Refresh download link</value>
+    <comment>Title of the refresh link window.</comment>
+  </data>
+  <data name="RefreshAutomationName" xml:space="preserve">
+    <value>Refresh link window</value>
+    <comment>Name announced by screen readers for the refresh link window.</comment>
+  </data>
+  <data name="RefreshAsk" xml:space="preserve">
+    <value>The link for {0} has expired. Kasi can open the page the download came from in your browser to get a new one, then carry on from where it stopped.</value>
+    <comment>{0} is the file name.</comment>
+  </data>
+  <data name="RefreshStart" xml:space="preserve">
+    <value>Open the page and refresh</value>
+    <comment>Button that asks the browser to open the page.</comment>
+  </data>
+  <data name="RefreshWaiting" xml:space="preserve">
+    <value>Waiting for the browser. Keep the browser open; this can take up to a minute.</value>
+    <comment>Shown while the browser opens the page.</comment>
+  </data>
+  <data name="RefreshDone" xml:space="preserve">
+    <value>The link was refreshed and the download continues.</value>
+    <comment>Shown after a successful refresh.</comment>
+  </data>
+  <data name="RefreshNoReferrer" xml:space="preserve">
+    <value>Kasi does not know which page this download came from, so it cannot get a new link. Download it again from the page.</value>
+    <comment>Shown when the download has no referrer.</comment>
+  </data>
+  <data name="RefreshNoBrowser" xml:space="preserve">
+    <value>No browser with the Kasi extension is connected. Open your browser and try again.</value>
+    <comment>Shown when no browser extension is connected.</comment>
+  </data>
+  <data name="RefreshTimedOut" xml:space="preserve">
+    <value>The page did not start a download in time. Try again, or download the file again from the page.</value>
+    <comment>Shown when the browser found no download.</comment>
+  </data>
+  <data name="RefreshRejected" xml:space="preserve">
+    <value>The new link serves a different file, so the download stays paused.</value>
+    <comment>Shown when the new link does not match the partly downloaded file.</comment>
+  </data>
+  <data name="RefreshFailed" xml:space="preserve">
+    <value>The link could not be refreshed. The download stays paused.</value>
+    <comment>Shown when the refresh failed for another reason.</comment>
+  </data>
+  <data name="RefreshClose" xml:space="preserve">
+    <value>Close</value>
+    <comment>Button that closes the refresh link window.</comment>
+  </data>
+  <data name="MenuRefreshLink" xml:space="preserve">
+    <value>Refresh link...</value>
+    <comment>Menu item on a paused download.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

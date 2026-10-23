@@ -13,6 +13,8 @@ internal sealed class JobService(
     IJobSecretRepository? secrets = null,
     TimeProvider? timeProvider = null) : IJobService
 {
+    private static readonly TimeSpan _resumeWait = TimeSpan.FromSeconds(20);
+
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     public event Action<EngineEvent>? EventRaised
@@ -88,6 +90,70 @@ internal sealed class JobService(
         }
 
         return new AddResult(check, stored);
+    }
+
+    public Task<Job?> GetAsync(JobId id, CancellationToken cancellationToken = default) => jobs.GetAsync(id, cancellationToken);
+
+    public async Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(cookies);
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
+        {
+            throw new ArgumentException("A refreshed link must be an http or https address.", nameof(url));
+        }
+
+        var existing = secrets is null ? null : await secrets.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        var secret = (existing ?? new JobSecret { SensitiveOrigin = new Uri(uri.GetLeftPart(UriPartial.Authority)) }) with { Cookies = cookies };
+        var settled = new TaskCompletionSource<LinkRefreshResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // The engine's call returns when the transfer ends, which can be hours away. "Resumed" is the first bytes (or a finished file);
+        // a pause or failure before that is the refusal.
+        void OnEvent(EngineEvent engineEvent)
+        {
+            switch (engineEvent)
+            {
+                case JobProgressed progressed when progressed.Id == id:
+                case JobStateChanged { To: JobState.Completed } changed when changed.Id == id:
+                    settled.TrySetResult(new LinkRefreshResult(RefreshProblem.None));
+                    break;
+                case JobStateChanged { From: JobState.Downloading, To: JobState.Paused } paused when paused.Id == id:
+                    settled.TrySetResult(new LinkRefreshResult(RefreshProblem.Rejected));
+                    break;
+                case JobStateChanged { To: JobState.Failed } failed when failed.Id == id:
+                    settled.TrySetResult(new LinkRefreshResult(RefreshProblem.Failed));
+                    break;
+            }
+        }
+
+        engine.EventRaised += OnEvent;
+        try
+        {
+            var run = Task.Run(() => engine.RefreshLinkAsync(id, uri, secret, CancellationToken.None), CancellationToken.None);
+            _ = run.ContinueWith(
+                task => settled.TrySetResult(new LinkRefreshResult(task.Exception?.GetBaseException() switch
+                {
+                    null when task.Result is TransferFailed { ErrorKind: TransferErrorKind.FileChanged } => RefreshProblem.Rejected,
+                    null when task.Result is TransferFailed => RefreshProblem.Failed,
+                    null => RefreshProblem.None,
+                    InvalidOperationException or NotSupportedException => RefreshProblem.NotResumable,
+                    _ => RefreshProblem.Failed,
+                })),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            try
+            {
+                return await settled.Task.WaitAsync(_resumeWait, _time, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                return new LinkRefreshResult(RefreshProblem.None); // started and still validating: nothing refused it
+            }
+        }
+        finally
+        {
+            engine.EventRaised -= OnEvent;
+        }
     }
 
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => engine.PauseJobAsync(id, cancellationToken);

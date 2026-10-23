@@ -43,7 +43,10 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                     services.GetRequiredService<ISiteDefaults>(),
                     browser.Settings,
                     new AvaloniaAddDialogHost(),
+                    new LinkRefresher(services.GetRequiredService<IJobService>(), browser.Refreshes),
                     ReportAddFault);
+                _add.Watch();
+                services.GetRequiredService<MainWindowViewModel>().RefreshLinkHandler = _add.RequestRefresh;
                 browser.Intake.Attach(_add, action => Dispatcher.UIThread.Post(action));
                 browser.SettingsLauncher.Attach(section => Dispatcher.UIThread.Post(() => ShowSettings(browser.Settings, section)));
             }

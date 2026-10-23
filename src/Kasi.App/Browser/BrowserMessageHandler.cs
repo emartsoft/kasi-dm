@@ -31,7 +31,8 @@ internal sealed partial class BrowserMessageHandler(
     IBrowserIntake intake,
     ISettingsLauncher settingsLauncher,
     TimeProvider? time = null,
-    ILogger? logger = null)
+    ILogger? logger = null,
+    IRefreshBroker? refreshes = null)
 {
     public const int RememberedRequests = 1024;
     public static readonly TimeSpan RememberFor = TimeSpan.FromMinutes(10);
@@ -91,7 +92,8 @@ internal sealed partial class BrowserMessageHandler(
             AddDownload add => OnceFor(add.Id, () => intake.TryAdd(ToDownload(add))),
             AddBatch batch => OnceFor(batch.Id, () => intake.TryAddBatch(new BrowserBatch(batch.Referrer, batch.Links, batch.Cookies, batch.UserAgent))),
             OpenSettings open => OnOpenSettings(open),
-            MediaDetected or CaptureMedia or LinkRefreshed => Error(message.Id, IpcErrorCode.Internal), // M3 and the refresh dialog of PR 2.8d
+            LinkRefreshed refreshed => refreshes is not null && refreshes.TryComplete(refreshed) ? new Ack { Id = refreshed.Id, Ok = true } : Error(refreshed.Id, IpcErrorCode.InvalidMessage), // nobody asked: refused
+            MediaDetected or CaptureMedia => Error(message.Id, IpcErrorCode.Internal), // M3
             Ack or IpcError => null, // not a reply to anything we are waiting for
             _ => Error(message.Id, IpcErrorCode.InvalidMessage), // Rules and RefreshLink only ever travel from Kasi to the browser
         };

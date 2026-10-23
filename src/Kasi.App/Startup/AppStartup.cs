@@ -71,6 +71,7 @@ internal static class AppStartup
         try
         {
             browserPipe.Start();
+            browser.Refreshes.Bind(new PipeRefreshChannel(browserPipe));
             handOffPipe.Start();
         }
         catch (IOException)
