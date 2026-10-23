@@ -24,6 +24,7 @@
         <ScrollViewer>
           <StackPanel Spacing="8" Margin="0,12,0,0">
             <CheckBox Content="{Binding EnabledLabel}" IsChecked="{Binding Enabled}" AutomationProperties.Name="{Binding EnabledLabel}" />
+            <CheckBox Content="{Binding ShowAddDialogLabel}" IsChecked="{Binding ShowAddDialog}" AutomationProperties.Name="{Binding ShowAddDialogLabel}" />
             <TextBlock Text="{Binding ExtensionsLabel}" />
             <TextBox Text="{Binding ExtensionsText}" AcceptsReturn="True" Height="110" TextWrapping="Wrap" AutomationProperties.Name="{Binding ExtensionsLabel}" />
             <TextBlock Text="{Binding MimeTypesLabel}" />

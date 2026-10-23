@@ -22,6 +22,60 @@ internal static class Strings
 
     public static string JobColumnSize => Get(nameof(JobColumnSize));
 
+    public static string AddTitle => Get(nameof(AddTitle));
+
+    public static string AddAutomationName => Get(nameof(AddAutomationName));
+
+    public static string AddUrlLabel => Get(nameof(AddUrlLabel));
+
+    public static string AddFileNameLabel => Get(nameof(AddFileNameLabel));
+
+    public static string AddFolderLabel => Get(nameof(AddFolderLabel));
+
+    public static string AddCategoryLabel => Get(nameof(AddCategoryLabel));
+
+    public static string AddQueueLabel => Get(nameof(AddQueueLabel));
+
+    public static string AddConnectionsLabel => Get(nameof(AddConnectionsLabel));
+
+    public static string AddStartNowLabel => Get(nameof(AddStartNowLabel));
+
+    public static string AddChecksumLabel => Get(nameof(AddChecksumLabel));
+
+    public static string AddChecksumHexLabel => Get(nameof(AddChecksumHexLabel));
+
+    public static string AddChecksumNone => Get(nameof(AddChecksumNone));
+
+    public static string AddRememberLabel => Get(nameof(AddRememberLabel));
+
+    public static string AddAddButton => Get(nameof(AddAddButton));
+
+    public static string AddCancelButton => Get(nameof(AddCancelButton));
+
+    public static string AddErrorUrl => Get(nameof(AddErrorUrl));
+
+    public static string AddErrorFileName => Get(nameof(AddErrorFileName));
+
+    public static string AddErrorQueue => Get(nameof(AddErrorQueue));
+
+    public static string AddErrorConnections => Get(nameof(AddErrorConnections));
+
+    public static string AddErrorChecksum => Get(nameof(AddErrorChecksum));
+
+    public static string AddErrorFailed => Get(nameof(AddErrorFailed));
+
+    public static string DuplicateTitle => Get(nameof(DuplicateTitle));
+
+    public static string DuplicateMessage => Get(nameof(DuplicateMessage));
+
+    public static string DuplicateResume => Get(nameof(DuplicateResume));
+
+    public static string DuplicateOverwrite => Get(nameof(DuplicateOverwrite));
+
+    public static string DuplicateRename => Get(nameof(DuplicateRename));
+
+    public static string BrowserShowAddDialog => Get(nameof(BrowserShowAddDialog));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

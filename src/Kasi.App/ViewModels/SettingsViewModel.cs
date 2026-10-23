@@ -24,6 +24,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private bool _enabled;
 
     [ObservableProperty]
+    private bool _showAddDialog;
+
+    [ObservableProperty]
     private string _extensionsText = string.Empty;
 
     [ObservableProperty]
@@ -70,6 +73,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public void Load(BrowserSettings settings)
     {
         Enabled = settings.Enabled;
+        ShowAddDialog = settings.ShowAddDialog;
         ExtensionsText = string.Join(Environment.NewLine, settings.Extensions);
         MimeTypesText = string.Join(Environment.NewLine, settings.MimeTypes);
         ExcludedSitesText = string.Join(Environment.NewLine, settings.ExcludedSites);
@@ -83,6 +87,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public BrowserSettings ToSettings() => new()
     {
         Enabled = Enabled,
+        ShowAddDialog = ShowAddDialog,
         Extensions = Split(ExtensionsText),
         MimeTypes = Split(MimeTypesText),
         ExcludedSites = Split(ExcludedSitesText),
@@ -117,6 +122,8 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public string GeneralPlaceholder => Strings.SettingsGeneralPlaceholder;
 
     public string EnabledLabel => Strings.BrowserInterceptionEnabled;
+
+    public string ShowAddDialogLabel => Strings.BrowserShowAddDialog;
 
     public string ExtensionsLabel => Strings.BrowserExtensionsLabel;
 
