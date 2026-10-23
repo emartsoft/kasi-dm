@@ -41,6 +41,6 @@ After M2.8 the main window was a four-column list. The wireframes and TRD 12.2 c
 
 ## Consequences
 
-- Filtering and counting are O(n) per change, verified under 100 ms at 10,000 rows, and 20 active job updates apply under 16 ms.
+- Filtering and counting are O(n) per change. Measured at 10,000 rows: about 10 ms to filter (the spec asks for under 100 ms) and under 1 ms to apply 20 active job updates (a frame is 16 ms). The tests assert much looser bounds (2 s, and one 250 ms tick) on purpose, because a stalled shared CI runner can exceed a tight stopwatch limit; they still fail on quadratic work or on cost that grows with the list.
 - The delete confirmation setting lives in a new small JSON file; 9b adds the column layout and theme to it.
 - Mica backdrop provides native Windows 11 styling with graceful fallback to theme brushes on Windows 10/Linux/headless.
