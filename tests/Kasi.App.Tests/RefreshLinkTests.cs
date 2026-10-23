@@ -424,6 +424,16 @@ public class RefreshTriggerTests
         public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => _inner.ResumeAsync(id, cancellationToken);
 
         public Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default) => _inner.CancelAsync(id, deleteFiles, cancellationToken);
+
+        public Task StartQueueAsync(int queueId, CancellationToken cancellationToken = default) => _inner.StartQueueAsync(queueId, cancellationToken);
+
+        public Task StopQueueAsync(int queueId, CancellationToken cancellationToken = default) => _inner.StopQueueAsync(queueId, cancellationToken);
+
+        public Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default) => _inner.GetScheduleAsync(queueId, cancellationToken);
+
+        public Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default) => _inner.SaveScheduleAsync(schedule, cancellationToken);
+
+        public Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default) => _inner.SaveQueueAsync(queue, cancellationToken);
     }
 
     private sealed class Fixed(BrowserSettings current) : IBrowserSettings

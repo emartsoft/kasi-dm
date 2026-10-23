@@ -5,6 +5,7 @@ using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Data;
 using Kasi.Engine;
+using Kasi.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -50,6 +51,7 @@ internal static class CompositionRoot
         services.AddSingleton<ISegmentRepository>(sp => new SegmentRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICategoryRepository>(sp => new CategoryRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueRepository>(sp => new QueueRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<IQueueScheduleRepository>(sp => new QueueScheduleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobSecretRepository>(sp => new JobSecretRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton(sp => new CheckpointWriter(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICheckpointWriter>(sp => sp.GetRequiredService<CheckpointWriter>());
@@ -60,6 +62,24 @@ internal static class CompositionRoot
             sp.GetRequiredService<ICheckpointWriter>(),
             sp.GetRequiredService<BandwidthLimiter>(),
             secrets: sp.GetRequiredService<IJobSecretRepository>()));
+        services.AddSingleton<IJobControl>(sp => sp.GetRequiredService<DownloadEngine>());
+        services.AddSingleton<IQueueRunner>(sp => new QueueRunner(
+            sp.GetRequiredService<IQueueRepository>(),
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IJobControl>()));
+        services.AddSingleton<IPowerController, WindowsPowerController>();
+        services.AddSingleton<IProgramRunner, ProcessProgramRunner>();
+        services.AddSingleton(sp => new PostActionCoordinator(
+            sp.GetRequiredService<IQueueRunner>(),
+            sp.GetRequiredService<IQueueRepository>(),
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IPowerController>(),
+            sp.GetRequiredService<IProgramRunner>(),
+            TimeProvider.System));
+        services.AddSingleton(sp => new QueueScheduler(
+            sp.GetRequiredService<IQueueRunner>(),
+            sp.GetRequiredService<IQueueScheduleRepository>(),
+            TimeProvider.System));
         services.AddSingleton<IJobService>(sp => new JobService(
             sp.GetRequiredService<DownloadEngine>(),
             sp.GetRequiredService<IJobRepository>(),
@@ -67,7 +87,13 @@ internal static class CompositionRoot
             sp.GetRequiredService<IQueueRepository>(),
             AppPaths.DownloadsFolder(),
             sp.GetRequiredService<IJobSecretRepository>(),
-            sp.GetRequiredService<BandwidthLimiter>()));
-        services.AddSingleton<IHostedService, EngineLifetime>();
+            sp.GetRequiredService<BandwidthLimiter>(),
+            sp.GetRequiredService<IQueueRunner>(),
+            sp.GetRequiredService<IQueueScheduleRepository>()));
+        services.AddSingleton<IHostedService>(sp => new EngineLifetime(
+            sp.GetRequiredService<MigrationRunner>(),
+            sp.GetRequiredService<CheckpointWriter>(),
+            sp.GetRequiredService<DownloadEngine>(),
+            sp.GetRequiredService<QueueScheduler>()));
     }
 }

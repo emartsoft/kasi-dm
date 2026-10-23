@@ -80,4 +80,14 @@ internal interface IJobService
     Task ResumeAsync(JobId id, CancellationToken cancellationToken = default);
 
     Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default);
+
+    Task StartQueueAsync(int queueId, CancellationToken cancellationToken = default);
+
+    Task StopQueueAsync(int queueId, CancellationToken cancellationToken = default);
+
+    Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default);
+
+    Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default);
+
+    Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default);
 }
