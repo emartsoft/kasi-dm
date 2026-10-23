@@ -45,7 +45,14 @@ internal static class ChildRunner
                 if (took > slowest)
                 {
                     slowest = took;
-                    File.WriteAllText(flushFile, slowest.TotalSeconds.ToString("R", CultureInfo.InvariantCulture));
+                    try
+                    {
+                        File.WriteAllText(flushFile, slowest.TotalSeconds.ToString("R", CultureInfo.InvariantCulture));
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // a virus scanner or the parent may hold the file for a moment; the latency is a measurement, never a reason to stop
+                    }
                 }
             };
         }

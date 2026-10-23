@@ -204,7 +204,15 @@ public sealed class CheckpointWriter : ICheckpointWriter, IAsyncDisposable
         _pending.Clear();
         _lastError = null;
         Interlocked.Increment(ref _commits);
-        CommitCompleted?.Invoke(_time.GetElapsedTime(started));
+        try
+        {
+            CommitCompleted?.Invoke(_time.GetElapsedTime(started));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // a test seam never decides whether checkpointing goes on: an exception here would end the reader loop, and with it every later commit
+        }
+
         return null;
     }
 

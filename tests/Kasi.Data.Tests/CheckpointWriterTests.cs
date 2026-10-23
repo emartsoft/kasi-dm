@@ -181,6 +181,24 @@ public sealed class CheckpointWriterTests : IAsyncLifetime, IDisposable
         (await DoneBytesAsync(_a)).Should().Be(500, "the kept updates commit later");
     }
 
+    [Trait("TC", "TC-RES-001")]
+    [Fact]
+    public async Task A_commit_completed_seam_that_throws_does_not_stop_later_commits()
+    {
+        // The harness's measurement seam once threw on a CI runner (a locked file) and ended the reader loop: the first commit counted,
+        // then no checkpoint was ever written again, which the kill suites reported as a refetch of the whole file.
+        _writer.CommitCompleted = _ => throw new IOException("the seam failed");
+        _writer.Record(_a, 0, 400);
+        _time.Advance(_interval);
+        await EventuallyAsync(() => _writer.CommitCount == 1);
+
+        _writer.Record(_a, 0, 700);
+        _time.Advance(_interval);
+        await EventuallyAsync(() => _writer.CommitCount == 2);
+
+        (await WrittenAsync(_a, 0)).Should().Be(700);
+    }
+
     [Fact]
     public async Task A_failed_commit_keeps_the_updates_and_a_later_tick_commits_them()
     {
