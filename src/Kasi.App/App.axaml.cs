@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Kasi.App.Browser;
+using Kasi.App.Engine;
 using Kasi.App.Startup;
 using Kasi.App.ViewModels;
 using Kasi.App.Views;
@@ -18,6 +19,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private MainWindow? _window;
     private SettingsWindow? _settings;
+    private AddCoordinator? _add;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -36,7 +38,14 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
             if (browser is not null)
             {
                 // the pipe has been serving since before this point: what it queued meanwhile is delivered now, on the UI thread
-                browser.Intake.Attach(new WindowSink(services.GetRequiredService<MainWindowViewModel>(), ShowMainWindow), action => Dispatcher.UIThread.Post(action));
+                _add = new AddCoordinator(
+                    services.GetRequiredService<IJobService>(),
+                    services.GetRequiredService<ISiteDefaults>(),
+                    browser.Settings,
+                    new AvaloniaAddDialogHost(),
+                    new WindowSink(services.GetRequiredService<MainWindowViewModel>(), ShowMainWindow),
+                    ReportAddFault);
+                browser.Intake.Attach(_add, action => Dispatcher.UIThread.Post(action));
                 browser.SettingsLauncher.Attach(section => Dispatcher.UIThread.Post(() => ShowSettings(browser.Settings, section)));
             }
         }
@@ -65,13 +74,22 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     {
         if (request.Urls.Count > 0)
         {
-            services.GetRequiredService<IAddDownloadService>().RequestAdd(request.Urls);
+            (_add as IAddDownloadService ?? services.GetRequiredService<IAddDownloadService>()).RequestAdd(request.Urls);
         }
 
         // the host relaunches `Kasi.exe --tray` on every reconnect: a bare --tray must stay quiet
         if (!request.Tray || request.Urls.Count > 0)
         {
             ShowMainWindow();
+        }
+    }
+
+    private void ReportAddFault(Exception ex)
+    {
+        // the type only: the message may name a URL or a path
+        if (services.GetService<ILoggerFactory>() is { } factory)
+        {
+            AppLog.AddFailed(factory.CreateLogger<App>(), ex.GetType().Name);
         }
     }
 

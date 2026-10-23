@@ -13,6 +13,7 @@ public sealed class JobServiceTests : IAsyncLifetime
     private CheckpointWriter _checkpoints = null!;
     private DownloadEngine _engine = null!;
     private JobService _service = null!;
+    private JobSecretRepository _secrets = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -21,9 +22,10 @@ public sealed class JobServiceTests : IAsyncLifetime
         _checkpoints = new CheckpointWriter(factory);
         _checkpoints.Start();
         var jobs = new JobRepository(factory);
+        _secrets = new JobSecretRepository(factory);
         _engine = new DownloadEngine(jobs, new SegmentRepository(factory), _checkpoints, new BandwidthLimiter());
         await _engine.StartAsync(TestContext.Current.CancellationToken);
-        _service = new JobService(_engine, jobs, new CategoryRepository(factory), new QueueRepository(factory), Path.Combine(_root, "Downloads"));
+        _service = new JobService(_engine, jobs, new CategoryRepository(factory), new QueueRepository(factory), Path.Combine(_root, "Downloads"), _secrets);
     }
 
     public async ValueTask DisposeAsync()
@@ -130,6 +132,45 @@ public sealed class JobServiceTests : IAsyncLifetime
 
         await act.Should().ThrowAsync<ArgumentException>();
         (await _service.ListAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Cookies_and_the_agent_are_stored_with_the_job_and_nowhere_else()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var cookie = new JobCookie { Name = "sid", Value = "COOKIE-VALUE", Domain = ".example.org" };
+
+        var result = await _service.AddAsync(Request() with { Cookies = [cookie], UserAgent = "Agent/1.0" }, cancellationToken: ct);
+
+        var secret = await _secrets.GetAsync(result.Job!.Id, ct);
+        secret!.Cookies.Should().ContainSingle(c => c.Name == "sid" && c.Value == "COOKIE-VALUE");
+        secret.Headers["User-Agent"].Should().Be("Agent/1.0");
+        result.Job.ToString().Should().NotContain("COOKIE-VALUE");
+    }
+
+    [Fact]
+    public async Task A_job_without_cookies_or_agent_has_no_secret()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await _service.AddAsync(Request(), cancellationToken: ct);
+
+        (await _secrets.GetAsync(result.Job!.Id, ct)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_checksum_is_stored_normalised_and_a_wrong_length_is_refused()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var hex = new string('A', 64);
+
+        var result = await _service.AddAsync(Request() with { ChecksumAlgorithm = "SHA-256", Checksum = hex }, cancellationToken: ct);
+        var wrong = () => _service.AddAsync(Request("b.zip", url: "https://files.example.org/b.zip") with { ChecksumAlgorithm = "md5", Checksum = hex }, cancellationToken: ct);
+
+        result.Job!.ChecksumAlgo.Should().Be("sha256");
+        result.Job.Checksum.Should().Be(hex.ToLowerInvariant());
+        await wrong.Should().ThrowAsync<ArgumentException>();
+        (await _service.ListAsync(ct)).Should().HaveCount(1);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ internal sealed class JobService(
     ICategoryRepository categories,
     IQueueRepository queues,
     string downloadsFolder,
+    IJobSecretRepository? secrets = null,
     TimeProvider? timeProvider = null) : IJobService
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -34,6 +35,19 @@ internal sealed class JobService(
             throw new ArgumentException("Only http, https, ftp and ftps links can be added.", nameof(request));
         }
 
+        string? checksumAlgo = null;
+        string? checksum = null;
+        if (request.Checksum is not null || request.ChecksumAlgorithm is not null)
+        {
+            if (!ExpectedChecksum.TryParse(request.ChecksumAlgorithm, request.Checksum, out var expected) || expected is null)
+            {
+                throw new ArgumentException("The checksum is not a valid hash for its algorithm.", nameof(request));
+            }
+
+            checksumAlgo = request.ChecksumAlgorithm!.ToLowerInvariant().Replace("-", "", StringComparison.Ordinal);
+            checksum = expected.Hex;
+        }
+
         var folder = request.Folder ?? await FolderForAsync(request.CategoryId, cancellationToken).ConfigureAwait(false);
         var last = (await jobs.ListAsync(request.QueueId, cancellationToken: cancellationToken).ConfigureAwait(false)).Select(j => j.QueuePos).DefaultIfEmpty(0).Max();
         var job = new Job
@@ -48,6 +62,8 @@ internal sealed class JobService(
             QueuePos = last + 1,
             CategoryId = request.CategoryId,
             Connections = request.Connections,
+            ChecksumAlgo = checksumAlgo,
+            Checksum = checksum,
             CreatedUtc = _time.GetUtcNow(),
         };
 
@@ -55,6 +71,12 @@ internal sealed class JobService(
         if (check.HasConflict && resolution is null)
         {
             return new AddResult(check, null);
+        }
+
+        if (check.ExistingJob is null && resolution != DuplicateAction.Resume && secrets is not null && HasSecret(request))
+        {
+            // the job row exists now, which the secret's foreign key needs; nothing starts before this is stored
+            await secrets.SetAsync(job.Id, SecretOf(request, uri), cancellationToken).ConfigureAwait(false);
         }
 
         // Resume: the existing job is the one to continue; nothing new was added.
@@ -74,6 +96,17 @@ internal sealed class JobService(
 
     public Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default) =>
         engine.CancelJobAsync(id, deleteFiles, cancellationToken);
+
+    private static bool HasSecret(NewDownload request) => request.Cookies is { Count: > 0 } || !string.IsNullOrEmpty(request.UserAgent);
+
+    private static JobSecret SecretOf(NewDownload request, Uri uri) => new()
+    {
+        Cookies = request.Cookies ?? [],
+        Headers = string.IsNullOrEmpty(request.UserAgent)
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["User-Agent"] = request.UserAgent },
+        SensitiveOrigin = new Uri(uri.GetLeftPart(UriPartial.Authority)),
+    };
 
     private async Task<string> FolderForAsync(int? categoryId, CancellationToken cancellationToken)
     {

@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.ViewModels"
+        x:Class="Kasi.App.Views.DuplicatePromptWindow"
+        x:DataType="vm:DuplicatePromptViewModel"
+        Title="{Binding Title}"
+        AutomationProperties.Name="{Binding Title}"
+        Width="460"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="16" Spacing="12">
+    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+    <ItemsControl ItemsSource="{Binding Choices}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:DuplicateChoice">
+          <Button Content="{Binding Label}" Tag="{Binding Action}" Click="OnChoose" HorizontalAlignment="Stretch" Margin="0,0,0,6" AutomationProperties.Name="{Binding Label}" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Button Content="{Binding CancelLabel}" Click="OnCancel" IsCancel="True" HorizontalAlignment="Right" AutomationProperties.Name="{Binding CancelLabel}" />
+  </StackPanel>
+</Window>
