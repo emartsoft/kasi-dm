@@ -38,6 +38,15 @@ internal static class PageServer
         app.MapGet("/_stub/received-batches", () => Results.Json(stub.Batches, _json));
         // 40 links to files of the test server; the first 12 sit in #picked, so a test can select exactly those (TC-BRW-005)
         app.MapGet("/pages/links", () => Results.Content(Links(testServer), "text/html; charset=utf-8"));
+        // A page that starts its download by itself, as a download page with a countdown does (refreshLink, M2.5c)
+        app.MapGet("/pages/refresh/{seed}/{size:long}", (string seed, long size) =>
+            Results.Content($"<!doctype html><meta charset=\"utf-8\"><title>Kasi refresh</title><body><script>location.href='{testServer}/files/{seed}/{size}'</script></body>", "text/html; charset=utf-8"));
+        app.MapGet("/_stub/refreshed", () => Results.Json(stub.Refreshed, _json));
+        app.MapPost("/_stub/refresh-link", async (RefreshBody body) =>
+        {
+            await stub.SendRefreshAsync(body.JobId, body.ReferrerUrl, body.MatchHint);
+            return Results.NoContent();
+        });
         app.MapGet("/_stub/hellos", () => Results.Json(new { count = stub.Hellos }, _json));
         app.MapDelete("/_stub/received", () =>
         {
@@ -75,6 +84,8 @@ internal static class PageServer
         });
         return app;
     }
+
+    internal sealed record RefreshBody(string JobId, string ReferrerUrl, string? MatchHint);
 
     internal sealed record ModeBody(string Mode, int AnswerDelayMs);
 
