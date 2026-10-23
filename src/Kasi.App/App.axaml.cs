@@ -52,6 +52,8 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
             }
 
             _ = StartJobListAsync();
+            services.GetRequiredService<ConfirmHostProxy>().Inner = new AvaloniaConfirmHost(() => _window);
+            StartStatusPoll();
             if (shell)
             {
                 StartShell();
@@ -69,7 +71,11 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                     new LinkRefresher(services.GetRequiredService<IJobService>(), browser.Refreshes),
                     ReportAddFault);
                 _add.Watch();
-                services.GetRequiredService<MainWindowViewModel>().RefreshLinkHandler = _add.RequestRefresh;
+                var main = services.GetRequiredService<MainWindowViewModel>();
+                main.RefreshLinkHandler = _add.RequestRefresh;
+                main.AddUrlHandler = _add.RequestAddBlank;
+                main.SettingsHandler = () => ShowSettings(browser.Settings, SettingsSection.Browser);
+                main.ConnectedBrowsers = browser.ConnectedHosts;
                 if (shell)
                 {
                     // a copied download link opens the Add dialog; the watcher listens only while the setting is on
@@ -91,6 +97,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         try
         {
             await services.GetRequiredService<JobListViewModel>().StartAsync();
+            await services.GetRequiredService<SidebarViewModel>().LoadAsync();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -114,6 +121,15 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         {
             ShowMainWindow();
         }
+    }
+
+    // the status bar's one thing without an event: whether a browser extension is connected
+    private void StartStatusPoll()
+    {
+        var main = services.GetRequiredService<MainWindowViewModel>();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => main.Poll();
+        timer.Start();
     }
 
     private void ReportAddFault(Exception ex)
@@ -160,7 +176,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     private void StartShell()
     {
         var jobs = services.GetRequiredService<IJobService>();
-        _tray = new TrayIconViewModel(jobs, this);
+        _tray = new TrayIconViewModel(jobs, this, limit: services.GetRequiredService<SpeedLimitState>());
         _tray.Start();
         _trayIcon = BuildTrayIcon(_tray);
         TrayIcon.SetIcons(this, [_trayIcon]);

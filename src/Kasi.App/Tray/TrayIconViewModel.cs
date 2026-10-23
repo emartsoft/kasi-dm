@@ -44,23 +44,30 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     private SpeedPreset _selectedPreset;
 
-    public TrayIconViewModel(IJobService jobs, IAppLifetime app, Action<Action>? post = null, TimeProvider? timeProvider = null)
+    private readonly SpeedLimitState _limit;
+
+    public TrayIconViewModel(IJobService jobs, IAppLifetime app, Action<Action>? post = null, TimeProvider? timeProvider = null, SpeedLimitState? limit = null)
     {
         ArgumentNullException.ThrowIfNull(jobs);
         ArgumentNullException.ThrowIfNull(app);
         _jobs = jobs;
         _app = app;
         _post = post ?? (action => Dispatcher.UIThread.Post(action));
-        SpeedPresets =
-        [
-            new(Strings.TrayUnlimited, null),
-            .. new long[] { 1, 5, 10, 50 }.Select(mb => new SpeedPreset(string.Format(CultureInfo.CurrentCulture, _presetFormat, mb), mb * 1024 * 1024)),
-        ];
+        SpeedPresets = BuildPresets();
+        _limit = limit ?? new SpeedLimitState(jobs);
+        _limit.Changed += OnLimitChanged;
         _selectedPreset = SpeedPresets.FirstOrDefault(p => p.BytesPerSecond == jobs.SpeedLimit) ?? SpeedPresets[0];
         _total = new UiBatchDispatcher<int, long>(totals => _post(() => ShowTotal(totals.Last())), TimeSpan.FromSeconds(1), timeProvider);
     }
 
     public IReadOnlyList<SpeedPreset> SpeedPresets { get; }
+
+    /// <summary>Unlimited, 1, 5, 10 and 50 MB/s: the same choices in the tray and on the toolbar.</summary>
+    public static IReadOnlyList<SpeedPreset> BuildPresets() =>
+    [
+        new(Strings.TrayUnlimited, null),
+        .. new long[] { 1, 5, 10, 50 }.Select(mb => new SpeedPreset(string.Format(CultureInfo.CurrentCulture, _presetFormat, mb), mb * 1024 * 1024)),
+    ];
 
     /// <summary>Follows the engine's progress for the tooltip. Call once, on the UI thread.</summary>
     public void Start()
@@ -72,6 +79,7 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
     public async ValueTask DisposeAsync()
     {
         _jobs.EventRaised -= OnEvent;
+        _limit.Changed -= OnLimitChanged;
         await _total.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -102,12 +110,13 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
             return;
         }
 
-        _jobs.SpeedLimit = preset.BytesPerSecond;
-        SelectedPreset = preset;
+        _limit.Set(preset.BytesPerSecond);
     }
 
     [RelayCommand]
     private void Quit() => _app.Quit();
+
+    private void OnLimitChanged(long? bytesPerSecond) => SelectedPreset = SpeedPresets.FirstOrDefault(p => p.BytesPerSecond == bytesPerSecond) ?? SpeedPresets[0];
 
     private void OnEvent(EngineEvent engineEvent)
     {

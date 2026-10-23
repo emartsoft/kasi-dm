@@ -148,6 +148,116 @@ internal static class Strings
 
     public static string BrowserClipboardCapture => Get(nameof(BrowserClipboardCapture));
 
+    public static string ToolbarAddUrl => Get(nameof(ToolbarAddUrl));
+
+    public static string ToolbarResume => Get(nameof(ToolbarResume));
+
+    public static string ToolbarPause => Get(nameof(ToolbarPause));
+
+    public static string ToolbarStop => Get(nameof(ToolbarStop));
+
+    public static string ToolbarDelete => Get(nameof(ToolbarDelete));
+
+    public static string ToolbarDeleteCompleted => Get(nameof(ToolbarDeleteCompleted));
+
+    public static string ToolbarStartQueue => Get(nameof(ToolbarStartQueue));
+
+    public static string ToolbarStopQueue => Get(nameof(ToolbarStopQueue));
+
+    public static string ToolbarScheduler => Get(nameof(ToolbarScheduler));
+
+    public static string ToolbarSpeedLimit => Get(nameof(ToolbarSpeedLimit));
+
+    public static string ToolbarSettings => Get(nameof(ToolbarSettings));
+
+    public static string ToolbarAutomationName => Get(nameof(ToolbarAutomationName));
+
+    public static string SidebarAutomationName => Get(nameof(SidebarAutomationName));
+
+    public static string SidebarStatus => Get(nameof(SidebarStatus));
+
+    public static string SidebarCategories => Get(nameof(SidebarCategories));
+
+    public static string SidebarQueues => Get(nameof(SidebarQueues));
+
+    public static string FilterAll => Get(nameof(FilterAll));
+
+    public static string FilterActive => Get(nameof(FilterActive));
+
+    public static string FilterFinished => Get(nameof(FilterFinished));
+
+    public static string FilterUnfinished => Get(nameof(FilterUnfinished));
+
+    public static string JobColumnSpeed => Get(nameof(JobColumnSpeed));
+
+    public static string JobColumnTimeLeft => Get(nameof(JobColumnTimeLeft));
+
+    public static string JobColumnDateAdded => Get(nameof(JobColumnDateAdded));
+
+    public static string JobColumnCategory => Get(nameof(JobColumnCategory));
+
+    public static string StateQueued => Get(nameof(StateQueued));
+
+    public static string StateProbing => Get(nameof(StateProbing));
+
+    public static string StateDownloading => Get(nameof(StateDownloading));
+
+    public static string StateRetrying => Get(nameof(StateRetrying));
+
+    public static string StatePaused => Get(nameof(StatePaused));
+
+    public static string StateMuxing => Get(nameof(StateMuxing));
+
+    public static string StateVerifying => Get(nameof(StateVerifying));
+
+    public static string StateCompleted => Get(nameof(StateCompleted));
+
+    public static string StateFailed => Get(nameof(StateFailed));
+
+    public static string SearchPlaceholder => Get(nameof(SearchPlaceholder));
+
+    public static string SearchAutomationName => Get(nameof(SearchAutomationName));
+
+    public static string StatusTotalSpeed => Get(nameof(StatusTotalSpeed));
+
+    public static string StatusCounts => Get(nameof(StatusCounts));
+
+    public static string StatusLimit => Get(nameof(StatusLimit));
+
+    public static string StatusUnlimited => Get(nameof(StatusUnlimited));
+
+    public static string StatusExtensionConnected => Get(nameof(StatusExtensionConnected));
+
+    public static string StatusExtensionNone => Get(nameof(StatusExtensionNone));
+
+    public static string StatusBarAutomationName => Get(nameof(StatusBarAutomationName));
+
+    public static string TimeSeconds => Get(nameof(TimeSeconds));
+
+    public static string TimeMinutes => Get(nameof(TimeMinutes));
+
+    public static string TimeHoursMinutes => Get(nameof(TimeHoursMinutes));
+
+    public static string TimeDays => Get(nameof(TimeDays));
+
+    public static string DateToday => Get(nameof(DateToday));
+
+    public static string DateYesterday => Get(nameof(DateYesterday));
+
+    public static string DeleteTitle => Get(nameof(DeleteTitle));
+
+    public static string DeleteMessageOne => Get(nameof(DeleteMessageOne));
+
+    public static string DeleteMessageMany => Get(nameof(DeleteMessageMany));
+
+    public static string DeleteCompletedMessage => Get(nameof(DeleteCompletedMessage));
+
+    public static string DeleteAlsoFiles => Get(nameof(DeleteAlsoFiles));
+
+    public static string DeleteDontAsk => Get(nameof(DeleteDontAsk));
+
+    public static string DeleteButton => Get(nameof(DeleteButton));
+
     public static string SettingsTitle => Get(nameof(SettingsTitle));
 
     public static string SettingsAutomationName => Get(nameof(SettingsAutomationName));

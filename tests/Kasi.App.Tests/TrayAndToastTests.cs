@@ -44,6 +44,8 @@ internal sealed class EventingJobService : IJobService
 
     public Task<LinkRefreshResult> RefreshLinkAsync(JobId id, string url, IReadOnlyList<JobCookie> cookies, CancellationToken cancellationToken = default) => _inner.RefreshLinkAsync(id, url, cookies, cancellationToken);
 
+    public Task StartAsync(JobId id, CancellationToken cancellationToken = default) => _inner.StartAsync(id, cancellationToken);
+
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => _inner.PauseAsync(id, cancellationToken);
 
     public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => _inner.ResumeAsync(id, cancellationToken);

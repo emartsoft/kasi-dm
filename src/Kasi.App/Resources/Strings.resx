@@ -313,6 +313,226 @@
     <value>Offer to download a link when I copy one (uses the file types above)</value>
     <comment>Check box in Settings, Browser. Off by default.</comment>
   </data>
+  <data name="ToolbarAddUrl" xml:space="preserve">
+    <value>Add URL</value>
+    <comment>Toolbar button: opens the Add download window.</comment>
+  </data>
+  <data name="ToolbarResume" xml:space="preserve">
+    <value>Resume</value>
+    <comment>Toolbar button.</comment>
+  </data>
+  <data name="ToolbarPause" xml:space="preserve">
+    <value>Pause</value>
+    <comment>Toolbar button.</comment>
+  </data>
+  <data name="ToolbarStop" xml:space="preserve">
+    <value>Stop</value>
+    <comment>Toolbar button: stops the selected downloads.</comment>
+  </data>
+  <data name="ToolbarDelete" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Toolbar button: removes the selected downloads.</comment>
+  </data>
+  <data name="ToolbarDeleteCompleted" xml:space="preserve">
+    <value>Delete completed</value>
+    <comment>Toolbar button: removes every completed download from the list.</comment>
+  </data>
+  <data name="ToolbarStartQueue" xml:space="preserve">
+    <value>Start queue</value>
+    <comment>Toolbar button (needs the scheduler).</comment>
+  </data>
+  <data name="ToolbarStopQueue" xml:space="preserve">
+    <value>Stop queue</value>
+    <comment>Toolbar button (needs the scheduler).</comment>
+  </data>
+  <data name="ToolbarScheduler" xml:space="preserve">
+    <value>Scheduler</value>
+    <comment>Toolbar button (needs the scheduler).</comment>
+  </data>
+  <data name="ToolbarSpeedLimit" xml:space="preserve">
+    <value>Speed limit: {0}</value>
+    <comment>Toolbar menu; {0} is the current limit such as 10 MB/s or Unlimited.</comment>
+  </data>
+  <data name="ToolbarSettings" xml:space="preserve">
+    <value>Settings</value>
+    <comment>Toolbar button.</comment>
+  </data>
+  <data name="ToolbarAutomationName" xml:space="preserve">
+    <value>Toolbar</value>
+    <comment>Name announced by screen readers for the toolbar.</comment>
+  </data>
+  <data name="SidebarAutomationName" xml:space="preserve">
+    <value>Filters</value>
+    <comment>Name announced by screen readers for the list of filters.</comment>
+  </data>
+  <data name="SidebarStatus" xml:space="preserve">
+    <value>STATUS</value>
+    <comment>Sidebar heading.</comment>
+  </data>
+  <data name="SidebarCategories" xml:space="preserve">
+    <value>CATEGORIES</value>
+    <comment>Sidebar heading.</comment>
+  </data>
+  <data name="SidebarQueues" xml:space="preserve">
+    <value>QUEUES</value>
+    <comment>Sidebar heading.</comment>
+  </data>
+  <data name="FilterAll" xml:space="preserve">
+    <value>All downloads</value>
+    <comment>Sidebar filter.</comment>
+  </data>
+  <data name="FilterActive" xml:space="preserve">
+    <value>Active</value>
+    <comment>Sidebar filter: downloads that are transferring.</comment>
+  </data>
+  <data name="FilterFinished" xml:space="preserve">
+    <value>Finished</value>
+    <comment>Sidebar filter: completed downloads.</comment>
+  </data>
+  <data name="FilterUnfinished" xml:space="preserve">
+    <value>Unfinished</value>
+    <comment>Sidebar filter: downloads that are not completed.</comment>
+  </data>
+  <data name="JobColumnSpeed" xml:space="preserve">
+    <value>Speed</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="JobColumnTimeLeft" xml:space="preserve">
+    <value>Time left</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="JobColumnDateAdded" xml:space="preserve">
+    <value>Date added</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="JobColumnCategory" xml:space="preserve">
+    <value>Category</value>
+    <comment>Column header.</comment>
+  </data>
+  <data name="StateQueued" xml:space="preserve">
+    <value>Queued</value>
+    <comment>Download status.</comment>
+  </data>
+  <data name="StateProbing" xml:space="preserve">
+    <value>Checking</value>
+    <comment>Download status while the server is asked about the file.</comment>
+  </data>
+  <data name="StateDownloading" xml:space="preserve">
+    <value>Downloading</value>
+    <comment>Download status.</comment>
+  </data>
+  <data name="StateRetrying" xml:space="preserve">
+    <value>Retrying</value>
+    <comment>Download status.</comment>
+  </data>
+  <data name="StatePaused" xml:space="preserve">
+    <value>Paused</value>
+    <comment>Download status.</comment>
+  </data>
+  <data name="StateMuxing" xml:space="preserve">
+    <value>Joining</value>
+    <comment>Download status while video and audio are joined.</comment>
+  </data>
+  <data name="StateVerifying" xml:space="preserve">
+    <value>Verifying</value>
+    <comment>Download status while the checksum is checked.</comment>
+  </data>
+  <data name="StateCompleted" xml:space="preserve">
+    <value>Completed</value>
+    <comment>Download status.</comment>
+  </data>
+  <data name="StateFailed" xml:space="preserve">
+    <value>Failed</value>
+    <comment>Download status.</comment>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>Search downloads</value>
+    <comment>Placeholder of the search box.</comment>
+  </data>
+  <data name="SearchAutomationName" xml:space="preserve">
+    <value>Search downloads</value>
+    <comment>Name announced by screen readers for the search box.</comment>
+  </data>
+  <data name="StatusTotalSpeed" xml:space="preserve">
+    <value>{0}/s total</value>
+    <comment>Status bar; {0} is a size such as 11.5 MB.</comment>
+  </data>
+  <data name="StatusCounts" xml:space="preserve">
+    <value>{0} active, {1} queued</value>
+    <comment>Status bar; counts of downloads.</comment>
+  </data>
+  <data name="StatusLimit" xml:space="preserve">
+    <value>Speed limit: {0}</value>
+    <comment>Status bar; {0} is the current limit.</comment>
+  </data>
+  <data name="StatusUnlimited" xml:space="preserve">
+    <value>Unlimited</value>
+    <comment>No speed limit.</comment>
+  </data>
+  <data name="StatusExtensionConnected" xml:space="preserve">
+    <value>Browser extension connected</value>
+    <comment>Status bar.</comment>
+  </data>
+  <data name="StatusExtensionNone" xml:space="preserve">
+    <value>No browser extension connected</value>
+    <comment>Status bar.</comment>
+  </data>
+  <data name="StatusBarAutomationName" xml:space="preserve">
+    <value>Status bar</value>
+    <comment>Name announced by screen readers for the status bar.</comment>
+  </data>
+  <data name="TimeSeconds" xml:space="preserve">
+    <value>{0} s</value>
+    <comment>Time left; {0} seconds.</comment>
+  </data>
+  <data name="TimeMinutes" xml:space="preserve">
+    <value>{0} min</value>
+    <comment>Time left; {0} minutes.</comment>
+  </data>
+  <data name="TimeHoursMinutes" xml:space="preserve">
+    <value>{0} h {1} min</value>
+    <comment>Time left; hours and minutes.</comment>
+  </data>
+  <data name="TimeDays" xml:space="preserve">
+    <value>{0} d</value>
+    <comment>Time left; days.</comment>
+  </data>
+  <data name="DateToday" xml:space="preserve">
+    <value>Today {0}</value>
+    <comment>Date added; {0} is the time of day.</comment>
+  </data>
+  <data name="DateYesterday" xml:space="preserve">
+    <value>Yesterday {0}</value>
+    <comment>Date added; {0} is the time of day.</comment>
+  </data>
+  <data name="DeleteTitle" xml:space="preserve">
+    <value>Delete downloads</value>
+    <comment>Title of the delete confirmation window.</comment>
+  </data>
+  <data name="DeleteMessageOne" xml:space="preserve">
+    <value>Remove {0} from the list?</value>
+    <comment>{0} is a file name.</comment>
+  </data>
+  <data name="DeleteMessageMany" xml:space="preserve">
+    <value>Remove {0} downloads from the list?</value>
+    <comment>{0} is a number.</comment>
+  </data>
+  <data name="DeleteCompletedMessage" xml:space="preserve">
+    <value>Remove every completed download from the list?</value>
+    <comment>Confirmation for Delete completed.</comment>
+  </data>
+  <data name="DeleteAlsoFiles" xml:space="preserve">
+    <value>Also delete the downloaded files from the disk</value>
+    <comment>Check box in the delete confirmation.</comment>
+  </data>
+  <data name="DeleteDontAsk" xml:space="preserve">
+    <value>Do not ask again</value>
+    <comment>Check box in the delete confirmation.</comment>
+  </data>
+  <data name="DeleteButton" xml:space="preserve">
+    <value>Delete</value>
+    <comment>Confirms the deletion.</comment>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Kasi settings</value>
     <comment>Title of the Settings window.</comment>

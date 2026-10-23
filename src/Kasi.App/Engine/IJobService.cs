@@ -72,6 +72,9 @@ internal interface IJobService
     /// <summary>Resumes every download the user (or a restart or a lost network) paused. A download paused for want of access needs a fresh link first and is left alone.</summary>
     Task ResumeAllAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Starts a queued job now.</summary>
+    Task StartAsync(JobId id, CancellationToken cancellationToken = default);
+
     Task PauseAsync(JobId id, CancellationToken cancellationToken = default);
 
     Task ResumeAsync(JobId id, CancellationToken cancellationToken = default);

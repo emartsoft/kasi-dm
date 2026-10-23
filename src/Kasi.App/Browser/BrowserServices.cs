@@ -31,6 +31,9 @@ internal sealed class BrowserServices
     /// <summary>Asks the connected browsers for a fresh link (TRD 6.6); bound to the pipe by start-up.</summary>
     public RefreshBroker Refreshes { get; }
 
+    /// <summary>How many browser hosts are connected now; start-up points it at the pipe. The status bar shows it.</summary>
+    public Func<int> ConnectedHosts { get; set; } = () => 0;
+
     private ILogger Logger { get; }
 
     /// <summary>The services of the real app: settings in the user's local data folder, named apart for a test instance.</summary>
