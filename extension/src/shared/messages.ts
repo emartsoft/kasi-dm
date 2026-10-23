@@ -1,6 +1,6 @@
 // Runtime checks for messages that arrive from Kasi. Ajv is not used here: it compiles schemas with
 // new Function(), which the MV3 content security policy forbids. tests/unit checks these against the schema fixtures.
-import type { Ack, ErrorMessage, Rules } from '../types/protocol';
+import type { Ack, ErrorMessage, RefreshLink, Rules } from '../types/protocol';
 
 type Obj = Record<string, unknown>;
 
@@ -45,6 +45,17 @@ export function parseError(value: unknown): ErrorMessage | undefined {
   if (!isHeader(value, 'error') || !ERROR_CODES.includes(value.code as string)) return undefined;
   if (value.detail !== undefined && !isText(value.detail, 256)) return undefined;
   return value as unknown as ErrorMessage;
+}
+
+// Kasi asks for a fresh link (TRD 6.6). Only an http(s) page may be opened; the schema's webUrl pattern is checked here too.
+export function parseRefreshLink(value: unknown): RefreshLink | undefined {
+  if (!isObj(value) || !hasOnly(value, ['v', 'id', 'type', 'jobId', 'referrerUrl', 'matchHint']))
+    return undefined;
+  if (!isHeader(value, 'refreshLink') || !isText(value.jobId, 64)) return undefined;
+  if (!isText(value.referrerUrl, 8192) || !/^https?:\/\/[^\s/?#]+/.test(value.referrerUrl))
+    return undefined;
+  if (value.matchHint !== undefined && !isText(value.matchHint, 256)) return undefined;
+  return value as unknown as RefreshLink;
 }
 
 export function parseRules(value: unknown): Rules | undefined {
