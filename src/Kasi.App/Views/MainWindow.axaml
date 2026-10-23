@@ -102,6 +102,7 @@
       </DataGrid.KeyBindings>
       <DataGrid.ContextMenu>
         <ContextMenu>
+          <MenuItem Header="{x:Static res:Strings.MenuDetails}" Command="{Binding OpenRowCommand}" CommandParameter="{Binding SelectedRow}" AutomationProperties.Name="{x:Static res:Strings.MenuDetails}" />
           <MenuItem Header="{x:Static res:Strings.ToolbarResume}" Command="{Binding ResumeCommand}" />
           <MenuItem Header="{x:Static res:Strings.ToolbarPause}" Command="{Binding PauseCommand}" />
           <MenuItem Header="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />

@@ -29,6 +29,9 @@ internal sealed partial class JobRowViewModel : ObservableObject
     private long _doneBytes;
     private long? _totalBytes;
 
+    [ObservableProperty]
+    private string _downloaded = string.Empty;
+
     public JobRowViewModel(Job job, string categoryName = "", DateTimeOffset? now = null)
     {
         ArgumentNullException.ThrowIfNull(job);
@@ -44,6 +47,7 @@ internal sealed partial class JobRowViewModel : ObservableObject
         _totalBytes = job.TotalBytes;
         _size = SizeText(job.TotalBytes);
         _percent = PercentOf(job.DoneBytes, job.TotalBytes);
+        _downloaded = DownloadedText(job.DoneBytes, job.TotalBytes);
     }
 
     public JobId Id { get; }
@@ -83,6 +87,7 @@ internal sealed partial class JobRowViewModel : ObservableObject
         _totalBytes = totalBytes;
         Percent = PercentOf(doneBytes, totalBytes);
         Size = SizeText(totalBytes);
+        Downloaded = DownloadedText(doneBytes, totalBytes);
         // a short average, so the numbers do not jitter and "time left" does not leap
         _smoothedSpeed = bytesPerSecond <= 0 ? 0 : _smoothedSpeed <= 0 ? bytesPerSecond : (_smoothedSpeed * 0.7) + (bytesPerSecond * 0.3);
         Refresh();
@@ -119,6 +124,9 @@ internal sealed partial class JobRowViewModel : ObservableObject
         _totalBytes is { } total && _smoothedSpeed > 0 && StateValue == JobState.Downloading
             ? (long)Math.Ceiling(Math.Max(0, total - _doneBytes) / _smoothedSpeed)
             : null;
+
+    // "3.66 GB of 5.9 GB", or just the bytes so far when the size is not known
+    private static string DownloadedText(long done, long? total) => total is null ? ByteText.Format(done) : ByteText.Format(done) + " / " + ByteText.Format(total.Value);
 
     private static double PercentOf(long done, long? total) => total is > 0 ? Math.Min(100d, done * 100d / total.Value) : 0d;
 

@@ -549,19 +549,28 @@ public sealed class DownloadEngine : IAsyncDisposable
             InitialUrl = url.Scheme is "http" or "https" ? url : null,
             ExpectedChecksum = expected,
             SchedulerTick = ProgressPublisher(job),
+            Log = line => Publish(new JobLogged(job.Id, _time.GetUtcNow(), line)),
             BeforeVerifyAsync = () => EnterVerifyingAsync(job.Id),
         };
         return OptionsDecorator is { } decorator ? decorator(job, options) : options;
     }
 
-    // At most one sample per second per job, with the speed measured over that second.
+    // At most one speed sample per second per job, with the speed measured over that second, and the shape of the transfer (segments and
+    // connections) about four times a second for the details window. Nothing here runs per chunk: it runs on the scheduler's pulse.
+    private static readonly TimeSpan _segmentInterval = TimeSpan.FromMilliseconds(250);
+
     private Action<SegmentScheduler> ProgressPublisher(Job job)
     {
         var last = _time.GetTimestamp();
         long lastBytes = 0;
         var seeded = false;
+        var lastShape = _time.GetTimestamp() - _time.TimestampFrequency; // so the first pulse publishes at once
+        var seenSegments = 0;
+        var seenConnections = -1;
+        var leaseMarks = new Dictionary<int, (long Start, long Cursor, long Stamp)>();
         return scheduler =>
         {
+            PublishShape(scheduler);
             if (!seeded)
             {
                 // A resumed or recovered job starts with its saved bytes already counted; they were not transferred in the
@@ -584,6 +593,46 @@ public sealed class DownloadEngine : IAsyncDisposable
             last = now;
             lastBytes = written;
         };
+
+        void PublishShape(SegmentScheduler scheduler)
+        {
+            var now = _time.GetTimestamp();
+            if (_time.GetElapsedTime(lastShape, now) < _segmentInterval)
+            {
+                return;
+            }
+
+            var segments = scheduler.GetSegmentsSnapshot();
+            var leases = scheduler.GetLeaseSnapshot();
+            var connections = new List<ConnectionView>(leases.Count);
+            foreach (var lease in leases)
+            {
+                var speed = 0L;
+                if (leaseMarks.TryGetValue(lease.Worker, out var mark) && mark.Start == lease.Start && lease.Cursor >= mark.Cursor)
+                {
+                    var seconds = _time.GetElapsedTime(mark.Stamp, now).TotalSeconds;
+                    speed = seconds > 0 ? (long)((lease.Cursor - mark.Cursor) / seconds) : 0;
+                }
+
+                leaseMarks[lease.Worker] = (lease.Start, lease.Cursor, now);
+                connections.Add(new ConnectionView(lease.Worker, lease.SegmentIndex, lease.Start, lease.End, speed));
+            }
+
+            lastShape = now;
+            if (seenSegments > 0 && segments.Count > seenSegments)
+            {
+                Publish(new JobLogged(job.Id, _time.GetUtcNow(), string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Slow lane: split, {segments.Count} segments")));
+            }
+
+            if (connections.Count != seenConnections)
+            {
+                Publish(new JobLogged(job.Id, _time.GetUtcNow(), string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Connections: {connections.Count}")));
+            }
+
+            seenSegments = segments.Count;
+            seenConnections = connections.Count;
+            Publish(new SegmentsProgressed(job.Id, segments, connections));
+        }
     }
 
     private async Task EnterVerifyingAsync(JobId id)

@@ -13,6 +13,7 @@ using Kasi.App.Startup;
 using Kasi.App.Tray;
 using Kasi.App.ViewModels;
 using Kasi.App.Views;
+using Kasi.Core;
 using Kasi.Ipc.Messages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     private TrayIcon? _trayIcon;
     private IDisposable? _toastClicks;
     private ClipboardWatcher? _clipboard;
+    private readonly Dictionary<JobId, DetailsWindow> _details = [];
     private bool _quitting;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -75,6 +77,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                 var main = services.GetRequiredService<MainWindowViewModel>();
                 main.RefreshLinkHandler = _add.RequestRefresh;
                 main.AddUrlHandler = _add.RequestAddBlank;
+                main.DetailsRequested += row => ShowDetails(row, _add.RequestRefresh);
                 main.SettingsHandler = () => ShowSettings(browser.Settings, SettingsSection.Browser);
                 main.ConnectedBrowsers = browser.ConnectedHosts;
                 if (shell)
@@ -130,6 +133,28 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         var ui = services.GetRequiredService<IUiSettings>();
         ThemeApplier.Apply(this, ui.Current.Theme);
         ui.Changed += changed => Dispatcher.UIThread.Post(() => ThemeApplier.Apply(this, changed.Theme));
+    }
+
+    // one details window per download: asking again brings the open one forward
+    private void ShowDetails(JobRowViewModel row, Action<JobId> refresh)
+    {
+        if (_details.TryGetValue(row.Id, out var open))
+        {
+            open.Activate();
+            return;
+        }
+
+        var model = new DetailsViewModel(row, services.GetRequiredService<IJobService>(), services.GetRequiredService<IShell>()) { RefreshLinkHandler = refresh };
+        var window = new DetailsWindow { DataContext = model };
+        model.Closed += window.Close;
+        window.Closed += (_, _) =>
+        {
+            _details.Remove(row.Id);
+            model.Dispose();
+        };
+        _details[row.Id] = window;
+        window.Show();
+        _ = model.StartAsync();
     }
 
     // the status bar's one thing without an event: whether a browser extension is connected

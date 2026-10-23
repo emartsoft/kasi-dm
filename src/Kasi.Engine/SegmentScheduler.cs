@@ -176,6 +176,15 @@ public sealed class SegmentScheduler
         }
     }
 
+    /// <summary>The connections that hold a primary lease right now, for the details window.</summary>
+    public IReadOnlyList<LeaseSnapshot> GetLeaseSnapshot()
+    {
+        lock (_gate)
+        {
+            return [.. _segments.Where(s => s.Primary is { Superseded: false }).Select(s => new LeaseSnapshot(s.Primary!.Worker, s.Index, s.Primary.Start, s.Primary.End, s.Primary.Cursor)).OrderBy(l => l.Worker)];
+        }
+    }
+
     /// <summary>The segment snapshot and the structure version it belongs to, read atomically for the checkpoint writer.</summary>
     internal (IReadOnlyList<Segment> Segments, int Version) GetCheckpointSnapshot()
     {
