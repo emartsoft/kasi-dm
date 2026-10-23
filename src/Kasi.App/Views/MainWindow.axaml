@@ -106,12 +106,14 @@
           <MenuItem Header="{x:Static res:Strings.ToolbarPause}" Command="{Binding PauseCommand}" />
           <MenuItem Header="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />
           <MenuItem Header="{x:Static res:Strings.ToolbarDelete}" Command="{Binding DeleteCommand}" />
+          <Separator />
+          <MenuItem x:Name="ColumnsMenu" Header="{x:Static res:Strings.ColumnsMenu}" AutomationProperties.Name="{x:Static res:Strings.ColumnsMenu}" />
         </ContextMenu>
       </DataGrid.ContextMenu>
       <DataGrid.Columns>
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnName}" Binding="{Binding FileName}" Width="2*" MinWidth="200" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSize}" Binding="{Binding Size}" SortMemberPath="SortSize" Width="90" />
-        <DataGridTemplateColumn Header="{x:Static res:Strings.JobColumnProgress}" SortMemberPath="Percent" Width="130">
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnName}" Tag="name" Binding="{Binding FileName}" Width="2*" MinWidth="200" />
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSize}" Tag="size" Binding="{Binding Size}" SortMemberPath="SortSize" Width="90" />
+        <DataGridTemplateColumn Header="{x:Static res:Strings.JobColumnProgress}" Tag="progress" SortMemberPath="Percent" Width="130">
           <DataGridTemplateColumn.CellTemplate>
             <DataTemplate x:DataType="vm:JobRowViewModel">
               <Grid ColumnDefinitions="*,48" Margin="6,0">
@@ -121,11 +123,11 @@
             </DataTemplate>
           </DataGridTemplateColumn.CellTemplate>
         </DataGridTemplateColumn>
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSpeed}" Binding="{Binding Speed}" SortMemberPath="SortSpeed" Width="100" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnTimeLeft}" Binding="{Binding TimeLeft}" SortMemberPath="SortTimeLeft" Width="90" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnState}" Binding="{Binding State}" Width="110" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnDateAdded}" Binding="{Binding DateAdded}" SortMemberPath="Created" Width="130" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnCategory}" Binding="{Binding CategoryName}" Width="110" />
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSpeed}" Tag="speed" Binding="{Binding Speed}" SortMemberPath="SortSpeed" Width="100" />
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnTimeLeft}" Tag="timeleft" Binding="{Binding TimeLeft}" SortMemberPath="SortTimeLeft" Width="90" />
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnState}" Tag="status" Binding="{Binding State}" Width="110" />
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnDateAdded}" Tag="date" Binding="{Binding DateAdded}" SortMemberPath="Created" Width="130" />
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnCategory}" Tag="category" Binding="{Binding CategoryName}" Width="110" />
       </DataGrid.Columns>
     </DataGrid>
   </DockPanel>

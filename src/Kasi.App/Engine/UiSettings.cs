@@ -1,10 +1,34 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Kasi.App.Engine;
 
-/// <summary>What the main window remembers between runs. More arrives with the layout and theme work (M2.9b).</summary>
+/// <summary>Whether the windows follow Windows' light or dark setting, or always use one of them (KASI-UI-006).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<ThemePreference>))]
+internal enum ThemePreference
+{
+    System,
+    Light,
+    Dark,
+}
+
+/// <summary>One grid column as the user left it (KASI-UI-007): where it sits, how wide it is, whether it shows.</summary>
+internal sealed record ColumnLayout(string Id, double Width, int DisplayIndex, bool Visible);
+
+/// <summary>What the main window remembers between runs.</summary>
 internal sealed record UiSettings
 {
+    /// <summary>The theme override; <see cref="ThemePreference.System"/> follows Windows.</summary>
+    public ThemePreference Theme { get; init; } = ThemePreference.System;
+
+    /// <summary>The grid's columns in the user's layout; empty means the defaults.</summary>
+    public IReadOnlyList<ColumnLayout> Columns { get; init; } = [];
+
+    /// <summary>The column the grid is sorted by (a column id), or null for the engine's order.</summary>
+    public string? SortColumn { get; init; }
+
+    public bool SortDescending { get; init; }
+
     /// <summary>Ask before deleting downloads; the delete window's "Do not ask again" turns it off.</summary>
     public bool ConfirmDelete { get; init; } = true;
 }
@@ -12,6 +36,9 @@ internal sealed record UiSettings
 internal interface IUiSettings
 {
     UiSettings Current { get; }
+
+    /// <summary>Raised after a save, on the saving thread.</summary>
+    event Action<UiSettings>? Changed;
 
     Task SaveAsync(UiSettings settings, CancellationToken cancellationToken = default);
 }
@@ -31,6 +58,8 @@ internal sealed class UiSettingsStore : IUiSettings
 
     public UiSettings Current => _current;
 
+    public event Action<UiSettings>? Changed;
+
     public async Task SaveAsync(UiSettings settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -39,6 +68,7 @@ internal sealed class UiSettingsStore : IUiSettings
         await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(settings, _json), cancellationToken).ConfigureAwait(false);
         File.Move(temp, _path, overwrite: true);
         _current = settings;
+        Changed?.Invoke(settings);
     }
 
     private static UiSettings Load(string path)

@@ -37,8 +37,8 @@ internal sealed record JobFilter(StatusFilter Status = StatusFilter.All, int? Ca
 
 /// <summary>
 /// The jobs the engine knows, kept current from its events (KASI-UI-001, 008). Progress goes through a <see cref="UiBatchDispatcher{TKey, TUpdate}"/>
-/// (the latest per job, every 250 ms); added, removed and state changes are rare and applied at once. <see cref="Visible"/> is replaced as a
-/// whole when the filter or the membership changes (one list rebuild, not a thousand collection events), and a row that only progresses just
+/// (the latest per job, every 250 ms); added, removed and state changes are rare and applied at once. <see cref="Visible"/> takes its new content in one change
+/// when the filter or the membership changes (one reset, or a few single changes), and a row that only progresses just
 /// raises its own property changes. Events arrive on the engine's thread, so <c>post</c> moves everything to the UI thread.
 /// </summary>
 internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposable
@@ -56,9 +56,6 @@ internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposa
     private readonly Dictionary<JobId, long> _moving = [];
     private Dictionary<int, string> _categoryNames = [];
     private JobFilter _filter = new();
-
-    [ObservableProperty]
-    private IReadOnlyList<JobRowViewModel> _visible = [];
 
     [ObservableProperty]
     private int _allCount;
@@ -92,6 +89,9 @@ internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposa
             ProgressPeriod,
             timeProvider);
     }
+
+    /// <summary>The jobs the filter lets through. One collection for the life of the window, so the grid keeps its sort across changes.</summary>
+    public BulkObservableCollection<JobRowViewModel> Visible { get; } = [];
 
     /// <summary>Every job, whatever the filter.</summary>
     public IReadOnlyList<JobRowViewModel> All => _all;
@@ -201,7 +201,7 @@ internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposa
         return true;
     }
 
-    private void Refilter() => Visible = _filter.IsEverything ? _all : [.. _all.Where(_filter.Matches)];
+    private void Refilter() => Visible.ReplaceAll(_filter.IsEverything ? _all : [.. _all.Where(_filter.Matches)]);
 
     private void Recount()
     {
