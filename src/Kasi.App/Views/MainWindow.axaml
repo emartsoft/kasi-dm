@@ -11,7 +11,9 @@
         Height="720"
         MinWidth="760"
         MinHeight="420"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        TransparencyLevelHint="Mica, AcrylicBlur, None"
+        TransparencyBackgroundFallback="{DynamicResource SolidBackgroundFillColorBaseBrush}">
   <Window.Styles>
     <!-- the DataGrid's own header colours are not defined by FluentAvalonia's theme, which left the header text black on a dark window -->
     <Style Selector="DataGridColumnHeader">
@@ -103,10 +105,10 @@
       <DataGrid.ContextMenu>
         <ContextMenu>
           <MenuItem Header="{x:Static res:Strings.MenuDetails}" Command="{Binding OpenRowCommand}" CommandParameter="{Binding SelectedRow}" AutomationProperties.Name="{x:Static res:Strings.MenuDetails}" />
-          <MenuItem Header="{x:Static res:Strings.ToolbarResume}" Command="{Binding ResumeCommand}" />
-          <MenuItem Header="{x:Static res:Strings.ToolbarPause}" Command="{Binding PauseCommand}" />
+          <MenuItem Header="{x:Static res:Strings.ToolbarResume}" Command="{Binding ResumeCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarResume}" />
+          <MenuItem Header="{x:Static res:Strings.ToolbarPause}" Command="{Binding PauseCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarPause}" />
           <MenuItem Header="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />
-          <MenuItem Header="{x:Static res:Strings.ToolbarDelete}" Command="{Binding DeleteCommand}" />
+          <MenuItem Header="{x:Static res:Strings.ToolbarDelete}" Command="{Binding DeleteCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarDelete}" />
           <Separator />
           <MenuItem x:Name="ColumnsMenu" Header="{x:Static res:Strings.ColumnsMenu}" AutomationProperties.Name="{x:Static res:Strings.ColumnsMenu}" />
         </ContextMenu>
@@ -118,7 +120,7 @@
           <DataGridTemplateColumn.CellTemplate>
             <DataTemplate x:DataType="vm:JobRowViewModel">
               <Grid ColumnDefinitions="*,48" Margin="6,0">
-                <ProgressBar Grid.Column="0" MinWidth="0" Margin="0,0,6,0" Value="{Binding Percent}" Minimum="0" Maximum="100" VerticalAlignment="Center" />
+                <ProgressBar Grid.Column="0" MinWidth="0" Margin="0,0,6,0" Value="{Binding Percent}" Minimum="0" Maximum="100" VerticalAlignment="Center" AutomationProperties.Name="{Binding Percent, StringFormat={}{0:0}%}" />
                 <TextBlock Grid.Column="1" Text="{Binding Percent, StringFormat={}{0:0}%}" HorizontalAlignment="Right" VerticalAlignment="Center" />
               </Grid>
             </DataTemplate>
