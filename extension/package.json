@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "package": "tsx scripts/package.ts",
     "smoke:chromium": "tsx tests/browser/chromium-smoke.ts",
     "smoke:firefox": "web-ext lint --source-dir dist/firefox --warnings-as-errors"
   },

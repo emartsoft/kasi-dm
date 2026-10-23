@@ -140,6 +140,8 @@ jobs:
       - run: npm run check:types
       - run: npm test
       - run: npm run build
+      # M2.7: the store zips and the AMO source package, checked for a key, source maps and the manifest version
+      - run: npm run package -- --skip-build
 
   # M2.2b (plan docs/plans/m2-2.md section 3): the Native AOT publish of the browser's native messaging host, with zero warnings
   # (TreatWarningsAsErrors covers trimming and AOT warnings), a size limit, a recorded cold start and the malformed-message sample
