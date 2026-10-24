@@ -1,0 +1,92 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Kasi.App.Controls">
+  <Styles.Resources>
+    <ControlTheme x:Key="KasiStatusChipTheme" TargetType="c:StatusChip">
+      <Setter Property="Foreground" Value="{DynamicResource KasiTextSecondaryBrush}" />
+      <Setter Property="Background" Value="{DynamicResource KasiNeutralSoftBrush}" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource KasiChipCornerRadius}" Padding="8,2">
+            <TextBlock Text="{TemplateBinding Text}" Foreground="{TemplateBinding Foreground}" FontFamily="{DynamicResource KasiMonoFont}"
+                       FontSize="11" FontWeight="SemiBold" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:accent">
+        <Setter Property="Foreground" Value="{DynamicResource KasiAccentTextBrush}" />
+        <Setter Property="Background" Value="{DynamicResource KasiAccentSoftBrush}" />
+      </Style>
+      <Style Selector="^:info">
+        <Setter Property="Foreground" Value="{DynamicResource KasiInfoBrush}" />
+        <Setter Property="Background" Value="{DynamicResource KasiInfoSoftBrush}" />
+      </Style>
+      <Style Selector="^:success">
+        <Setter Property="Foreground" Value="{DynamicResource KasiSuccessBrush}" />
+        <Setter Property="Background" Value="{DynamicResource KasiSuccessSoftBrush}" />
+      </Style>
+      <Style Selector="^:warning">
+        <Setter Property="Foreground" Value="{DynamicResource KasiWarningBrush}" />
+        <Setter Property="Background" Value="{DynamicResource KasiWarningSoftBrush}" />
+      </Style>
+      <Style Selector="^:danger">
+        <Setter Property="Foreground" Value="{DynamicResource KasiDangerBrush}" />
+        <Setter Property="Background" Value="{DynamicResource KasiDangerSoftBrush}" />
+      </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="KasiToggleRowTheme" TargetType="c:ToggleRow">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{DynamicResource KasiCardBrush}" BorderBrush="{DynamicResource KasiBorderBrush}" BorderThickness="1"
+                  CornerRadius="{DynamicResource KasiCardCornerRadius}" Padding="16,12">
+            <Grid ColumnDefinitions="*,16,Auto">
+              <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Text="{TemplateBinding Title}" FontWeight="SemiBold" Foreground="{DynamicResource KasiTextPrimaryBrush}" />
+                <TextBlock Text="{TemplateBinding Description}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource KasiTextSecondaryBrush}" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2" IsChecked="{TemplateBinding IsChecked, Mode=TwoWay}" OnContent="" OffContent=""
+                            AutomationProperties.Name="{TemplateBinding Title}" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </Styles.Resources>
+
+  <Style Selector=":is(c|StatusChip)">
+    <Setter Property="Theme" Value="{StaticResource KasiStatusChipTheme}" />
+  </Style>
+  <Style Selector="c|ToggleRow">
+    <Setter Property="Theme" Value="{StaticResource KasiToggleRowTheme}" />
+  </Style>
+
+  <!-- a surface: the card of the redesign -->
+  <Style Selector="Border.kasi-card">
+    <Setter Property="Background" Value="{DynamicResource KasiCardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KasiBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KasiCardCornerRadius}" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+
+  <!-- text roles -->
+  <Style Selector="TextBlock.kasi-title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource KasiTextPrimaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.kasi-secondary">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource KasiTextSecondaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.kasi-mono">
+    <Setter Property="FontFamily" Value="{DynamicResource KasiMonoFont}" />
+  </Style>
+  <Style Selector="TextBlock.kasi-icon">
+    <Setter Property="FontFamily" Value="{DynamicResource KasiIconFont}" />
+    <Setter Property="FontSize" Value="16" />
+  </Style>
+</Styles>

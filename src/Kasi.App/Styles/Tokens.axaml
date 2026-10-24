@@ -1,0 +1,130 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Kasi design tokens (docs/adr/0031-ui-design-system.md). Dark follows the redesign mocks; light is derived from the same roles.
+       The brushes are inside each theme dictionary on purpose: a brush defined outside would take its colour from the application's theme,
+       not from the window's. -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Dark">
+      <Color x:Key="KasiBaseColor">#0f0f13</Color>
+      <Color x:Key="KasiMicaColor">#16161c</Color>
+      <Color x:Key="KasiCardColor">#1e1e26</Color>
+      <Color x:Key="KasiCardHoverColor">#252530</Color>
+      <Color x:Key="KasiBorderColor">#2c2d3a</Color>
+      <Color x:Key="KasiSubtleColor">#3b3c4f</Color>
+      <Color x:Key="KasiAccentColor">#6366f1</Color>
+      <Color x:Key="KasiAccentHoverColor">#4f46e5</Color>
+      <Color x:Key="KasiAccentTextColor">#818cf8</Color>
+      <Color x:Key="KasiTextPrimaryColor">#e2e8f0</Color>
+      <Color x:Key="KasiTextSecondaryColor">#94a3b8</Color>
+      <Color x:Key="KasiSuccessColor">#34d399</Color>
+      <Color x:Key="KasiWarningColor">#fbbf24</Color>
+      <Color x:Key="KasiDangerColor">#f87171</Color>
+      <Color x:Key="KasiInfoColor">#38bdf8</Color>
+
+      <SolidColorBrush x:Key="KasiBaseBrush" Color="{StaticResource KasiBaseColor}" />
+      <SolidColorBrush x:Key="KasiMicaBrush" Color="{StaticResource KasiMicaColor}" />
+      <SolidColorBrush x:Key="KasiCardBrush" Color="{StaticResource KasiCardColor}" />
+      <SolidColorBrush x:Key="KasiCardHoverBrush" Color="{StaticResource KasiCardHoverColor}" />
+      <SolidColorBrush x:Key="KasiBorderBrush" Color="{StaticResource KasiBorderColor}" />
+      <SolidColorBrush x:Key="KasiSubtleBrush" Color="{StaticResource KasiSubtleColor}" />
+      <SolidColorBrush x:Key="KasiAccentBrush" Color="{StaticResource KasiAccentColor}" />
+      <SolidColorBrush x:Key="KasiAccentHoverBrush" Color="{StaticResource KasiAccentHoverColor}" />
+      <SolidColorBrush x:Key="KasiAccentTextBrush" Color="{StaticResource KasiAccentTextColor}" />
+      <SolidColorBrush x:Key="KasiTextPrimaryBrush" Color="{StaticResource KasiTextPrimaryColor}" />
+      <SolidColorBrush x:Key="KasiTextSecondaryBrush" Color="{StaticResource KasiTextSecondaryColor}" />
+      <SolidColorBrush x:Key="KasiSuccessBrush" Color="{StaticResource KasiSuccessColor}" />
+      <SolidColorBrush x:Key="KasiWarningBrush" Color="{StaticResource KasiWarningColor}" />
+      <SolidColorBrush x:Key="KasiDangerBrush" Color="{StaticResource KasiDangerColor}" />
+      <SolidColorBrush x:Key="KasiInfoBrush" Color="{StaticResource KasiInfoColor}" />
+      <SolidColorBrush x:Key="KasiNeutralSoftBrush" Color="{StaticResource KasiSubtleColor}" Opacity="0.35" />
+      <SolidColorBrush x:Key="KasiAccentSoftBrush" Color="{StaticResource KasiAccentColor}" Opacity="0.18" />
+      <SolidColorBrush x:Key="KasiInfoSoftBrush" Color="{StaticResource KasiInfoColor}" Opacity="0.15" />
+      <SolidColorBrush x:Key="KasiSuccessSoftBrush" Color="{StaticResource KasiSuccessColor}" Opacity="0.15" />
+      <SolidColorBrush x:Key="KasiWarningSoftBrush" Color="{StaticResource KasiWarningColor}" Opacity="0.15" />
+      <SolidColorBrush x:Key="KasiDangerSoftBrush" Color="{StaticResource KasiDangerColor}" Opacity="0.15" />
+
+      <!-- the stock controls take the design's accent: a filled accent button, an indigo switch with a white knob -->
+      <StaticResource x:Key="AccentButtonBackground" ResourceKey="KasiAccentBrush" />
+      <StaticResource x:Key="AccentButtonBackgroundPointerOver" ResourceKey="KasiAccentHoverBrush" />
+      <StaticResource x:Key="AccentButtonBackgroundPressed" ResourceKey="KasiAccentHoverBrush" />
+      <SolidColorBrush x:Key="AccentButtonForeground" Color="#ffffff" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#ffffff" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#ffffff" />
+      <StaticResource x:Key="ToggleSwitchFillOn" ResourceKey="KasiAccentBrush" />
+      <StaticResource x:Key="ToggleSwitchFillOnPointerOver" ResourceKey="KasiAccentHoverBrush" />
+      <StaticResource x:Key="ToggleSwitchFillOnPressed" ResourceKey="KasiAccentHoverBrush" />
+      <StaticResource x:Key="ToggleSwitchStrokeOn" ResourceKey="KasiAccentBrush" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#ffffff" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#ffffff" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#ffffff" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Light">
+      <Color x:Key="KasiBaseColor">#f4f4f8</Color>
+      <Color x:Key="KasiMicaColor">#ececf3</Color>
+      <Color x:Key="KasiCardColor">#ffffff</Color>
+      <Color x:Key="KasiCardHoverColor">#f6f6fb</Color>
+      <Color x:Key="KasiBorderColor">#dcdde8</Color>
+      <Color x:Key="KasiSubtleColor">#c4c6d6</Color>
+      <Color x:Key="KasiAccentColor">#4f46e5</Color>
+      <Color x:Key="KasiAccentHoverColor">#4338ca</Color>
+      <Color x:Key="KasiAccentTextColor">#4f46e5</Color>
+      <Color x:Key="KasiTextPrimaryColor">#1e293b</Color>
+      <Color x:Key="KasiTextSecondaryColor">#475569</Color>
+      <Color x:Key="KasiSuccessColor">#047857</Color>
+      <Color x:Key="KasiWarningColor">#b45309</Color>
+      <Color x:Key="KasiDangerColor">#b91c1c</Color>
+      <Color x:Key="KasiInfoColor">#0369a1</Color>
+
+      <SolidColorBrush x:Key="KasiBaseBrush" Color="{StaticResource KasiBaseColor}" />
+      <SolidColorBrush x:Key="KasiMicaBrush" Color="{StaticResource KasiMicaColor}" />
+      <SolidColorBrush x:Key="KasiCardBrush" Color="{StaticResource KasiCardColor}" />
+      <SolidColorBrush x:Key="KasiCardHoverBrush" Color="{StaticResource KasiCardHoverColor}" />
+      <SolidColorBrush x:Key="KasiBorderBrush" Color="{StaticResource KasiBorderColor}" />
+      <SolidColorBrush x:Key="KasiSubtleBrush" Color="{StaticResource KasiSubtleColor}" />
+      <SolidColorBrush x:Key="KasiAccentBrush" Color="{StaticResource KasiAccentColor}" />
+      <SolidColorBrush x:Key="KasiAccentHoverBrush" Color="{StaticResource KasiAccentHoverColor}" />
+      <SolidColorBrush x:Key="KasiAccentTextBrush" Color="{StaticResource KasiAccentTextColor}" />
+      <SolidColorBrush x:Key="KasiTextPrimaryBrush" Color="{StaticResource KasiTextPrimaryColor}" />
+      <SolidColorBrush x:Key="KasiTextSecondaryBrush" Color="{StaticResource KasiTextSecondaryColor}" />
+      <SolidColorBrush x:Key="KasiSuccessBrush" Color="{StaticResource KasiSuccessColor}" />
+      <SolidColorBrush x:Key="KasiWarningBrush" Color="{StaticResource KasiWarningColor}" />
+      <SolidColorBrush x:Key="KasiDangerBrush" Color="{StaticResource KasiDangerColor}" />
+      <SolidColorBrush x:Key="KasiInfoBrush" Color="{StaticResource KasiInfoColor}" />
+      <SolidColorBrush x:Key="KasiNeutralSoftBrush" Color="{StaticResource KasiSubtleColor}" Opacity="0.35" />
+      <SolidColorBrush x:Key="KasiAccentSoftBrush" Color="{StaticResource KasiAccentColor}" Opacity="0.18" />
+      <SolidColorBrush x:Key="KasiInfoSoftBrush" Color="{StaticResource KasiInfoColor}" Opacity="0.15" />
+      <SolidColorBrush x:Key="KasiSuccessSoftBrush" Color="{StaticResource KasiSuccessColor}" Opacity="0.15" />
+      <SolidColorBrush x:Key="KasiWarningSoftBrush" Color="{StaticResource KasiWarningColor}" Opacity="0.15" />
+      <SolidColorBrush x:Key="KasiDangerSoftBrush" Color="{StaticResource KasiDangerColor}" Opacity="0.15" />
+
+      <!-- the stock controls take the design's accent: a filled accent button, an indigo switch with a white knob -->
+      <StaticResource x:Key="AccentButtonBackground" ResourceKey="KasiAccentBrush" />
+      <StaticResource x:Key="AccentButtonBackgroundPointerOver" ResourceKey="KasiAccentHoverBrush" />
+      <StaticResource x:Key="AccentButtonBackgroundPressed" ResourceKey="KasiAccentHoverBrush" />
+      <SolidColorBrush x:Key="AccentButtonForeground" Color="#ffffff" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#ffffff" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#ffffff" />
+      <StaticResource x:Key="ToggleSwitchFillOn" ResourceKey="KasiAccentBrush" />
+      <StaticResource x:Key="ToggleSwitchFillOnPointerOver" ResourceKey="KasiAccentHoverBrush" />
+      <StaticResource x:Key="ToggleSwitchFillOnPressed" ResourceKey="KasiAccentHoverBrush" />
+      <StaticResource x:Key="ToggleSwitchStrokeOn" ResourceKey="KasiAccentBrush" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#ffffff" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#ffffff" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#ffffff" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <CornerRadius x:Key="KasiCardCornerRadius">8</CornerRadius>
+  <CornerRadius x:Key="KasiControlCornerRadius">6</CornerRadius>
+  <CornerRadius x:Key="KasiChipCornerRadius">4</CornerRadius>
+  <x:Double x:Key="KasiSpace1">4</x:Double>
+  <x:Double x:Key="KasiSpace2">8</x:Double>
+  <x:Double x:Key="KasiSpace3">12</x:Double>
+  <x:Double x:Key="KasiSpace4">16</x:Double>
+  <x:Double x:Key="KasiSpace5">24</x:Double>
+
+  <!-- Windows 11 ships Segoe UI Variable and Segoe Fluent Icons; Windows 10 falls back to Segoe UI and Segoe MDL2 Assets (same code points) -->
+  <FontFamily x:Key="KasiTextFont">Segoe UI Variable, Segoe UI, sans-serif</FontFamily>
+  <FontFamily x:Key="KasiMonoFont">Consolas, Cascadia Mono, monospace</FontFamily>
+  <FontFamily x:Key="KasiIconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+</ResourceDictionary>
