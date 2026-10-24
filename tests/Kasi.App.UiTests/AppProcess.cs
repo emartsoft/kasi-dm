@@ -30,6 +30,9 @@ public sealed class AppProcess : IAsyncDisposable
 
     public string DataFolder { get; }
 
+    /// <summary>Where Kasi saves a download that names no folder (<c>KASI_DOWNLOADS_DIR</c>), so a test never writes into the user's Downloads.</summary>
+    public string DownloadsFolder => Path.Combine(Path.GetDirectoryName(DataFolder)!, "downloads");
+
     /// <summary>The name of this instance's browser pipe: the per-user name with the test suffix this app was started with.</summary>
     public string BrowserPipe { get; private set; } = string.Empty;
 
@@ -56,6 +59,7 @@ public sealed class AppProcess : IAsyncDisposable
         }
 
         start.Environment["KASI_DATA_DIR"] = data;
+        start.Environment["KASI_DOWNLOADS_DIR"] = Path.Combine(root, "downloads");
         var suffix = "ui" + Guid.NewGuid().ToString("N")[..8];
         start.Environment["KASI_ENDPOINT_SUFFIX"] = suffix;
         var app = new AppProcess(Process.Start(start)!, start, data, work);
@@ -78,7 +82,7 @@ public sealed class AppProcess : IAsyncDisposable
         using var second = Process.Start(new ProcessStartInfo(_start.FileName)
         {
             UseShellExecute = false,
-            Environment = { ["KASI_DATA_DIR"] = _start.Environment["KASI_DATA_DIR"], ["KASI_ENDPOINT_SUFFIX"] = _start.Environment["KASI_ENDPOINT_SUFFIX"] },
+            Environment = { ["KASI_DATA_DIR"] = _start.Environment["KASI_DATA_DIR"], ["KASI_DOWNLOADS_DIR"] = _start.Environment["KASI_DOWNLOADS_DIR"], ["KASI_ENDPOINT_SUFFIX"] = _start.Environment["KASI_ENDPOINT_SUFFIX"] },
         })!;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         limit.CancelAfter(TimeSpan.FromSeconds(60));

@@ -127,4 +127,55 @@ public sealed class QueueAndCategoryRepositoryTests : IAsyncLifetime, IDisposabl
         (await repository.GetAsync(20, TempDatabase.Ct)).Should().BeEquivalentTo(new Category { Id = 20, Name = "Code", Folder = "Downloads\\Code" });
         (await repository.GetAsync(404, TempDatabase.Ct)).Should().BeNull();
     }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-002")]
+    public async Task A_user_category_can_be_added_changed_and_deleted_with_its_rules()
+    {
+        var categories = new CategoryRepository(_db.Factory);
+        var rules = new CategoryRuleRepository(_db.Factory);
+
+        var id = await categories.AddAsync(new Category { Id = 99, Name = "Code", Folder = "Code", IsBuiltin = true }, TempDatabase.Ct);
+        await rules.AddAsync(new CategoryRule { CategoryId = id, Kind = CategoryRuleKind.Domain, Pattern = "github.com" }, TempDatabase.Ct);
+
+        (await categories.GetAsync(id, TempDatabase.Ct)).Should().Be(new Category { Id = id, Name = "Code", Folder = "Code", IsBuiltin = false });
+        (await categories.UpdateAsync(new Category { Id = id, Name = "Source", Folder = @"D:\Src" }, TempDatabase.Ct)).Should().BeTrue();
+        (await categories.GetAsync(id, TempDatabase.Ct))!.Should().BeEquivalentTo(new Category { Id = id, Name = "Source", Folder = @"D:\Src" });
+        (await categories.DeleteAsync(id, TempDatabase.Ct)).Should().BeTrue();
+        (await categories.GetAsync(id, TempDatabase.Ct)).Should().BeNull();
+        (await rules.ListAsync(TempDatabase.Ct)).Should().NotContain(r => r.CategoryId == id);
+        (await categories.DeleteAsync(id, TempDatabase.Ct)).Should().BeFalse();
+        (await categories.UpdateAsync(new Category { Id = id, Name = "x", Folder = "x" }, TempDatabase.Ct)).Should().BeFalse();
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-002")]
+    public async Task A_built_in_category_keeps_its_name_and_cannot_be_deleted_but_its_folder_can_change()
+    {
+        var categories = new CategoryRepository(_db.Factory);
+
+        (await categories.UpdateAsync(new Category { Id = 5, Name = "Movies", Folder = "Films" }, TempDatabase.Ct)).Should().BeTrue();
+        (await categories.DeleteAsync(5, TempDatabase.Ct)).Should().BeFalse();
+
+        var video = (await categories.GetAsync(5, TempDatabase.Ct))!;
+        video.Name.Should().Be("Video", "a built-in category is not renamed");
+        video.Folder.Should().Be("Films");
+        video.IsBuiltin.Should().BeTrue();
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-002")]
+    public async Task Deleting_a_category_lets_its_jobs_keep_their_folder_and_leaves_other_jobs_alone()
+    {
+        var categories = new CategoryRepository(_db.Factory);
+        var id = await categories.AddAsync(new Category { Id = 0, Name = "Code", Folder = "Code" }, TempDatabase.Ct);
+        await _db.ExecAsync($"INSERT INTO job (id, kind, url, file_name, folder, state, queue_id, queue_pos, category_id, created_utc) VALUES ('a', 'http', 'u', 'f', 'D:/Code', 'Queued', 1, 1.0, {id}, 't');");
+        await _db.ExecAsync("INSERT INTO job (id, kind, url, file_name, folder, state, queue_id, queue_pos, category_id, created_utc) VALUES ('b', 'http', 'u', 'g', 'D:/Video', 'Queued', 1, 2.0, 5, 't');");
+
+        (await categories.DeleteAsync(id, TempDatabase.Ct)).Should().BeTrue();
+
+        (await _db.ScalarAsync("SELECT COUNT(*) FROM job WHERE id = 'a' AND category_id IS NULL;")).Should().Be(1L, "the job falls back to no category");
+        (await _db.ScalarAsync("SELECT folder FROM job WHERE id = 'a';")).Should().Be("D:/Code", "its file stays where it is");
+        (await _db.ScalarAsync("SELECT category_id FROM job WHERE id = 'b';")).Should().Be(5L);
+    }
 }

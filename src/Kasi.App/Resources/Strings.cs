@@ -357,4 +357,80 @@ internal static class Strings
     public static string SettingsSaveFailed => Get(nameof(SettingsSaveFailed));
 
     private static string Get(string name) => _resources.GetString(name, CultureInfo.CurrentUICulture) ?? name;
+
+    public static string CategoriesTab => Get(nameof(CategoriesTab));
+
+    public static string CategoriesNote => Get(nameof(CategoriesNote));
+
+    public static string CategoriesListLabel => Get(nameof(CategoriesListLabel));
+
+    public static string CategoryNameLabel => Get(nameof(CategoryNameLabel));
+
+    public static string CategoryFolderLabel => Get(nameof(CategoryFolderLabel));
+
+    public static string CategoryAddButton => Get(nameof(CategoryAddButton));
+
+    public static string CategorySaveButton => Get(nameof(CategorySaveButton));
+
+    public static string CategoryDeleteButton => Get(nameof(CategoryDeleteButton));
+
+    public static string CategoryNewLabel => Get(nameof(CategoryNewLabel));
+
+    public static string CategoryNewFolderLabel => Get(nameof(CategoryNewFolderLabel));
+
+    public static string CategoryBuiltinMark => Get(nameof(CategoryBuiltinMark));
+
+    public static string RulesLabel => Get(nameof(RulesLabel));
+
+    public static string RuleKindLabel => Get(nameof(RuleKindLabel));
+
+    public static string RuleKindExtension => Get(nameof(RuleKindExtension));
+
+    public static string RuleKindDomain => Get(nameof(RuleKindDomain));
+
+    public static string RuleKindUrl => Get(nameof(RuleKindUrl));
+
+    public static string RulePatternLabel => Get(nameof(RulePatternLabel));
+
+    public static string RuleAddButton => Get(nameof(RuleAddButton));
+
+    public static string RuleDeleteButton => Get(nameof(RuleDeleteButton));
+
+    public static string RuleMoveUp => Get(nameof(RuleMoveUp));
+
+    public static string RuleMoveDown => Get(nameof(RuleMoveDown));
+
+    public static string RuleEnabledLabel => Get(nameof(RuleEnabledLabel));
+
+    public static string RuleOriginYours => Get(nameof(RuleOriginYours));
+
+    public static string TryLabel => Get(nameof(TryLabel));
+
+    public static string TryButton => Get(nameof(TryButton));
+
+    public static string TryNoLink => Get(nameof(TryNoLink));
+
+    public static string TryResultFormat => Get(nameof(TryResultFormat));
+
+    public static string TryBecauseRule => Get(nameof(TryBecauseRule));
+
+    public static string TryBecauseNothing => Get(nameof(TryBecauseNothing));
+
+    public static string CategoriesSaved => Get(nameof(CategoriesSaved));
+
+    public static string CategoryErrorName => Get(nameof(CategoryErrorName));
+
+    public static string CategoryErrorNameTaken => Get(nameof(CategoryErrorNameTaken));
+
+    public static string CategoryErrorFolder => Get(nameof(CategoryErrorFolder));
+
+    public static string RuleErrorEmpty => Get(nameof(RuleErrorEmpty));
+
+    public static string RuleErrorTooLong => Get(nameof(RuleErrorTooLong));
+
+    public static string RuleErrorEverything => Get(nameof(RuleErrorEverything));
+
+    public static string RuleErrorExtension => Get(nameof(RuleErrorExtension));
+
+    public static string RuleErrorChars => Get(nameof(RuleErrorChars));
 }

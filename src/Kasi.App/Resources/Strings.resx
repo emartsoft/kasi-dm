@@ -729,4 +729,156 @@
     <value>The settings could not be saved.</value>
     <comment>Shown when saving the settings file failed.</comment>
   </data>
+  <data name="CategoriesTab" xml:space="preserve">
+    <value>Categories</value>
+    <comment>Tab header of the Categories page in Settings.</comment>
+  </data>
+  <data name="CategoriesNote" xml:space="preserve">
+    <value>Changes on this page are saved at once.</value>
+    <comment>Note at the top of the Categories page.</comment>
+  </data>
+  <data name="CategoriesListLabel" xml:space="preserve">
+    <value>Categories</value>
+    <comment>Label of the list of categories.</comment>
+  </data>
+  <data name="CategoryNameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>Label of the category name box.</comment>
+  </data>
+  <data name="CategoryFolderLabel" xml:space="preserve">
+    <value>Folder (under Downloads, or a full path)</value>
+    <comment>Label of the category folder box.</comment>
+  </data>
+  <data name="CategoryAddButton" xml:space="preserve">
+    <value>Add category</value>
+    <comment>Button that adds a new category.</comment>
+  </data>
+  <data name="CategorySaveButton" xml:space="preserve">
+    <value>Save category</value>
+    <comment>Button that saves the name and folder of the chosen category.</comment>
+  </data>
+  <data name="CategoryDeleteButton" xml:space="preserve">
+    <value>Delete category</value>
+    <comment>Button that deletes the chosen category; downloads already made keep their folder.</comment>
+  </data>
+  <data name="CategoryNewLabel" xml:space="preserve">
+    <value>New category</value>
+    <comment>Heading above the boxes for a new category.</comment>
+  </data>
+  <data name="CategoryNewFolderLabel" xml:space="preserve">
+    <value>Folder for the new category</value>
+    <comment>Name of the folder box for a new category (read by a screen reader).</comment>
+  </data>
+  <data name="CategoryBuiltinMark" xml:space="preserve">
+    <value>Built in</value>
+    <comment>Marks a category or rule that ships with Kasi.</comment>
+  </data>
+  <data name="RulesLabel" xml:space="preserve">
+    <value>Rules for this category</value>
+    <comment>Label of the list of rules of the chosen category.</comment>
+  </data>
+  <data name="RuleKindLabel" xml:space="preserve">
+    <value>Rule type</value>
+    <comment>Label of the rule type list.</comment>
+  </data>
+  <data name="RuleKindExtension" xml:space="preserve">
+    <value>File extension</value>
+    <comment>Rule type: matches the file extension, like mp4.</comment>
+  </data>
+  <data name="RuleKindDomain" xml:space="preserve">
+    <value>Website</value>
+    <comment>Rule type: matches the website name, like *.example.com.</comment>
+  </data>
+  <data name="RuleKindUrl" xml:space="preserve">
+    <value>Address</value>
+    <comment>Rule type: matches the address up to the path, like https://example.org/files/*.</comment>
+  </data>
+  <data name="RulePatternLabel" xml:space="preserve">
+    <value>Pattern</value>
+    <comment>Label of the rule pattern box.</comment>
+  </data>
+  <data name="RuleAddButton" xml:space="preserve">
+    <value>Add rule</value>
+    <comment>Button that adds a rule.</comment>
+  </data>
+  <data name="RuleDeleteButton" xml:space="preserve">
+    <value>Delete rule</value>
+    <comment>Button that deletes the chosen rule of your own.</comment>
+  </data>
+  <data name="RuleMoveUp" xml:space="preserve">
+    <value>Move up</value>
+    <comment>Button that tries the chosen rule earlier.</comment>
+  </data>
+  <data name="RuleMoveDown" xml:space="preserve">
+    <value>Move down</value>
+    <comment>Button that tries the chosen rule later.</comment>
+  </data>
+  <data name="RuleEnabledLabel" xml:space="preserve">
+    <value>On</value>
+    <comment>Check box that switches a rule on or off.</comment>
+  </data>
+  <data name="RuleOriginYours" xml:space="preserve">
+    <value>Yours</value>
+    <comment>Marks a rule the person added.</comment>
+  </data>
+  <data name="TryLabel" xml:space="preserve">
+    <value>Try a link</value>
+    <comment>Label of the box where a link is typed to see its category.</comment>
+  </data>
+  <data name="TryButton" xml:space="preserve">
+    <value>Check</value>
+    <comment>Button that shows the category a link would get.</comment>
+  </data>
+  <data name="TryNoLink" xml:space="preserve">
+    <value>Type a full link, starting with http or https.</value>
+    <comment>Shown when the link to try is not a link.</comment>
+  </data>
+  <data name="TryResultFormat" xml:space="preserve">
+    <value>{0}: saved in {1} ({2})</value>
+    <comment>Result of trying a link: category, folder, reason.</comment>
+  </data>
+  <data name="TryBecauseRule" xml:space="preserve">
+    <value>{0} rule {1}</value>
+    <comment>Reason in the result: the rule type and its pattern.</comment>
+  </data>
+  <data name="TryBecauseNothing" xml:space="preserve">
+    <value>nothing matched, so General</value>
+    <comment>Reason in the result when no rule matched.</comment>
+  </data>
+  <data name="CategoriesSaved" xml:space="preserve">
+    <value>Saved.</value>
+    <comment>Shown after a change on the Categories page was saved.</comment>
+  </data>
+  <data name="CategoryErrorName" xml:space="preserve">
+    <value>Give the category a name of up to 64 characters.</value>
+    <comment>Error: the category name is empty, too long or has control characters.</comment>
+  </data>
+  <data name="CategoryErrorNameTaken" xml:space="preserve">
+    <value>A category with this name already exists.</value>
+    <comment>Error: the category name is taken.</comment>
+  </data>
+  <data name="CategoryErrorFolder" xml:space="preserve">
+    <value>The folder must be a plain folder name or a full path, without .. and without characters Windows does not allow.</value>
+    <comment>Error: the category folder is not valid.</comment>
+  </data>
+  <data name="RuleErrorEmpty" xml:space="preserve">
+    <value>Type a pattern.</value>
+    <comment>Error: the rule pattern is empty.</comment>
+  </data>
+  <data name="RuleErrorTooLong" xml:space="preserve">
+    <value>A pattern can be at most 256 characters.</value>
+    <comment>Error: the rule pattern is too long.</comment>
+  </data>
+  <data name="RuleErrorEverything" xml:space="preserve">
+    <value>A pattern that matches everything is not allowed; General already catches the rest.</value>
+    <comment>Error: the pattern is only stars.</comment>
+  </data>
+  <data name="RuleErrorExtension" xml:space="preserve">
+    <value>An extension is letters and digits, like mp4 or tar.gz, without a dot in front.</value>
+    <comment>Error: the extension pattern is not valid.</comment>
+  </data>
+  <data name="RuleErrorChars" xml:space="preserve">
+    <value>A pattern cannot have spaces or control characters.</value>
+    <comment>Error: the pattern has spaces or control characters.</comment>
+  </data>
 </root>

@@ -37,6 +37,39 @@ public sealed class UiFlowTests
     }
 
     [UiFact]
+    [Trait("TC", "TC-CAT-002")]
+    [Trait("Requirement", "KASI-CAT-002")]
+    public async Task A_category_and_a_rule_made_in_settings_route_the_next_download_into_its_folder()
+    {
+        await using var server = await TestServerHost.StartAsync(cancellationToken: Ct);
+        await using var app = AppProcess.Start();
+        var window = app.WaitForWindow(AppProcess.MainWindowName);
+
+        window.Press("Settings");
+        var settings = app.WaitForWindow("Kasi settings");
+        settings.Named(ControlType.TabItem, "Categories", "the Categories tab").Patterns.SelectionItem.Pattern.Select();
+        settings.SetText("New category", "Mine");
+        settings.SetText("Folder for the new category", "Mine");
+        settings.Press("Add category");
+        UiHelpers.WaitFor(() => settings.FindFirstDescendant(c => c.ByName("Saved.")), "the page to say it saved", settings);
+        settings.SetText("Pattern", "zzz");
+        settings.Press("Add rule");
+        UiHelpers.WaitFor(() => settings.FindAllDescendants(c => c.ByControlType(ControlType.CheckBox)).FirstOrDefault(c => c.Name.Contains("zzz", StringComparison.Ordinal)), "the new rule in the list", settings);
+        settings.Press("Cancel");
+
+        window.Press("Add URL");
+        var dialog = app.WaitForWindow("Add download");
+        dialog.SetText("Link", new Uri(server.BaseAddress, "/files/ui-category/1024").ToString());
+        dialog.SetText("Save as", "routed.zzz");
+        UiHelpers.WaitFor(() => dialog.FindFirstDescendant(c => c.ByControlType(ControlType.ComboBox).And(c.ByName("Category"))) is { } box && box.FindFirstDescendant(c => c.ByName("Mine")) is not null ? box : null, "the dialog to choose Mine by the rule", dialog);
+        dialog.Press("Add");
+
+        var path = Path.Combine(app.DownloadsFolder, "Mine", "routed.zzz");
+        UiHelpers.WaitFor(() => File.Exists(path) && new FileInfo(path).Length == 1024 ? path : null, "the file in the new category's folder", window);
+        (await UiHelpers.Sha256Async(path, Ct)).Should().Be(GeneratedContent.Sha256Hex("ui-category", 1024));
+    }
+
+    [UiFact]
     [Trait("TC", "TC-BRW-005")]
     [Trait("Requirement", "KASI-BRW-005")]
     public async Task Links_a_browser_sends_open_the_picker_and_only_the_ticked_ones_download()

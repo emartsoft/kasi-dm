@@ -1,6 +1,6 @@
 # ADR 0028: Categories, rules and file safety
 
-- **Status:** Proposed (M2.11a, 11b and 11b2; 11c to 11e extend it)
+- **Status:** Proposed (M2.11a to 11c; 11d and 11e extend it)
 - **Requirements:** KASI-CAT-001, KASI-CAT-002 (11a); KASI-CAT-003, KASI-CAT-004 (11d, 11e) | **Test cases:** TC-CAT-001, TC-CAT-002
 - **Plan:** [`docs/plans/m2-11.md`](../plans/m2-11.md)
 
@@ -26,6 +26,13 @@ A download takes its category from the dialog or a remembered site, otherwise it
 8. **A job knows whether only the fallback decided its category.** `job.category_auto` (migration `0008`, `Job.CategoryAuto`) is set by `JobService.AddAsync` when no category and no folder were named and the resolver found nothing in the link, the name or the browser's MIME type (`CategoryMatch.IsFallback`). A person's choice, a rule's choice and the browser's MIME type all leave it off.
 9. **The engine asks once, after the probe.** For a job with `CategoryAuto` and no saved bytes, `HttpTransferOptions.RouteAfterProbe` calls an `IPostProbeRouter` (Core; the engine does not know categories) with the file name and the `Content-Type` the probe reported, before the part file is created. The app's `CategoryRouter` runs the resolver with that MIME type; if it finds a category other than the fallback it saves the job's category and folder (`UpdateRoutingAsync`, which also clears the mark, so a job is routed once and a resume looks in the right folder) and returns the folder. A router that returns null or throws changes nothing and never fails the download (the job log says "not re-checked").
 10. **Not done:** a job whose probe reports a file name (Content-Disposition) is not re-named by it, as before: the dialog's name wins. Only the MIME type is new here.
+
+## Decision (11c)
+
+11. **A Categories tab in Settings that saves each change at once**, so it has no Save button of its own (the window's Save and Cancel apply to the General and Browser tabs). `CategoriesViewModel` lists the categories and, for the chosen one, its rules (kind, pattern, built in or yours, on or off with a check box), with add, save, delete and move up or down. A built-in category keeps its name, takes only a folder under Downloads, and cannot be deleted; its rules can be switched off, not deleted. A user category may take a relative folder or a full path (a drive or a share). Deleting a category deletes its rules and leaves its downloads where they are, with no category.
+12. **What may be typed is checked before it is saved** (`CategoryInput`): a name of 1 to 64 characters that no other category has (ignoring case); a folder without `..`, reserved Windows names, characters Windows does not allow or stream syntax; a pattern by `GlobPattern.Validate`. Every message is a resource string.
+13. **"Try a link"** runs the resolver on a typed link and says which category and folder it would get and which rule decided, or that nothing matched and General is used.
+14. **Moving a rule** swaps its position with the next rule of the same kind shown for that category; rules of other categories keep their own positions.
 
 ## Consequences
 

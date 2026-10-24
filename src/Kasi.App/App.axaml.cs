@@ -188,8 +188,13 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     {
         if (_settings is not { IsVisible: true })
         {
-            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>());
+            var categories = new CategoriesViewModel(
+                services.GetRequiredService<ICategoryRepository>(),
+                services.GetRequiredService<ICategoryRuleRepository>(),
+                AppPaths.DownloadsFolder());
+            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>(), categories);
             _settings = new SettingsWindow { DataContext = model };
+            _ = categories.LoadAsync();
             model.Saved += _settings.Close;
             _settings.Show();
         }
