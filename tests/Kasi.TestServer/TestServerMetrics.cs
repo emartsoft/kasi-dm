@@ -17,6 +17,7 @@ public sealed class TestServerMetrics
     private int _http2Requests;
     private int _requestsWithAuthorization;
     private int _requestsWithCookie;
+    private int _requestsWithReferer;
     private int _authChallenges;
     private int _signedLinkRejects;
     private int _requestsServed;
@@ -44,6 +45,8 @@ public sealed class TestServerMetrics
     public int RequestsWithAuthorization => Volatile.Read(ref _requestsWithAuthorization);
 
     public int RequestsWithCookie => Volatile.Read(ref _requestsWithCookie);
+
+    public int RequestsWithReferer => Volatile.Read(ref _requestsWithReferer);
 
     public int AuthChallengesSent => Volatile.Read(ref _authChallenges);
 
@@ -78,6 +81,7 @@ public sealed class TestServerMetrics
         Interlocked.Exchange(ref _http2Requests, 0);
         Interlocked.Exchange(ref _requestsWithAuthorization, 0);
         Interlocked.Exchange(ref _requestsWithCookie, 0);
+        Interlocked.Exchange(ref _requestsWithReferer, 0);
         Interlocked.Exchange(ref _authChallenges, 0);
         Interlocked.Exchange(ref _signedLinkRejects, 0);
         Interlocked.Exchange(ref _requestsServed, 0);
@@ -120,6 +124,11 @@ public sealed class TestServerMetrics
         if (!string.IsNullOrEmpty(context.Request.Headers.Cookie))
         {
             Interlocked.Increment(ref _requestsWithCookie);
+        }
+
+        if (!string.IsNullOrEmpty(context.Request.Headers.Referer))
+        {
+            Interlocked.Increment(ref _requestsWithReferer);
         }
 
         var protocol = context.Request.Protocol;

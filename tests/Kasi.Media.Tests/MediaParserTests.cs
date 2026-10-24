@@ -152,6 +152,27 @@ public sealed class MediaParserTests
     }
 
     [Fact]
+    public void Hls_segments_carry_their_media_sequence_number()
+    {
+        var media = HlsParser.ParseMedia("#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:7\n#EXTINF:4,\na.ts\n#EXTINF:4,\nb.ts\n#EXT-X-ENDLIST\n", _master);
+        media.Segments.Select(segment => segment.Sequence).Should().Equal(7L, 8L);
+    }
+
+    [Fact]
+    public void Dash_segment_base_drops_an_init_range_that_is_the_media_file_itself()
+    {
+        const string Mpd = """
+            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT8S"><Period>
+              <AdaptationSet mimeType="video/mp4"><Representation id="v" bandwidth="100"><BaseURL>video.mp4</BaseURL>
+                <SegmentBase indexRange="100-199"><Initialization sourceURL="video.mp4" range="0-99"/></SegmentBase>
+              </Representation></AdaptationSet></Period></MPD>
+            """;
+        var video = DashParser.Parse(Mpd, _manifest).Variants[0].Video;
+        video.Initialization.Should().BeNull("the whole file, init included, is the single segment");
+        video.Segments.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Hls_ignores_blank_lines_and_does_not_leak_uris_in_errors()
     {
         var media = HlsParser.ParseMedia("#EXTM3U\r\n#EXT-X-TARGETDURATION:4\r\n\r\n#EXTINF:4,\r\nseg0.ts\r\n\r\n#EXTINF:4,\r\nseg1.ts\r\n#EXT-X-ENDLIST\r\n\r\n\r\n", _master);

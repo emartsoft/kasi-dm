@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.Media/Kasi.Media.csproj" />
+    <ProjectReference Include="../../src/Kasi.Data/Kasi.Data.csproj" />
+    <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
     <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
     <PackageReference Include="FsCheck.Xunit.v3" />
   </ItemGroup>

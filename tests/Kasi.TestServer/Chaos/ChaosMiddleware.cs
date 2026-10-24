@@ -5,14 +5,15 @@ internal sealed class ChaosMiddleware(RequestDelegate next, ChaosRegistry regist
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!context.Request.Headers.TryGetValue(ChaosRegistry.HeaderName, out var header)
-            || context.Request.Path.StartsWithSegments("/_chaos", StringComparison.Ordinal))
+        var hasHeader = context.Request.Headers.TryGetValue(ChaosRegistry.HeaderName, out var header);
+        if (context.Request.Path.StartsWithSegments("/_chaos", StringComparison.Ordinal)
+            || (!hasHeader && registry.DefaultProfile is null))
         {
             await next(context);
             return;
         }
 
-        var session = registry.Begin(header.ToString());
+        var session = registry.Begin(hasHeader ? header.ToString() : null);
         if (session is null)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
