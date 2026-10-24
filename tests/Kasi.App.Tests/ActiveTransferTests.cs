@@ -110,4 +110,35 @@ public class ActiveTransferTests
         details.SpeedLimits[0].BytesPerSecond.Should().BeNull("the first choice is Unlimited");
         service.OptionsSaved.Select(o => (o.Limit, o.Open)).Should().Equal((1_048_576L, false), (null, false));
     }
+
+    [Fact]
+    [Trait("Requirement", "KASI-UI-003")]
+    public async Task The_footer_names_what_the_queue_does_when_it_finishes_and_opens_the_scheduler_on_that_queue()
+    {
+        var job = TestJobs.New("a.iso", JobState.Downloading, total: 10);
+        var service = new RecordingJobService { QueueList = [new Core.Queue { Id = job.QueueId, Name = "Night", SortOrder = 0, PostAction = PostActionParser.Format(new PostActionConfig { Kind = PostActionKind.Shutdown }) }] };
+        service.Stored[job.Id] = job;
+        var asked = new List<int>();
+        using var details = new DetailsViewModel(new JobRowViewModel(job), service, new ShellSpy(), action => action()) { SchedulerHandler = asked.Add };
+
+        await details.StartAsync(TestContext.Current.CancellationToken);
+
+        details.HasQueueAction.Should().BeTrue();
+        details.QueueActionText.Should().Be("Shut down");
+        details.ChangeQueueActionCommand.Execute(null);
+        asked.Should().Equal(job.QueueId);
+    }
+
+    [Fact]
+    public async Task A_queue_that_does_nothing_when_it_finishes_adds_no_row()
+    {
+        var job = TestJobs.New("a.iso", JobState.Downloading, total: 10);
+        var service = new RecordingJobService { QueueList = [new Core.Queue { Id = job.QueueId, Name = "Main", SortOrder = 0 }] };
+        service.Stored[job.Id] = job;
+        using var details = new DetailsViewModel(new JobRowViewModel(job), service, new ShellSpy(), action => action());
+
+        await details.StartAsync(TestContext.Current.CancellationToken);
+
+        details.HasQueueAction.Should().BeFalse();
+    }
 }

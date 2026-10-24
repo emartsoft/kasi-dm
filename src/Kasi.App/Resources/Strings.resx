@@ -1117,4 +1117,157 @@
   <data name="ToastDetailsFormat" xml:space="preserve">
     <value>{0} in {1}</value>
   </data>
+  <data name="SchedulerTitle" xml:space="preserve">
+    <value>Scheduler</value>
+  </data>
+  <data name="SchedulerQueueLabel" xml:space="preserve">
+    <value>Queue:</value>
+  </data>
+  <data name="SchedulerSelectQueue" xml:space="preserve">
+    <value>Select Queue</value>
+  </data>
+  <data name="SchedulerTabQueue" xml:space="preserve">
+    <value>Queue settings</value>
+  </data>
+  <data name="SchedulerTabSchedule" xml:space="preserve">
+    <value>Schedule</value>
+  </data>
+  <data name="SchedulerTabPost" xml:space="preserve">
+    <value>Post-completion</value>
+  </data>
+  <data name="SchedulerMaxParallel" xml:space="preserve">
+    <value>Maximum parallel downloads (1–20):</value>
+  </data>
+  <data name="SchedulerMaxParallelName" xml:space="preserve">
+    <value>Maximum parallel downloads</value>
+  </data>
+  <data name="SchedulerEnable" xml:space="preserve">
+    <value>Enable schedule</value>
+  </data>
+  <data name="SchedulerStartLabel" xml:space="preserve">
+    <value>Start time (HH:mm):</value>
+  </data>
+  <data name="SchedulerStartName" xml:space="preserve">
+    <value>Start time</value>
+  </data>
+  <data name="SchedulerStopLabel" xml:space="preserve">
+    <value>Stop time (HH:mm):</value>
+  </data>
+  <data name="SchedulerStopName" xml:space="preserve">
+    <value>Stop time</value>
+  </data>
+  <data name="SchedulerUntilEmpty" xml:space="preserve">
+    <value>Run until queue is empty (no stop time)</value>
+  </data>
+  <data name="SchedulerUntilEmptyName" xml:space="preserve">
+    <value>Run until queue is empty</value>
+  </data>
+  <data name="SchedulerActiveDays" xml:space="preserve">
+    <value>Active days:</value>
+  </data>
+  <data name="SchedulerDaySun" xml:space="preserve">
+    <value>Sun</value>
+  </data>
+  <data name="SchedulerDayMon" xml:space="preserve">
+    <value>Mon</value>
+  </data>
+  <data name="SchedulerDayTue" xml:space="preserve">
+    <value>Tue</value>
+  </data>
+  <data name="SchedulerDayWed" xml:space="preserve">
+    <value>Wed</value>
+  </data>
+  <data name="SchedulerDayThu" xml:space="preserve">
+    <value>Thu</value>
+  </data>
+  <data name="SchedulerDayFri" xml:space="preserve">
+    <value>Fri</value>
+  </data>
+  <data name="SchedulerDaySat" xml:space="preserve">
+    <value>Sat</value>
+  </data>
+  <data name="SchedulerDaySunday" xml:space="preserve">
+    <value>Sunday</value>
+  </data>
+  <data name="SchedulerDayMonday" xml:space="preserve">
+    <value>Monday</value>
+  </data>
+  <data name="SchedulerDayTuesday" xml:space="preserve">
+    <value>Tuesday</value>
+  </data>
+  <data name="SchedulerDayWednesday" xml:space="preserve">
+    <value>Wednesday</value>
+  </data>
+  <data name="SchedulerDayThursday" xml:space="preserve">
+    <value>Thursday</value>
+  </data>
+  <data name="SchedulerDayFriday" xml:space="preserve">
+    <value>Friday</value>
+  </data>
+  <data name="SchedulerDaySaturday" xml:space="preserve">
+    <value>Saturday</value>
+  </data>
+  <data name="SchedulerWhenDone" xml:space="preserve">
+    <value>When all downloads in this queue finish:</value>
+  </data>
+  <data name="SchedulerPostActionName" xml:space="preserve">
+    <value>Post action</value>
+  </data>
+  <data name="SchedulerForce" xml:space="preserve">
+    <value>Execute even if other queues are downloading</value>
+  </data>
+  <data name="SchedulerForceName" xml:space="preserve">
+    <value>Force even if other queues downloading</value>
+  </data>
+  <data name="SchedulerProgramPath" xml:space="preserve">
+    <value>Program executable path:</value>
+  </data>
+  <data name="SchedulerProgramPathName" xml:space="preserve">
+    <value>Program executable path</value>
+  </data>
+  <data name="SchedulerProgramArgs" xml:space="preserve">
+    <value>Program arguments (use %1 for completed file path):</value>
+  </data>
+  <data name="SchedulerProgramArgsName" xml:space="preserve">
+    <value>Program arguments</value>
+  </data>
+  <data name="SchedulerSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SchedulerCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="SchedulerErrParallel" xml:space="preserve">
+    <value>Max parallel must be between 1 and 20.</value>
+  </data>
+  <data name="SchedulerErrStart" xml:space="preserve">
+    <value>Invalid start time format (use HH:mm).</value>
+  </data>
+  <data name="SchedulerErrStop" xml:space="preserve">
+    <value>Invalid stop time format (use HH:mm).</value>
+  </data>
+  <data name="PostActionNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="PostActionSleep" xml:space="preserve">
+    <value>Sleep</value>
+  </data>
+  <data name="PostActionHibernate" xml:space="preserve">
+    <value>Hibernate</value>
+  </data>
+  <data name="PostActionShutdown" xml:space="preserve">
+    <value>Shut down</value>
+  </data>
+  <data name="PostActionExit" xml:space="preserve">
+    <value>Exit Kasi</value>
+  </data>
+  <data name="PostActionRunProgram" xml:space="preserve">
+    <value>Run program</value>
+  </data>
+  <data name="DetailsWhenCompleted" xml:space="preserve">
+    <value>When completed:</value>
+  </data>
+  <data name="DetailsChangeQueueAction" xml:space="preserve">
+    <value>Change</value>
+  </data>
 </root>
