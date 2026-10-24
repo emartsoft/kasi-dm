@@ -1,0 +1,874 @@
+<!DOCTYPE html><html class="dark h-full" lang="en" data-scribe-recorder-ready="true"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Kasi Download Manager</title>
+<!-- Tailwind CSS v3 CDN with forms & container queries plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter & Segoe UI compatible system font -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Segoe UI', 'Inter', -apple-system, 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+          },
+          colors: {
+            win: {
+              base: '#0f0f13',
+              mica: '#16161c',
+              card: '#1e1e26',
+              cardHover: '#252530',
+              border: '#2c2d3a',
+              subtle: '#3b3c4f',
+              accent: '#6366f1',
+              accentHover: '#4f46e5',
+              accentLight: '#818cf8',
+            }
+          },
+          boxShadow: {
+            'fluent-1': '0 2px 4px rgba(0, 0, 0, 0.28), 0 0 1px rgba(255, 255, 255, 0.08)',
+            'fluent-popup': '0 12px 32px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(255, 255, 255, 0.1)',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="fluent-base-styles">
+    /* Fluent scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #353648;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4a4b63;
+    }
+    
+    /* Acrylic backdrop blur simulation */
+    .win-acrylic {
+      background-color: rgba(22, 22, 28, 0.85);
+      backdrop-filter: blur(24px) saturate(160%);
+    }
+
+    .win-card-surface {
+      background-color: rgba(30, 30, 38, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+  </style>
+<style data-purpose="custom-animations">
+    @keyframes pulseGaze {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    .status-pulse {
+      animation: pulseGaze 2.2s infinite ease-in-out;
+    }
+
+    @keyframes progressStripe {
+      from { background-position: 1rem 0; }
+      to { background-position: 0 0; }
+    }
+    .progress-bar-striped {
+      background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 1rem 1rem;
+      animation: progressStripe 1.2s linear infinite;
+    }
+  </style>
+</head>
+<body class="h-full bg-win-base text-slate-200 antialiased font-sans select-none overflow-hidden flex flex-col">
+<!-- BEGIN: WindowTitleBar -->
+<!-- Windows 11 Chrome Title Bar with Mica blur -->
+<header class="h-10 bg-[#121217] border-b border-win-border flex items-center justify-between px-3 shrink-0 z-50">
+<!-- App Branding / Icon and Title -->
+<div class="flex items-center space-x-2.5">
+<div class="w-5 h-5 rounded-md bg-gradient-to-br from-indigo-500 via-teal-400 to-emerald-400 p-0.5 flex items-center justify-center shadow-sm">
+<span class="text-[11px] font-black text-slate-950 font-mono tracking-tighter">K</span>
+</div>
+<span class="text-xs font-medium text-slate-300 tracking-wide flex items-center gap-1.5">
+        Kasi
+        <span class="text-[10px] text-slate-500 font-normal border border-win-border px-1.5 py-0.2 rounded-full">v3.4 Fluent</span>
+</span>
+</div>
+<!-- Window Drag Region Simulator -->
+<div class="flex-1 text-center text-xs text-slate-500 select-none cursor-default font-normal tracking-wider opacity-60">
+      Kasi Download Manager &amp; Accelerator
+    </div>
+<!-- Window Caption Buttons (Minimize, Maximize, Close) -->
+<div class="flex items-center -mr-3 h-full">
+<button aria-label="Minimize" class="h-full px-3.5 hover:bg-white/5 text-slate-400 hover:text-white transition-colors duration-150 inline-flex items-center justify-center" type="button">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+<path d="M2.5 8.75h11a.75.75 0 0 0 0-1.5h-11a.75.75 0 0 0 0 1.5z"></path>
+</svg>
+</button>
+<button aria-label="Maximize" class="h-full px-3.5 hover:bg-white/5 text-slate-400 hover:text-white transition-colors duration-150 inline-flex items-center justify-center" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 16 16">
+<rect height="11" rx="1" width="11" x="2.5" y="2.5"></rect>
+</svg>
+</button>
+<button aria-label="Close" class="h-full px-4 hover:bg-red-600 hover:text-white text-slate-400 transition-colors duration-150 inline-flex items-center justify-center" type="button">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+<path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: WindowTitleBar -->
+<!-- BEGIN: TopCommandBar -->
+<!-- WinUI 3 Command Bar & Quick Actions -->
+<section class="win-acrylic border-b border-win-border px-3.5 py-2 flex flex-wrap items-center justify-between gap-2.5 shrink-0" data-purpose="command-toolbar">
+<!-- Action Control Group (Left) -->
+<div class="flex items-center flex-wrap gap-1.5">
+<!-- Primary Action: + Add Download -->
+<button class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-semibold px-3 py-1.5 rounded-md shadow-sm border border-indigo-400/30 transition-all duration-150 group" id="btn-add-download">
+<svg class="w-3.5 h-3.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Add URL</span>
+</button>
+<div class="h-5 w-px bg-win-border mx-1"></div>
+<!-- Play / Resume Button -->
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 hover:text-emerald-400 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all" title="Resume selected download">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+<path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"></path>
+</svg>
+<span class="">Resume</span>
+</button>
+<!-- Pause Button -->
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 hover:text-amber-400 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all" title="Pause download">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+<path clip-rule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75.75v12a.75.75 0 0 1-1.5 0v-12a.75.75 0 0 1 .75-.75Zm9 0a.75.75 0 0 1 .75.75v12a.75.75 0 0 1-1.5 0v-12a.75.75 0 0 1 .75-.75Z" fill-rule="evenodd"></path>
+</svg>
+<span class="">Pause</span>
+</button>
+<!-- Stop Button -->
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 hover:text-rose-400 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all" title="Stop active task">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+<rect height="13.5" rx="1.5" width="13.5" x="5.25" y="5.25"></rect>
+</svg>
+<span class="">Stop</span>
+</button>
+<!-- Delete Button -->
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 hover:text-rose-400 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all" title="Delete item">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Delete</span>
+</button>
+<!-- Clean Finished -->
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 hover:text-indigo-300 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all" title="Clear completed downloads from list">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Delete Completed</span>
+</button>
+<div class="h-5 w-px bg-win-border mx-1"></div>
+<!-- Queue Controls -->
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Start Queue</span>
+</button>
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all">
+<svg class="w-3.5 h-3.5 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">Scheduler</span>
+</button>
+<!-- Speed Dropdown -->
+<div class="relative group">
+<button class="inline-flex items-center gap-1.5 bg-win-card hover:bg-win-cardHover text-slate-300 text-xs px-2.5 py-1.5 rounded-md border border-win-border/80 transition-all">
+<svg class="w-3.5 h-3.5 text-cyan-400 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-slate-400 font-normal">Limit:</span>
+<span class="font-medium text-slate-200">Unlimited</span>
+<svg class="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Quick Search and Settings Button (Right) -->
+<div class="flex items-center gap-2">
+<div class="relative w-56">
+<span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" fill-rule="evenodd"></path>
+</svg>
+</span>
+<input class="w-full bg-[#121217] text-xs text-slate-200 placeholder-slate-500 rounded-md pl-8 pr-12 py-1.5 border border-win-border focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors" placeholder="Search downloads..." type="text">
+<span class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+<kbd class="text-[10px] text-slate-400 bg-win-card border border-win-border px-1 rounded font-mono">Ctrl+F</kbd>
+</span>
+</div>
+<!-- Settings Flyout Toggle Button -->
+<button class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-win-card hover:bg-win-cardHover text-slate-300 hover:text-white border border-win-border/80 transition-colors relative" id="toggle-settings-btn" title="Open Settings">
+<svg class="w-4 h-4 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="w-2 h-2 rounded-full bg-emerald-400 absolute top-1.5 right-1.5 ring-2 ring-win-mica"></span>
+</button>
+</div>
+</section>
+<!-- END: TopCommandBar -->
+<!-- BEGIN: MainContentArea -->
+<div class="flex-1 flex overflow-hidden relative" data-purpose="workspace">
+<!-- BEGIN: LeftSidebar -->
+<!-- WinUI 3 Navigation View Sidebar -->
+<aside class="w-60 bg-[#141419] border-r border-win-border flex flex-col justify-between shrink-0 select-none overflow-y-auto" data-purpose="category-sidebar">
+<div class="p-3 space-y-4">
+<!-- Section: STATUS -->
+<div>
+<div class="px-2.5 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Status
+          </div>
+<nav class="space-y-0.5 text-xs">
+<!-- Active item -->
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-indigo-600/15 text-indigo-300 font-medium border-l-2 border-indigo-500 transition-colors" href="#">
+<span class="flex items-center gap-2.5">
+<svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" fill-rule="evenodd"></path>
+</svg>
+<span class="">All downloads</span>
+</span>
+<span class="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">14</span>
+</a>
+<!-- Active / Downloading -->
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<span class="flex items-center gap-2.5">
+<span class="relative flex h-2 w-2 ml-1 mr-1">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+</span>
+<span class="">Active</span>
+</span>
+<span class="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold">2</span>
+</a>
+<!-- Finished -->
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<span class="flex items-center gap-2.5">
+<svg class="w-4 h-4 text-sky-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" fill-rule="evenodd"></path>
+</svg>
+<span class="">Finished</span>
+</span>
+<span class="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-win-card text-slate-400">11</span>
+</a>
+<!-- Unfinished / Paused -->
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<span class="flex items-center gap-2.5">
+<svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" fill-rule="evenodd"></path>
+</svg>
+<span class="">Unfinished</span>
+</span>
+<span class="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-win-card text-slate-400">1</span>
+</a>
+</nav>
+</div>
+<!-- Section: CATEGORIES -->
+<div>
+<div class="px-2.5 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Categories
+          </div>
+<nav class="space-y-0.5 text-xs">
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"></path>
+</svg>
+<span class="">General</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"></path>
+</svg>
+<span class="">Compressed</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+<path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"></path>
+</svg>
+<span class="">Documents</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M9 18V5l12-2v13"></path>
+<circle cx="6" cy="18" r="3"></circle>
+<circle cx="18" cy="16" r="3"></circle>
+</svg>
+<span class="">Music</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="16" rx="2.18" width="20" x="2" y="4"></rect>
+<path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"></path>
+</svg>
+<span class="">Video</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="18" rx="2" width="18" x="3" y="3"></rect>
+<path d="m9 8 3 3-3 3M13 14h3"></path>
+</svg>
+<span class="">Programs</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="18" rx="2" width="18" x="3" y="3"></rect>
+<circle cx="9" cy="9" r="2"></circle>
+<path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+</svg>
+<span class="">Images</span>
+</a>
+<a class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+</svg>
+<span class="">Torrents</span>
+</a>
+</nav>
+</div>
+<!-- Section: QUEUES -->
+<div>
+<div class="px-2.5 pb-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            Queues
+          </div>
+<nav class="space-y-0.5 text-xs">
+<a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+<span class="">Night Queue (02:00 - 07:00)</span>
+</a>
+<a class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-win-card/70 transition-colors" href="#">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+<span class="">High Priority Bandwidth</span>
+</a>
+</nav>
+</div>
+</div>
+<!-- Telemetry Mini Card & Browser status (Sidebar bottom) -->
+<div class="p-3 border-t border-win-border bg-[#101014] space-y-2.5">
+<div class="bg-win-card/60 p-2.5 rounded-lg border border-win-border">
+<div class="flex items-center justify-between text-[11px] mb-1">
+<span class="text-slate-400">Aggregate Speed</span>
+<span class="font-mono text-emerald-400 font-semibold text-xs">42.6 MB/s</span>
+</div>
+<!-- Micro Sparkline SVG -->
+<svg class="w-full h-7 stroke-emerald-400 fill-emerald-500/10 overflow-hidden" viewBox="0 0 100 24">
+<path d="M0,18 Q15,22 30,12 T60,8 T85,4 L100,2 L100,24 L0,24 Z"></path>
+<path d="M0,18 Q15,22 30,12 T60,8 T85,4 L100,2" fill="none" stroke-width="1.8"></path>
+</svg>
+<div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-1 pt-1 border-t border-win-border/50">
+<span class="">↓ 42.6 MB/s</span>
+<span class="">↑ 1.4 MB/s</span>
+</div>
+</div>
+<!-- Browser Extension Status badge -->
+<div class="flex items-center justify-between px-2 py-1.5 rounded-md bg-win-card/30 border border-win-border text-[11px]">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+<span class="text-slate-300 font-medium">Extension</span>
+</div>
+<span class="text-[10px] text-emerald-400 font-mono">Connected</span>
+</div>
+</div>
+</aside>
+<!-- END: LeftSidebar -->
+<!-- BEGIN: MainDataGrid -->
+<!-- Downloads Table and Workspace -->
+<main class="flex-1 flex flex-col bg-win-base overflow-hidden relative">
+<!-- View Header / Filter Bar -->
+<div class="px-4 py-2 border-b border-win-border flex items-center justify-between bg-[#14141a]/90 text-xs">
+<div class="flex items-center gap-3">
+<span class="font-semibold text-slate-200">All Downloads</span>
+<span class="text-slate-500">•</span>
+<span class="text-slate-400">6 items displayed</span>
+</div>
+<div class="flex items-center gap-2">
+<!-- Selection Counter -->
+<span class="text-[11px] text-slate-400 mr-2">1 selected</span>
+<!-- View modes toggle -->
+<div class="inline-flex rounded-md p-0.5 bg-win-card border border-win-border">
+<button class="p-1 rounded bg-indigo-600/30 text-indigo-300" title="Detailed List View">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 5.5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zm0 5.5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" fill-rule="evenodd"></path>
+</svg>
+</button>
+<button class="p-1 rounded text-slate-400 hover:text-slate-200" title="Grid Card View">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v2.5A2.25 2.25 0 004.25 9h2.5A2.25 2.25 0 009 6.75v-2.5A2.25 2.25 0 006.75 2h-2.5zm0 9A2.25 2.25 0 002 13.25v2.5A2.25 2.25 0 004.25 18h2.5A2.25 2.25 0 009 15.75v-2.5A2.25 2.25 0 006.75 11h-2.5zm9-9A2.25 2.25 0 0011 4.25v2.5A2.25 2.25 0 0013.25 9h2.5A2.25 2.25 0 0018 6.75v-2.5A2.25 2.25 0 0015.75 2h-2.5zm0 9A2.25 2.25 0 0011 13.25v2.5A2.25 2.25 0 0013.25 18h2.5A2.25 2.25 0 0018 15.75v-2.5A2.25 2.25 0 0015.75 11h-2.5z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</div>
+</div>
+<!-- Table Structure -->
+<div class="flex-1 overflow-x-auto overflow-y-auto">
+<table class="w-full text-left text-xs border-collapse">
+<!-- Table Header -->
+<thead class="sticky top-0 bg-[#16161d] text-slate-400 text-[11px] font-semibold tracking-wider uppercase border-b border-win-border z-10 select-none">
+<tr>
+<th class="w-8 py-2.5 pl-4 pr-1 text-center" scope="col">
+<input class="rounded bg-win-card border-win-border text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</th>
+<th class="py-2.5 px-3 min-w-[280px]" scope="col">File Name</th>
+<th class="py-2.5 px-3 w-24" scope="col">Size</th>
+<th class="py-2.5 px-3 min-w-[200px]" scope="col">Progress</th>
+<th class="py-2.5 px-3 w-28" scope="col">Speed</th>
+<th class="py-2.5 px-3 w-24" scope="col">Time Left</th>
+<th class="py-2.5 px-3 w-28" scope="col">Status</th>
+<th class="py-2.5 px-3 w-32" scope="col">Date Added</th>
+<th class="py-2.5 px-3 text-right pr-4 w-28" scope="col">Actions</th>
+</tr>
+</thead>
+<!-- Table Body with diverse mock downloads -->
+<tbody class="divide-y divide-win-border/50 text-slate-300">
+<!-- ROW 1: Active Downloading (Ubuntu ISO) -->
+<tr class="bg-indigo-600/5 hover:bg-win-cardHover/70 transition-colors group cursor-pointer">
+<td class="py-3 pl-4 pr-1 text-center">
+<input checked="" class="rounded bg-win-card border-indigo-500 text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</td>
+<td class="py-3 px-3">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 font-mono text-[10px] font-bold">
+                    ISO
+                  </div>
+<div class="truncate">
+<div class="font-medium text-slate-100 group-hover:text-indigo-300 transition-colors truncate">
+                      Ubuntu-24.04.1-desktop-amd64.iso
+                    </div>
+<div class="text-[11px] text-slate-500 truncate font-mono">
+                      releases.ubuntu.com/noble/
+                    </div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-400">5.80 GB</td>
+<td class="py-3 px-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-mono">
+<span class="text-indigo-300">64.2%</span>
+<span class="text-slate-400">3.72 GB / 5.80 GB</span>
+</div>
+<div class="w-full bg-[#1e1e28] h-2 rounded-full overflow-hidden border border-white/5">
+<div class="bg-gradient-to-r from-indigo-500 to-cyan-400 h-full rounded-full progress-bar-striped" style="width: 64.2%"></div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-emerald-400 font-semibold">24.2 MB/s</td>
+<td class="py-3 px-3 font-mono text-slate-300">1m 24s</td>
+<td class="py-3 px-3">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Downloading
+                </span>
+</td>
+<td class="py-3 px-3 text-slate-400 text-[11px]">Today, 15:42</td>
+<td class="py-3 px-3 pr-4 text-right">
+<div class="inline-flex items-center gap-1 opacity-80 group-hover:opacity-100">
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-amber-400" title="Pause">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"></path>
+</svg>
+</button>
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-rose-400" title="Cancel">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"></path>
+</svg>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 2: Active Downloading (Blender) -->
+<tr class="hover:bg-win-cardHover/70 transition-colors group cursor-pointer">
+<td class="py-3 pl-4 pr-1 text-center">
+<input class="rounded bg-win-card border-win-border text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</td>
+<td class="py-3 px-3">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded bg-blue-500/10 border border-blue-500/30 flex items-center justify-center shrink-0 text-blue-400 font-mono text-[10px] font-bold">
+                    MSI
+                  </div>
+<div class="truncate">
+<div class="font-medium text-slate-100 group-hover:text-indigo-300 transition-colors truncate">
+                      Blender-4.2.0-windows-x64.msi
+                    </div>
+<div class="text-[11px] text-slate-500 truncate font-mono">
+                      download.blender.org/release/Blender4.2/
+                    </div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-400">345.2 MB</td>
+<td class="py-3 px-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-mono">
+<span class="text-cyan-300">88.5%</span>
+<span class="text-slate-400">305.5 MB / 345 MB</span>
+</div>
+<div class="w-full bg-[#1e1e28] h-2 rounded-full overflow-hidden border border-white/5">
+<div class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full" style="width: 88.5%"></div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-emerald-400 font-semibold">18.4 MB/s</td>
+<td class="py-3 px-3 font-mono text-slate-300">3s</td>
+<td class="py-3 px-3">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Downloading
+                </span>
+</td>
+<td class="py-3 px-3 text-slate-400 text-[11px]">Today, 15:58</td>
+<td class="py-3 px-3 pr-4 text-right">
+<div class="inline-flex items-center gap-1 opacity-80 group-hover:opacity-100">
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-amber-400" title="Pause">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"></path>
+</svg>
+</button>
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-rose-400" title="Cancel">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"></path>
+</svg>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 3: Paused (Node.js) -->
+<tr class="hover:bg-win-cardHover/70 transition-colors group cursor-pointer opacity-90">
+<td class="py-3 pl-4 pr-1 text-center">
+<input class="rounded bg-win-card border-win-border text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</td>
+<td class="py-3 px-3">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400 font-mono text-[10px] font-bold">
+                    MSI
+                  </div>
+<div class="truncate">
+<div class="font-medium text-slate-200 group-hover:text-indigo-300 transition-colors truncate">
+                      node-v22.5.1-x64.msi
+                    </div>
+<div class="text-[11px] text-slate-500 truncate font-mono">
+                      nodejs.org/dist/v22.5.1/
+                    </div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-400">32.4 MB</td>
+<td class="py-3 px-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-mono">
+<span class="text-amber-400">45.0%</span>
+<span class="text-slate-500">14.6 MB / 32.4 MB</span>
+</div>
+<div class="w-full bg-[#1e1e28] h-2 rounded-full overflow-hidden border border-white/5">
+<div class="bg-amber-400/80 h-full rounded-full" style="width: 45%"></div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-500">0 KB/s</td>
+<td class="py-3 px-3 font-mono text-amber-400/80">Paused</td>
+<td class="py-3 px-3">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] bg-amber-500/10 text-amber-300 border border-amber-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  Paused
+                </span>
+</td>
+<td class="py-3 px-3 text-slate-400 text-[11px]">Today, 14:10</td>
+<td class="py-3 px-3 pr-4 text-right">
+<div class="inline-flex items-center gap-1 opacity-80 group-hover:opacity-100">
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-emerald-400" title="Resume">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path>
+</svg>
+</button>
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-rose-400" title="Delete">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 4: Finished (VS Code) -->
+<tr class="hover:bg-win-cardHover/70 transition-colors group cursor-pointer">
+<td class="py-3 pl-4 pr-1 text-center">
+<input class="rounded bg-win-card border-win-border text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</td>
+<td class="py-3 px-3">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded bg-blue-600/10 border border-blue-600/30 flex items-center justify-center shrink-0 text-sky-400 font-mono text-[10px] font-bold">
+                    EXE
+                  </div>
+<div class="truncate">
+<div class="font-medium text-slate-200 group-hover:text-indigo-300 transition-colors truncate">
+                      VSCodeUserSetup-x64-1.92.0.exe
+                    </div>
+<div class="text-[11px] text-slate-500 truncate font-mono">
+                      az764295.vo.msecnd.net/stable/
+                    </div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-400">96.4 MB</td>
+<td class="py-3 px-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-mono">
+<span class="text-sky-400">100.0%</span>
+<span class="text-slate-400">96.4 MB / 96.4 MB</span>
+</div>
+<div class="w-full bg-[#1e1e28] h-2 rounded-full overflow-hidden border border-white/5">
+<div class="bg-indigo-500 h-full rounded-full" style="width: 100%"></div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-500">—</td>
+<td class="py-3 px-3 font-mono text-slate-400">0s</td>
+<td class="py-3 px-3">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-sky-500/15 text-sky-300 border border-sky-500/30">
+<svg class="w-3 h-3 text-sky-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" fill-rule="evenodd"></path>
+</svg>
+                  Completed
+                </span>
+</td>
+<td class="py-3 px-3 text-slate-400 text-[11px]">Today, 14:20</td>
+<td class="py-3 px-3 pr-4 text-right">
+<div class="inline-flex items-center gap-1 opacity-80 group-hover:opacity-100">
+<button class="px-2 py-0.5 rounded text-[11px] font-medium bg-win-card hover:bg-win-subtle text-slate-200 border border-win-border" title="Open File">
+                    Open
+                  </button>
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-slate-200" title="Show in Folder">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+</svg>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 5: Finished (Cyberpunk OST) -->
+<tr class="hover:bg-win-cardHover/70 transition-colors group cursor-pointer">
+<td class="py-3 pl-4 pr-1 text-center">
+<input class="rounded bg-win-card border-win-border text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</td>
+<td class="py-3 px-3">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded bg-purple-500/10 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-400 font-mono text-[10px] font-bold">
+                    ZIP
+                  </div>
+<div class="truncate">
+<div class="font-medium text-slate-200 group-hover:text-indigo-300 transition-colors truncate">
+                      Cyberpunk_2077_OST_FLAC_Lossless.zip
+                    </div>
+<div class="text-[11px] text-slate-500 truncate font-mono">
+                      archive.soundtracks.io/games/2077/
+                    </div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-400">1.24 GB</td>
+<td class="py-3 px-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-mono">
+<span class="text-sky-400">100.0%</span>
+<span class="text-slate-400">1.24 GB / 1.24 GB</span>
+</div>
+<div class="w-full bg-[#1e1e28] h-2 rounded-full overflow-hidden border border-white/5">
+<div class="bg-indigo-500 h-full rounded-full" style="width: 100%"></div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-500">—</td>
+<td class="py-3 px-3 font-mono text-slate-400">0s</td>
+<td class="py-3 px-3">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-sky-500/15 text-sky-300 border border-sky-500/30">
+<svg class="w-3 h-3 text-sky-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" fill-rule="evenodd"></path>
+</svg>
+                  Completed
+                </span>
+</td>
+<td class="py-3 px-3 text-slate-400 text-[11px]">Yesterday</td>
+<td class="py-3 px-3 pr-4 text-right">
+<div class="inline-flex items-center gap-1 opacity-80 group-hover:opacity-100">
+<button class="px-2 py-0.5 rounded text-[11px] font-medium bg-win-card hover:bg-win-subtle text-slate-200 border border-win-border" title="Open File">
+                    Open
+                  </button>
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-slate-200" title="Show in Folder">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+</svg>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 6: Queued (Docker) -->
+<tr class="hover:bg-win-cardHover/70 transition-colors group cursor-pointer opacity-75">
+<td class="py-3 pl-4 pr-1 text-center">
+<input class="rounded bg-win-card border-win-border text-indigo-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5" type="checkbox">
+</td>
+<td class="py-3 px-3">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded bg-teal-500/10 border border-teal-500/30 flex items-center justify-center shrink-0 text-teal-400 font-mono text-[10px] font-bold">
+                    EXE
+                  </div>
+<div class="truncate">
+<div class="font-medium text-slate-200 group-hover:text-indigo-300 transition-colors truncate">
+                      DockerDesktopInstaller.exe
+                    </div>
+<div class="text-[11px] text-slate-500 truncate font-mono">
+                      desktop.docker.com/win/main/amd64/
+                    </div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-400">580.4 MB</td>
+<td class="py-3 px-3">
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] font-mono">
+<span class="text-slate-400">0%</span>
+<span class="text-slate-500">0 MB / 580 MB</span>
+</div>
+<div class="w-full bg-[#1e1e28] h-2 rounded-full overflow-hidden border border-white/5">
+<div class="bg-slate-600 h-full rounded-full" style="width: 0%"></div>
+</div>
+</div>
+</td>
+<td class="py-3 px-3 font-mono text-slate-500">—</td>
+<td class="py-3 px-3 font-mono text-slate-500">Queued</td>
+<td class="py-3 px-3">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] bg-slate-500/10 text-slate-400 border border-slate-600/30">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  In Queue (#1)
+                </span>
+</td>
+<td class="py-3 px-3 text-slate-400 text-[11px]">Today, 16:01</td>
+<td class="py-3 px-3 pr-4 text-right">
+<div class="inline-flex items-center gap-1 opacity-80 group-hover:opacity-100">
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-emerald-400" title="Start Now">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path d="M6.3 2.841A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path>
+</svg>
+</button>
+<button class="p-1 hover:bg-win-card rounded text-slate-400 hover:text-rose-400" title="Remove">
+<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</main>
+<!-- END: MainDataGrid -->
+<!-- BEGIN: SettingsSlideOver -->
+<!-- Modern WinUI 3 Settings Panel (Redesigning Image 2 Browser integration settings) -->
+
+<!-- END: SettingsSlideOver -->
+</div>
+<!-- END: MainContentArea -->
+<!-- BEGIN: BottomStatusBar -->
+<!-- Windows Fluent Desktop Status Bar -->
+<footer class="h-7 bg-[#101014] border-t border-win-border px-3 flex items-center justify-between text-[11px] text-slate-400 select-none shrink-0" data-purpose="status-bar">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+<span class="text-slate-300 font-medium">2 active</span>
+<span class="text-slate-500">|</span>
+<span class="">1 queued</span>
+</div>
+<div class="hidden sm:flex items-center gap-1 text-slate-400">
+<svg class="w-3 h-3 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 2a.75.75 0 01.75.75v12.59l1.95-2.1a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 111.1-1.02l1.95 2.1V2.75A.75.75 0 0110 2z" fill-rule="evenodd"></path>
+</svg>
+<span class="">Down: <strong class="text-slate-200 font-mono">42.6 MB/s</strong></span>
+</div>
+<div class="hidden md:flex items-center gap-1 text-slate-400">
+<svg class="w-3 h-3 text-cyan-400" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 18a.75.75 0 01-.75-.75V4.66L7.3 6.76a.75.75 0 01-1.1-1.02l3.25-3.5a.75.75 0 011.1 0l3.25 3.5a.75.75 0 01-1.1 1.02l-1.95-2.1v12.59A.75.75 0 0110 18z" fill-rule="evenodd"></path>
+</svg>
+<span class="">Up: <strong class="text-slate-200 font-mono">1.4 MB/s</strong></span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<!-- Drive storage meter -->
+<div class="flex items-center gap-1.5">
+<svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="16" rx="2" width="20" x="2" y="4"></rect>
+<path d="M6 16h.01M10 16h.01"></path>
+</svg>
+<span class="">Disk (C:): <span class="text-slate-200 font-mono">412 GB free</span></span>
+</div>
+<!-- Extension status indicator -->
+<div class="flex items-center gap-1.5 border-l border-win-border pl-3">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+<span class="text-slate-300">Browser extension active</span>
+</div>
+</div>
+</footer>
+<!-- END: BottomStatusBar -->
+<!-- BEGIN: InteractiveScripts -->
+<!-- Lightweight toggle script for the Settings modal flyout -->
+<script data-purpose="settings-panel-interactions">
+    document.addEventListener('DOMContentLoaded', () => {
+      const settingsPanel = document.getElementById('settings-panel');
+      const toggleBtn = document.getElementById('toggle-settings-btn');
+      const closeBtn = document.getElementById('close-settings-btn');
+      const cancelBtn = document.getElementById('cancel-settings-btn');
+      const saveBtn = document.getElementById('save-settings-btn');
+
+      // Helper function to toggle panel
+      const togglePanel = () => {
+        settingsPanel.classList.toggle('translate-x-0');
+        settingsPanel.classList.toggle('translate-x-full');
+      };
+
+      if (toggleBtn) toggleBtn.addEventListener('click', togglePanel);
+      if (closeBtn) closeBtn.addEventListener('click', togglePanel);
+      if (cancelBtn) cancelBtn.addEventListener('click', togglePanel);
+      if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+          // Visual feedback on save
+          saveBtn.innerText = 'Saved!';
+          saveBtn.classList.remove('bg-indigo-600');
+          saveBtn.classList.add('bg-emerald-600');
+          setTimeout(() => {
+            saveBtn.innerText = 'Save Changes';
+            saveBtn.classList.remove('bg-emerald-600');
+            saveBtn.classList.add('bg-indigo-600');
+            togglePanel();
+          }, 600);
+        });
+      }
+    });
+  </script>
+<!-- END: InteractiveScripts -->
+
+
+</body></html>
