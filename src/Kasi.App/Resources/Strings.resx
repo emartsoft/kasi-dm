@@ -965,10 +965,6 @@
     <value>MKV</value>
     <comment>Matroska output format.</comment>
   </data>
-  <data name="MediaPickerThumbnail" xml:space="preserve">
-    <value>Thumbnail available</value>
-    <comment>Shown in the picker when the page supplied a poster image.</comment>
-  </data>
   <data name="MediaPickerSubtitle" xml:space="preserve">
     <value>Subtitle</value>
     <comment>Fallback label for a subtitle track with no language.</comment>

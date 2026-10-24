@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Engine;
 using Kasi.Media;
@@ -25,6 +26,8 @@ internal sealed partial class MediaJobExecutor(
     TimeProvider? timeProvider = null,
     ILogger? logger = null) : IJobControl
 {
+    public const string ChoiceGoneMessage = "The quality you chose is no longer offered by this stream.";
+
     public const string FfmpegMissingMessage = "FFmpeg is not available, so this stream can't be saved.";
 
     private const int MaxLogLines = 20;
@@ -199,6 +202,13 @@ internal sealed partial class MediaJobExecutor(
                 return;
             }
 
+            var (selected, selectionError) = ResolveSelection(playable.Presentation, secret);
+            if (selectionError is not null)
+            {
+                await FailAsync(job.Id, selectionError).ConfigureAwait(false);
+                return;
+            }
+
             var downloaded = await runner.RunAsync(playable, new MediaJobOptions
             {
                 JobId = id,
@@ -207,10 +217,10 @@ internal sealed partial class MediaJobExecutor(
                 RequestContext = context,
                 BandwidthLimiter = bandwidth,
                 Events = publish,
-                SelectedVariant = SelectedVariant(playable.Presentation, secret),
+                SelectedVariant = selected,
             }, cancellationToken).ConfigureAwait(false);
 
-            var format = Header(secret, "X-Kasi-Media-Format");
+            var format = secret?.Media?.Format;
             var muxed = await new MediaMuxer(new FfmpegRunner(ffmpeg)).MuxAsync(
                 downloaded,
                 new MediaMuxOptions
@@ -283,17 +293,28 @@ internal sealed partial class MediaJobExecutor(
         }
     }
 
-    private static MediaVariant? SelectedVariant(MediaPresentation presentation, JobSecret? secret)
+    /// <summary>
+    /// The variant the person chose, found again in the freshly loaded manifest by height and nearest bitrate (playlist URLs can
+    /// change between loads). No saved choice means the default quality. A saved choice the stream no longer offers is an error,
+    /// never a silent change of quality.
+    /// </summary>
+    internal static (MediaVariant? Variant, string? Error) ResolveSelection(MediaPresentation presentation, JobSecret? secret)
     {
-        var variantId = Header(secret, "X-Kasi-Media-Variant");
-        if (!string.IsNullOrEmpty(variantId))
+        if (secret?.Media is not { } choice)
         {
-            return presentation.Variants.FirstOrDefault(variant => variant.Video.Id == variantId);
+            return (null, null);
         }
 
-        var audioId = Header(secret, "X-Kasi-Media-Audio");
-        var track = string.IsNullOrEmpty(audioId) ? null : presentation.AudioOnly.FirstOrDefault(audio => audio.Id == audioId);
-        return track is null ? null : new MediaVariant(track, track, null);
+        if (choice.Format == nameof(MediaPickerFormat.AudioOnly))
+        {
+            return presentation.FindAudioOnly(choice.Language, choice.Bandwidth) is { } track
+                ? (new MediaVariant(track, track, null), null)
+                : (null, ChoiceGoneMessage);
+        }
+
+        return presentation.FindVariant(choice.Height, choice.Bandwidth) is { } variant
+            ? (variant, null)
+            : (null, ChoiceGoneMessage);
     }
 
     private static string? Header(JobSecret? secret, string name) =>

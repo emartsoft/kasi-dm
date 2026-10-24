@@ -18,7 +18,6 @@
       </Border>
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.Name="{Binding Title}" />
-        <TextBlock Text="{Binding ThumbnailText}" IsVisible="{Binding HasThumbnail}" Opacity="0.7" />
       </StackPanel>
     </StackPanel>
 

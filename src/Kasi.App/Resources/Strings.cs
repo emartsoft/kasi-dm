@@ -60,7 +60,6 @@ internal static class Strings
 
     public static string MediaPickerMkv => Get(nameof(MediaPickerMkv));
 
-    public static string MediaPickerThumbnail => Get(nameof(MediaPickerThumbnail));
 
     public static string MediaPickerSubtitle => Get(nameof(MediaPickerSubtitle));
 

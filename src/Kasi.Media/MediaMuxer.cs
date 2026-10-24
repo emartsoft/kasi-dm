@@ -258,7 +258,8 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
 
     private static readonly string[] _mp4AudioCodecs = ["mp4a", "aac", "ac-3", "ec-3", "ac3", "eac3", "mp3"];
 
-    private static bool IsMp4Compatible(string videoCodec, string audioCodec)
+    /// <summary>True when MP4 can hold these codec strings (or names) with a stream copy; empty or unknown codecs do not fit.</summary>
+    public static bool IsMp4Compatible(string videoCodec, string audioCodec)
     {
         var videoOk = _mp4VideoCodecs
             .Any(codec => videoCodec.Contains(codec, StringComparison.OrdinalIgnoreCase));

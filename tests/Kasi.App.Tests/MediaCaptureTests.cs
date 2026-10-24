@@ -26,6 +26,26 @@ internal sealed class RecordingPicker : IMediaPicker
     }
 }
 
+/// <summary>A picker that stays open until the test releases it, to prove a second click does not open another dialog.</summary>
+internal sealed class GatedPicker(MediaPickerSelection selection) : IMediaPicker
+{
+    private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _opened;
+
+    public int Opened => Volatile.Read(ref _opened);
+
+    public void Release() => _gate.TrySetResult();
+
+    public async Task<MediaPickerSelection?> PickAsync(MediaPresentation presentation, string title, string? thumbnailUrl, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref _opened);
+#pragma warning disable VSTHRD003 // the gate is this fake's own completion source
+        await _gate.Task.ConfigureAwait(false);
+#pragma warning restore VSTHRD003
+        return selection;
+    }
+}
+
 internal sealed class RecordingControl : IJobControl
 {
     public List<JobId> Started { get; } = [];
@@ -428,10 +448,107 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         job.FileName.Should().EndWith(".mkv");
         control.Started.Should().ContainSingle().Which.Should().Be(job.Id);
         var secret = await _secrets.GetAsync(job.Id, ct);
-        secret!.Headers["X-Kasi-Media-Variant"].Should().Be(presentation.Variants.Single(variant => variant.Height == 360).Video.Id);
-        secret.Headers["X-Kasi-Media-Format"].Should().Be("Matroska");
+        secret!.Media.Should().Be(new MediaSelection("Matroska", 360, 800000, "avc1.42c00c,mp4a.40.2"));
+        secret.Headers.Keys.Should().NotContain(key => key.StartsWith("X-Kasi", StringComparison.OrdinalIgnoreCase), "the choice is not a request header");
         picker.Title.Should().NotBeNullOrWhiteSpace();
     }
+
+    [Fact]
+    public async Task Cancelling_the_picker_creates_no_job()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var capture = Capture(new RecordingControl(), new RecordingPicker { Selection = null });
+
+        var result = await capture.CaptureAsync(Message("/hls/clear/master.m3u8", IpcMediaKind.Hls), ct);
+
+        result.Status.Should().Be(MediaCaptureStatus.Cancelled);
+        (await _jobs.ListAsync(cancellationToken: ct)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Two_clicks_on_one_stream_open_one_picker_and_one_job()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var presentation = await LoadPresentationAsync("/hls/clear/master.m3u8", ct);
+        var picker = new GatedPicker(new MediaPickerSelection(presentation.Variants[0], null, MediaPickerFormat.Mp4));
+        var capture = Capture(new RecordingControl(), picker);
+
+        var first = capture.CaptureAsync(Message("/hls/clear/master.m3u8", IpcMediaKind.Hls), ct);
+        await WaitUntilAsync(() => picker.Opened == 1);
+        var second = capture.CaptureAsync(Message("/hls/clear/master.m3u8", IpcMediaKind.Hls), ct);
+        await Task.Delay(100, ct); // the second click is waiting behind the open picker
+        picker.Release();
+
+        (await first).Status.Should().Be(MediaCaptureStatus.Accepted);
+        (await second).Status.Should().Be(MediaCaptureStatus.Accepted);
+        picker.Opened.Should().Be(1, "the second click found the first one's job and did not open another picker");
+        (await _jobs.ListAsync(cancellationToken: ct)).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task A_saved_choice_is_found_again_by_height_and_nearest_bitrate_and_a_missing_one_is_an_error_not_a_new_quality()
+    {
+        var presentation = await LoadPresentationAsync("/hls/clear/master.m3u8", TestContext.Current.CancellationToken);
+
+        var exact = MediaJobExecutor.ResolveSelection(presentation, SecretWith(new MediaSelection("Mp4", 360, 800000)));
+        var retuned = MediaJobExecutor.ResolveSelection(presentation, SecretWith(new MediaSelection("Matroska", 360, 1)));
+        var gone = MediaJobExecutor.ResolveSelection(presentation, SecretWith(new MediaSelection("Mp4", 1080, 5_000_000)));
+        var none = MediaJobExecutor.ResolveSelection(presentation, null);
+        var noAudio = MediaJobExecutor.ResolveSelection(presentation, SecretWith(new MediaSelection("AudioOnly", Language: "en", Bandwidth: 48000)));
+
+        exact.Variant!.Height.Should().Be(360);
+        retuned.Variant!.Height.Should().Be(360, "the playlist URL may differ between loads; the height identifies the quality");
+        gone.Error.Should().Be(MediaJobExecutor.ChoiceGoneMessage);
+        none.Should().Be(((MediaVariant?)null, (string?)null), "no saved choice means the default quality");
+        noAudio.Error.Should().Be(MediaJobExecutor.ChoiceGoneMessage);
+        var audio = new MediaTrack("a", MediaRole.Audio, "en", "mp4a.40.2", null, 48000, null, null, 10, false, null, []);
+        var withAudio = new MediaPresentation(null, 10, false, [], [audio], []);
+        var picked = MediaJobExecutor.ResolveSelection(withAudio, SecretWith(new MediaSelection("AudioOnly", Language: "en", Bandwidth: 50000)));
+        picked.Variant!.Video.Should().BeSameAs(audio);
+        picked.Variant.Audio.Should().BeSameAs(audio);
+    }
+
+    [Fact]
+    public async Task A_job_whose_chosen_quality_is_gone_fails_with_that_message()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var job = await AddJobAsync(JobKind.Media, JobState.Queued, "stream.mp4");
+        await _secrets.SetAsync(job.Id, SecretWith(new MediaSelection("Mp4", 1080, 5_000_000)), ct);
+
+        await Executor(new FfmpegOptions("ffmpeg-not-used.exe", "ffprobe-not-used.exe")).StartJobAsync(job.Id, ct);
+
+        await WaitUntilAsync(async () => (await _jobs.GetAsync(job.Id, ct))!.State == JobState.Failed);
+        (await _jobs.GetAsync(job.Id, ct))!.Error.Should().Be(MediaJobExecutor.ChoiceGoneMessage);
+    }
+
+    [Fact]
+    public async Task The_poster_download_is_capped_and_limited_to_http()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _host.Route("/img/small.png", async (context, token) => await context.Response.OutputStream.WriteAsync(new byte[1000], token));
+        _host.Route("/img/big.png", async (context, token) =>
+        {
+            var chunk = new byte[64 * 1024];
+            for (var sent = 0; sent <= ThumbnailFetcher.MaxBytes; sent += chunk.Length)
+            {
+                await context.Response.OutputStream.WriteAsync(chunk, token);
+            }
+        });
+
+        var small = await ThumbnailFetcher.FetchAsync(new Uri(_host.BaseAddress, "/img/small.png").AbsoluteUri, ct);
+        var big = await ThumbnailFetcher.FetchAsync(new Uri(_host.BaseAddress, "/img/big.png").AbsoluteUri, ct);
+        var missing = await ThumbnailFetcher.FetchAsync(new Uri(_host.BaseAddress, "/img/missing.png").AbsoluteUri, ct);
+        var file = await ThumbnailFetcher.FetchAsync("file:///C:/Windows/win.ini", ct);
+        var none = await ThumbnailFetcher.FetchAsync(null, ct);
+
+        small.Should().HaveCount(1000);
+        big.Should().BeNull("a poster over the cap is dropped");
+        missing.Should().BeNull();
+        file.Should().BeNull();
+        none.Should().BeNull();
+    }
+
+    private static JobSecret SecretWith(MediaSelection selection) => new() { Media = selection };
 
     private async Task<MediaPresentation> LoadPresentationAsync(string path, CancellationToken ct)
     {
@@ -464,13 +581,16 @@ public sealed class MediaCaptureTests : IAsyncLifetime
 
     private static void AddStreams(LocalStreamServer server)
     {
-        const string Master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=200000,RESOLUTION=160x90,CODECS=\"avc1.42c00c,mp4a.40.2\"\nv.m3u8\n";
+        const string Master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=200000,RESOLUTION=160x90,CODECS=\"avc1.42c00c,mp4a.40.2\"\nv.m3u8\n"
+            + "#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.42c00c,mp4a.40.2\"\nv360.m3u8\n";
         const string Clear = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\nseg0.ts\n#EXTINF:4,\nseg1.ts\n#EXT-X-ENDLIST\n";
         const string Protected = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://k\",KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXTINF:4,\nseg0.ts\n#EXT-X-ENDLIST\n";
         server.Text("/hls/clear/master.m3u8", Master);
         server.Text("/hls/clear/v.m3u8", Clear);
+        server.Text("/hls/clear/v360.m3u8", Clear);
         server.Text("/hls/sample-aes/master.m3u8", Master);
         server.Text("/hls/sample-aes/v.m3u8", Protected);
+        server.Text("/hls/sample-aes/v360.m3u8", Protected);
         server.Route("/hls/stall/master.m3u8", async (_, ct) => await Task.Delay(TimeSpan.FromMinutes(5), ct)); // answers only when the test pauses the job
 
         var fixtures = Path.Combine(RepositoryRoot(), "tests", "fixtures", "media", "muxable", "hls");

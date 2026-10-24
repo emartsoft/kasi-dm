@@ -1,10 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Net.Http;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Resources;
+using Kasi.Core;
 using Kasi.Media;
 
 namespace Kasi.App.ViewModels;
@@ -31,7 +32,13 @@ internal sealed record MediaSubtitleChoice(string Label, bool IsEnabled);
 internal sealed record MediaAudioChoice(MediaTrack Track, string Label);
 
 /// <summary>The picker's immutable answer: the chosen variant (or audio-only track) and container.</summary>
-internal sealed record MediaPickerSelection(MediaVariant? Variant, MediaTrack? AudioOnly, MediaPickerFormat Format);
+internal sealed record MediaPickerSelection(MediaVariant? Variant, MediaTrack? AudioOnly, MediaPickerFormat Format)
+{
+    /// <summary>The choice in the form the job keeps (identified by height and bitrate, not by URL).</summary>
+    public MediaSelection ToJobSelection() => Variant is { } variant
+        ? new MediaSelection(Format.ToString(), variant.Height, variant.Video.Bandwidth, variant.Video.Codecs)
+        : new MediaSelection(MediaPickerFormat.AudioOnly.ToString(), Language: AudioOnly?.Language, Bandwidth: AudioOnly?.Bandwidth);
+}
 
 /// <summary>
 /// The media picker (KASI-MED-002, TRD 12): every video quality with codec, bitrate and estimated size; the best default at or
@@ -67,18 +74,24 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
             return;
         }
 
+        var bytes = await ThumbnailFetcher.FetchAsync(ThumbnailUrl, cancellationToken).ConfigureAwait(false);
+        if (bytes is null)
+        {
+            return; // a missing poster is not a reason to block the picker
+        }
+
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            await using var stream = await client.GetStreamAsync(ThumbnailUrl!, cancellationToken).ConfigureAwait(false);
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory, cancellationToken).ConfigureAwait(false);
-            memory.Position = 0;
-            Thumbnail = new Bitmap(memory);
+            // the bound property changes on the UI thread, whatever thread the download finished on
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                using var memory = new MemoryStream(bytes);
+                Thumbnail = new Bitmap(memory);
+            });
         }
-        catch (Exception exception) when (exception is HttpRequestException or IOException or ArgumentException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException)
         {
-            // a missing poster is not a reason to block the picker
+            // not a picture we can show
         }
     }
 
@@ -206,10 +219,6 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
 
     private static T? FirstOrNull<T>(IReadOnlyList<T> items) where T : class => items.Count > 0 ? items[0] : null;
 
-    private static readonly string[] Mp4VideoCodecs = ["avc", "h264", "hev", "hvc", "av01"];
-
-    private static readonly string[] Mp4AudioCodecs = ["mp4a", "aac", "ac-3", "ec-3", "ac3", "eac3"];
-
     private static IReadOnlyList<MediaFormatChoice> BuildFormats(MediaPresentation presentation) =>
     [
         new(MediaPickerFormat.Mp4, Strings.MediaPickerMp4),
@@ -225,17 +234,8 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
         return variant is not null && IsMp4Compatible(variant) ? MediaPickerFormat.Mp4 : MediaPickerFormat.Matroska;
     }
 
-    private static bool IsMp4Compatible(MediaVariant variant)
-    {
-        var video = variant.Video.Codecs ?? "";
-        var audio = variant.Audio?.Codecs ?? "";
-        var videoOk = Mp4VideoCodecs
-            .Any(codec => video.Contains(codec, StringComparison.OrdinalIgnoreCase));
-        var audioOk = string.IsNullOrEmpty(audio)
-            || Mp4AudioCodecs
-                .Any(codec => audio.Contains(codec, StringComparison.OrdinalIgnoreCase));
-        return videoOk && audioOk;
-    }
+    private static bool IsMp4Compatible(MediaVariant variant) =>
+        MediaMuxer.IsMp4Compatible(variant.Video.Codecs ?? "", variant.Audio?.Codecs ?? "");
 
     private static string DetailsOf(MediaVariant variant)
     {
@@ -254,7 +254,4 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
 
     private static string SubtitleLabel(MediaTrack track) =>
         string.IsNullOrWhiteSpace(track.Language) ? Strings.MediaPickerSubtitle : $"{Strings.MediaPickerSubtitle} ({track.Language})";
-
-    // Kept for the window's optional thumbnail area; the URL is never logged.
-    public string ThumbnailText => HasThumbnail ? Strings.MediaPickerThumbnail : string.Empty;
 }

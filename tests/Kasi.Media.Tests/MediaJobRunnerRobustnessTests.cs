@@ -53,6 +53,22 @@ public sealed class MediaJobRunnerRobustnessTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task An_audio_only_variant_is_one_stream_fetched_once()
+    {
+        using var loader = new MediaSourceLoader();
+        var playable = (MediaSourceLoader.Playable)await loader.LoadAsync(
+            MediaKind.Hls, Url("/hls/clear/master.m3u8"), cancellationToken: TestContext.Current.CancellationToken);
+        var track = playable.Presentation.AudioOnly.Should().ContainSingle().Which;
+        _host.ResetMetrics();
+
+        var result = await new MediaJobRunner(_media, _jobs).RunAsync(
+            playable, Options(parallelism: 2) with { SelectedVariant = new MediaVariant(track, track, null) }, TestContext.Current.CancellationToken);
+
+        result.Streams.Should().ContainSingle().Which.Role.Should().Be("audio");
+        _host.Metrics.RequestsForPath("/hls/clear/audio/seg0.ts").Should().Be(1, "the same track in both slots must not be fetched twice");
+    }
+
+    [Fact]
     public async Task A_byte_range_init_segment_fetches_only_its_range_and_the_page_referrer_follows_the_segment_origin()
     {
         var file = Url("/files/rng/4096");

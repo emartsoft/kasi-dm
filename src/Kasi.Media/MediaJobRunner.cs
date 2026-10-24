@@ -53,9 +53,9 @@ public sealed class MediaJobRunner(
             ?? throw new MediaJobException(MediaJobErrorKind.InvalidJob, "The presentation has no video variant.");
 
         var tracks = new List<MediaTrack> { variant.Video };
-        if (variant.Audio is { } audio)
+        if (variant.Audio is { } audio && !ReferenceEquals(audio, variant.Video) && audio.Id != variant.Video.Id)
         {
-            tracks.Add(audio);
+            tracks.Add(audio); // an audio-only variant is one track in both slots: fetch it once
         }
 
         if (tracks.Any(track => track.IsLive))
