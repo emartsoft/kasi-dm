@@ -193,7 +193,7 @@ public class StartupTests
             ct);
         await started.Task.WaitAsync(_connect, ct);
 
-        var start = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true };
+        var start = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
         start.ArgumentList.Add(Url);
         start.Environment[AppEndpoints.TestSuffixVariable] = suffix;
         using var second = Process.Start(start)!;
@@ -209,7 +209,8 @@ public class StartupTests
             throw new TimeoutException("The second Kasi.App process did not exit.");
         }
 
-        second.ExitCode.Should().Be(0);
+        var stderr = await second.StandardError.ReadToEndAsync(ct); // a crash explains itself here
+        second.ExitCode.Should().Be(0, "the second process printed: {0}", stderr);
         await arrived.Task.WaitAsync(_connect, ct);
         viewModel!.PendingAddUrls.Should().Equal(Url);
         done.Set();
