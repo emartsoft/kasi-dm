@@ -1,5 +1,9 @@
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using Kasi.App.Controls;
 using Kasi.App.ViewModels;
+using Kasi.App.Views;
 using Kasi.Core;
 using Kasi.Engine;
 
@@ -147,6 +151,59 @@ public class MainShellTests
         SidebarViewModel.ScheduleText(window with { StopTime = null }).Should().Be("from 23:00");
         SidebarViewModel.ScheduleText(window with { IsEnabled = false }).Should().BeNull();
         SidebarViewModel.ScheduleText(null).Should().BeNull();
+    }
+
+    [AvaloniaFact]
+    [Trait("Requirement", "KASI-UI-001")]
+    public async Task A_row_shows_its_file_type_host_and_status_badge_and_its_check_box_is_the_grids_selection()
+    {
+        var job = TestJobs.New("ubuntu.iso", JobState.Paused, total: 1000);
+        await using var rig = await MainRig.CreateAsync(job);
+        var window = new MainWindow { DataContext = rig.Model };
+        window.Show();
+        window.UpdateLayout();
+        var grid = window.FindControl<DataGrid>("Grid")!;
+
+        var chips = window.GetVisualDescendants().OfType<StatusChip>().Where(c => c.GetVisualAncestors().OfType<DataGrid>().Any()).ToList();
+        chips.OfType<FileTypeChip>().Should().Contain(c => c.Text == "ISO");
+        chips.Where(c => c.GetType() == typeof(StatusChip)).Should().Contain(c => c.Text == "Paused" && c.Kind == ChipKind.Warning);
+        var check = grid.GetVisualDescendants().OfType<CheckBox>().Single();
+        check.IsChecked.Should().BeFalse();
+
+        check.IsChecked = true;
+        grid.SelectedItems.Count.Should().Be(1);
+        grid.SelectedItems.Clear();
+        window.UpdateLayout();
+
+        check.IsChecked.Should().BeFalse("the check box and the selection are one thing");
+        window.Close();
+    }
+
+    [Fact]
+    public void The_status_badge_takes_its_colour_from_the_state()
+    {
+        var expected = new Dictionary<JobState, ChipKind>
+        {
+            [JobState.Completed] = ChipKind.Accent,
+            [JobState.Failed] = ChipKind.Danger,
+            [JobState.Paused] = ChipKind.Warning,
+            [JobState.Queued] = ChipKind.Neutral,
+            [JobState.Downloading] = ChipKind.Success,
+        };
+
+        foreach (var (state, kind) in expected)
+        {
+            new JobRowViewModel(TestJobs.New("a.bin", state)).StatusKind.Should().Be(kind, state.ToString());
+        }
+    }
+
+    [Fact]
+    public void A_row_keeps_the_host_of_its_address_and_nothing_else_of_it()
+    {
+        var row = new JobRowViewModel(TestJobs.New("a.bin", JobState.Queued) with { Url = "https://cdn.example.com/p/a.bin?token=secret" });
+
+        row.Host.Should().Be("cdn.example.com");
+        new JobRowViewModel(TestJobs.New("a.bin", JobState.Queued) with { Url = "not a url" }).Host.Should().BeEmpty();
     }
 
     private static async Task Eventually(Func<bool> condition)

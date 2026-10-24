@@ -10,7 +10,7 @@
 - **ADR:** `docs/adr/NNNN-ui-design-system.md` (tokens, controls, icons, fonts; written with UIR-0)
 - **Dependencies:** none new if questions 4 and 5 are answered as recommended (system fonts and the Segoe Fluent Icons font that ships with Windows 11; no chart library).
 - **Delivery:** eight reviewable PRs, UIR-0 to UIR-7 (section 3). Each leaves the app working and the tests green; the old look is never half-replaced.
-- **Status:** Approved by the owner on 2026-10-24, who accepted every recommendation in section 8 as written and asked that the items first left out of scope (section 7) take the same design language. **UIR-0 and UIR-1 implemented** (tokens in both themes, the shared controls, ADR 0031, TRD 12 amended; the main window shell); UIR-2 is next.
+- **Status:** Approved by the owner on 2026-10-24, who accepted every recommendation in section 8 as written and asked that the items first left out of scope (section 7) take the same design language. **UIR-0, UIR-1 and UIR-2 implemented** (tokens in both themes, the shared controls, ADR 0031, TRD 12 amended; the main window shell); UIR-3 is next. (UIR-2 put the check box inside the Name column rather than a column of its own, so the saved column layout is unchanged; there is no select-all box, Ctrl+A does it.)
 
 ---
 
