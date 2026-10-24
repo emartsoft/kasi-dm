@@ -45,6 +45,13 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
     private SpeedPreset _selectedPreset;
 
     private readonly SpeedLimitState _limit;
+    private readonly SpeedHistory _history = new();
+
+    [ObservableProperty]
+    private string _totalSpeedText = ByteText.Format(0) + "/s";
+
+    [ObservableProperty]
+    private IReadOnlyList<double> _speedSamples = [];
 
     public TrayIconViewModel(IJobService jobs, IAppLifetime app, Action<Action>? post = null, TimeProvider? timeProvider = null, SpeedLimitState? limit = null)
     {
@@ -92,6 +99,12 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
     public string SpeedLimitLabel => Strings.TraySpeedLimit;
 
     public string QuitLabel => Strings.TrayQuit;
+
+    public string FlyoutName => Strings.TrayFlyoutName;
+
+    public string FlyoutSpeedLabel => Strings.TrayFlyoutSpeed;
+
+    public string FlyoutLimitLabel => Strings.TrayFlyoutLimit;
 
     [RelayCommand]
     private void Open() => _app.ShowMainWindow();
@@ -144,6 +157,11 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
         _total.Post(0, total);
     }
 
-    private void ShowTotal(long bytesPerSecond) =>
+    private void ShowTotal(long bytesPerSecond)
+    {
         ToolTip = bytesPerSecond <= 0 ? Strings.AppTitle : string.Format(CultureInfo.CurrentCulture, _toolTipFormat, ByteText.Format(bytesPerSecond));
+        _history.Add(bytesPerSecond);
+        SpeedSamples = _history.Snapshot();
+        TotalSpeedText = ByteText.Format(Math.Max(0, bytesPerSecond)) + "/s";
+    }
 }

@@ -1105,4 +1105,16 @@
   <data name="DetailsSpeedLimit" xml:space="preserve">
     <value>Speed limit</value>
   </data>
+  <data name="TrayFlyoutName" xml:space="preserve">
+    <value>Kasi tray panel</value>
+  </data>
+  <data name="TrayFlyoutSpeed" xml:space="preserve">
+    <value>Total speed</value>
+  </data>
+  <data name="TrayFlyoutLimit" xml:space="preserve">
+    <value>Speed limit</value>
+  </data>
+  <data name="ToastDetailsFormat" xml:space="preserve">
+    <value>{0} in {1}</value>
+  </data>
 </root>

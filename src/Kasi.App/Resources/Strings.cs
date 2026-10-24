@@ -253,6 +253,14 @@ internal static class Strings
 
     public static string TrayQuit => Get(nameof(TrayQuit));
 
+    public static string TrayFlyoutName => Get(nameof(TrayFlyoutName));
+
+    public static string TrayFlyoutSpeed => Get(nameof(TrayFlyoutSpeed));
+
+    public static string TrayFlyoutLimit => Get(nameof(TrayFlyoutLimit));
+
+    public static string ToastDetailsFormat => Get(nameof(ToastDetailsFormat));
+
     public static string TrayToolTipSpeed => Get(nameof(TrayToolTipSpeed));
 
     public static string ToastCompleted => Get(nameof(ToastCompleted));
