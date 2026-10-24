@@ -4,7 +4,8 @@ name: Extension end to end
 # stub Kasi from tests/Kasi.BrowserHarness; TC-BRW-001 to 004. Nothing here touches the public internet except the browser and package
 # downloads; the test pages and files come from Kasi.TestServer on loopback.
 #   pull requests that touch the extension, the protocol, the host or the harness: Chromium only
-#   nightly and by hand: Chromium and Firefox (Firefox is driven through geckodriver, which the Windows runner image provides)
+#   nightly and by hand: Chromium and Firefox (Firefox is driven through geckodriver, which the Windows runner image provides),
+#     then again with the real Kasi.App in place of the stub (M2.13c, ADR 0026): the real app saves the file, cookies and all
 # The run registers the host under HKCU for the browser under test and restores what was there; KASI_E2E=1 is the opt-in for that.
 
 on:
@@ -56,6 +57,10 @@ jobs:
           dotnet publish src/Kasi.NativeHost/Kasi.NativeHost.csproj -c Release -r win-x64 -o artifacts/native-host --nologo
           dotnet build tests/Kasi.BrowserHarness/Kasi.BrowserHarness.csproj -c Release --nologo
 
+      - name: Publish the real Kasi.App
+        if: github.event_name != 'pull_request'
+        run: dotnet publish src/Kasi.App/Kasi.App.csproj -c Release -o artifacts/kasi-app --nologo
+
       - name: Build the extension
         working-directory: extension
         run: |
@@ -68,7 +73,7 @@ jobs:
         shell: pwsh
         run: |
           $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
-          npm run test:e2e -- chromium allowlist -t chromium
+          npm run test:e2e -- e2e/chromium.e2e allowlist -t chromium
 
       - name: Firefox
         if: github.event_name != 'pull_request'
@@ -77,4 +82,22 @@ jobs:
         run: |
           geckodriver --version
           $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
-          npm run test:e2e -- firefox allowlist -t firefox
+          npm run test:e2e -- e2e/firefox.e2e allowlist -t firefox
+
+      - name: Chromium with the real Kasi
+        if: github.event_name != 'pull_request'
+        working-directory: extension
+        shell: pwsh
+        run: |
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
+          $env:KASI_APP_DIR = (Resolve-Path ../artifacts/kasi-app).Path
+          npm run test:e2e -- real-kasi-chromium
+
+      - name: Firefox with the real Kasi
+        if: github.event_name != 'pull_request'
+        working-directory: extension
+        shell: pwsh
+        run: |
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
+          $env:KASI_APP_DIR = (Resolve-Path ../artifacts/kasi-app).Path
+          npm run test:e2e -- real-kasi-firefox

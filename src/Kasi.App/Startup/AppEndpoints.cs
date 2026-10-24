@@ -7,7 +7,7 @@ namespace Kasi.App.Startup;
 internal sealed record AppEndpoints(string InstanceLock, string BrowserPipe, string HandOffPipe)
 {
     /// <summary>Tests set this so a test instance never meets a real Kasi on the same machine; it only appends to the three names.</summary>
-    public const string TestSuffixVariable = "KASI_ENDPOINT_SUFFIX";
+    public const string TestSuffixVariable = KasiPipeNames.TestSuffixVariable;
 
     public static AppEndpoints ForCurrentUser()
     {

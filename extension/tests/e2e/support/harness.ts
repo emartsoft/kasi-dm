@@ -1,6 +1,6 @@
 // Starts tests/Kasi.BrowserHarness (the stub Kasi, the test pages and Kasi.TestServer) and the registered native host for one run.
 // Nothing here logs a URL or a cookie value; the harness itself touches loopback only.
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -75,6 +75,11 @@ export function harnessDirectory(): string {
   return (
     process.env.KASI_HARNESS_DIR ?? join(repo, 'tests/Kasi.BrowserHarness/bin/Release/net10.0')
   );
+}
+
+/** The published Kasi.App (dotnet publish src/Kasi.App -c Release -o artifacts/kasi-app), for the tests that run the real Kasi. */
+export function kasiAppDirectory(): string {
+  return process.env.KASI_APP_DIR ?? join(repo, 'artifacts/kasi-app');
 }
 
 export function nativeHostPath(): string {
@@ -229,15 +234,23 @@ export interface HostSetup {
  * Copies the real native host into a temp folder. With `tray` the harness is copied beside it as Kasi.exe, so the host's launcher
  * (TC-BRW-002) finds a Kasi to start; without it there is no Kasi.exe and the host answers APP_NOT_INSTALLED.
  */
-export async function installHost(tray?: {
-  adminPort: number;
-  launchDelayMs: number;
-  rules?: HarnessRules;
-}): Promise<HostSetup> {
+export async function installHost(
+  tray?: {
+    adminPort: number;
+    launchDelayMs: number;
+    rules?: HarnessRules;
+  },
+  realKasi = false,
+): Promise<HostSetup> {
   const root = await mkdtemp(join(tmpdir(), 'kasi-e2e-'));
   const appDir = join(root, 'app');
   await mkdir(appDir);
   await copyFile(nativeHostPath(), join(appDir, 'Kasi.NativeHost.exe'));
+  if (realKasi) {
+    // the real app beside the host as Kasi.exe: the apphost finds Kasi.App.dll next to itself, whatever the exe is called
+    await cp(kasiAppDirectory(), appDir, { recursive: true });
+    await copyFile(join(appDir, 'Kasi.App.exe'), join(appDir, 'Kasi.exe'));
+  }
   if (tray) {
     await cp(harnessDirectory(), appDir, { recursive: true });
     await copyFile(join(appDir, 'Kasi.BrowserHarness.exe'), join(appDir, 'Kasi.exe'));
@@ -271,6 +284,18 @@ export async function installHost(tray?: {
       await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     },
   };
+}
+
+/**
+ * Ends the real Kasi the native host started from this folder. It is found by the path of its executable, never by image name, so a
+ * Kasi the developer is running is not touched.
+ */
+export function stopKasiIn(appDir: string): void {
+  const pattern = `${appDir.replaceAll("'", "''")}${String.raw`\*`}`;
+  const script = `Get-CimInstance Win32_Process -Filter "Name='Kasi.exe'" | Where-Object { $_.ExecutablePath -like '${pattern}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`;
+  spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    windowsHide: true,
+  });
 }
 
 /** Asks the tray Kasi the native host started (it is not our child) to exit; it is never killed by image name. */
