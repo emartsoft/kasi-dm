@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -123,9 +124,28 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     /// <summary>The grid hands over what is selected; commands act on it.</summary>
     public void SetSelection(IEnumerable<JobRowViewModel> rows)
     {
+        foreach (var row in _selection)
+        {
+            row.PropertyChanged -= OnSelectedRowChanged;
+        }
+
         _selection = [.. rows];
+        foreach (var row in _selection)
+        {
+            row.PropertyChanged += OnSelectedRowChanged;
+        }
+
         SelectedRow = _selection.Count > 0 ? _selection[0] : null;
         RefreshSelectionCommands();
+    }
+
+    /// <summary>A selected download that starts, pauses or finishes changes what the buttons can do; the buttons follow only when told.</summary>
+    private void OnSelectedRowChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(JobRowViewModel.State) or nameof(JobRowViewModel.IsActive))
+        {
+            RefreshSelectionCommands();
+        }
     }
 
     /// <summary>Refreshes what changes without an event: the connected browsers. The app calls it once a second.</summary>
@@ -135,7 +155,14 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
         ExtensionStatusText = count > 0 ? Strings.StatusExtensionConnected : Strings.StatusExtensionNone;
     }
 
-    public void Dispose() => _limit.Changed -= OnLimitChanged;
+    public void Dispose()
+    {
+        _limit.Changed -= OnLimitChanged;
+        foreach (var row in _selection)
+        {
+            row.PropertyChanged -= OnSelectedRowChanged;
+        }
+    }
 
     [RelayCommand]
     private void AddUrl() => AddUrlHandler?.Invoke();
