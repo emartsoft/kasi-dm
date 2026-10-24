@@ -41,6 +41,12 @@ jobs:
           - target: host
             seconds: '300'
             findings: artifacts/fuzz-host/findings/
+          - target: hls
+            seconds: '300'
+            findings: artifacts/fuzz-hls/findings/
+          - target: dash
+            seconds: '300'
+            findings: artifacts/fuzz-dash/findings/
     steps:
       - uses: actions/checkout@v4
         with:

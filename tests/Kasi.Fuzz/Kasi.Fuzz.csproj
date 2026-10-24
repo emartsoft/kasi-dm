@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.Engine/Kasi.Engine.csproj" />
+    <ProjectReference Include="../../src/Kasi.Media/Kasi.Media.csproj" />
     <ProjectReference Include="../../src/Kasi.NativeHost/Kasi.NativeHost.csproj" />
     <PackageReference Include="SharpFuzz" />
   </ItemGroup>

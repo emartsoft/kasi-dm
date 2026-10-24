@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT12S">
+  <Period id="p1">
+    <AdaptationSet contentType="video" mimeType="video/mp4">
+      <SegmentList timescale="1000" duration="4000">
+        <Initialization sourceURL="video/init.mp4" range="0-99"/>
+        <SegmentURL media="video/seg-1.m4s" mediaRange="100-1099"/>
+        <SegmentURL media="video/seg-2.m4s"/>
+        <SegmentURL media="video/seg-3.m4s"/>
+      </SegmentList>
+      <Representation id="v" bandwidth="1000000" width="1280" height="720" codecs="avc1.4d401f"/>
+    </AdaptationSet>
+  </Period>
+</MPD>
