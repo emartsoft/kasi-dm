@@ -45,6 +45,10 @@ internal sealed class ShellSpy : IShell
     public List<string> Shown { get; } = [];
 
     public void ShowInFolder(string path) => Shown.Add(path);
+
+    public List<string> Folders { get; } = [];
+
+    public void OpenFolder(string path) => Folders.Add(path);
 }
 
 internal sealed class MainRig : IAsyncDisposable

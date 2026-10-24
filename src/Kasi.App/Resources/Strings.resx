@@ -988,6 +988,93 @@
   <data name="SelectRow" xml:space="preserve">
     <value>Select download</value>
   </data>
+  <data name="SettingsPageGeneral" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="SettingsPageGeneralDescription" xml:space="preserve">
+    <value>Appearance and how Kasi looks on this PC.</value>
+  </data>
+  <data name="SettingsPageBrowser" xml:space="preserve">
+    <value>Browser Integration</value>
+  </data>
+  <data name="SettingsPageBrowserDescription" xml:space="preserve">
+    <value>Choose which browser downloads Kasi takes, and the rules the extension follows.</value>
+  </data>
+  <data name="SettingsPageFiles" xml:space="preserve">
+    <value>File Types &amp; Paths</value>
+  </data>
+  <data name="SettingsPageFilesDescription" xml:space="preserve">
+    <value>Where each kind of file is saved, and the rules that decide it.</value>
+  </data>
+  <data name="SettingsPageScheduler" xml:space="preserve">
+    <value>Scheduler &amp; Queues</value>
+  </data>
+  <data name="SettingsPageSchedulerDescription" xml:space="preserve">
+    <value>Start and stop queues at set times, and choose what happens when they finish.</value>
+  </data>
+  <data name="SettingsPageAbout" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="SettingsPageAboutDescription" xml:space="preserve">
+    <value>Version, licence and the software Kasi is built with.</value>
+  </data>
+  <data name="SettingsBreadcrumbRoot" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsFind" xml:space="preserve">
+    <value>Find a setting (Ctrl+E)</value>
+  </data>
+  <data name="SettingsFindName" xml:space="preserve">
+    <value>Find a setting</value>
+  </data>
+  <data name="SettingsRestoreDefaults" xml:space="preserve">
+    <value>Restore Defaults</value>
+  </data>
+  <data name="SettingsReset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="SettingsNavigation" xml:space="preserve">
+    <value>Settings pages</value>
+  </data>
+  <data name="SettingsThisPc" xml:space="preserve">
+    <value>This PC</value>
+  </data>
+  <data name="SettingsDataFolder" xml:space="preserve">
+    <value>Data folder</value>
+  </data>
+  <data name="SettingsVersion" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="SettingsOpenDataFolder" xml:space="preserve">
+    <value>Open Config Directory</value>
+  </data>
+  <data name="SettingsOpenScheduler" xml:space="preserve">
+    <value>Open the Scheduler</value>
+  </data>
+  <data name="SettingsRulesHeading" xml:space="preserve">
+    <value>Interception rules and filters</value>
+  </data>
+  <data name="SettingsRulesNote" xml:space="preserve">
+    <value>Changes reach the browser extension when you save.</value>
+  </data>
+  <data name="SettingsAutoSaved" xml:space="preserve">
+    <value>Changes on this page are saved as you make them.</value>
+  </data>
+  <data name="SettingsRestartNote" xml:space="preserve">
+    <value>Settings are saved on this PC only.</value>
+  </data>
+  <data name="AboutTagline" xml:space="preserve">
+    <value>Download manager and accelerator</value>
+  </data>
+  <data name="AboutOwner" xml:space="preserve">
+    <value>MartSoft Solutions</value>
+  </data>
+  <data name="AboutNotices" xml:space="preserve">
+    <value>Third-party software</value>
+  </data>
+  <data name="SettingsPageNameLabel" xml:space="preserve">
+    <value>Page</value>
+  </data>
   <data name="DetailsPeak" xml:space="preserve">
     <value>Peak</value>
   </data>
