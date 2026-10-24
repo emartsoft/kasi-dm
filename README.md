@@ -120,6 +120,9 @@ dotnet test --filter "TC=TC-ENG-008"
 # Extension tests
 cd extension; npm run check:types; npm run lint; npm run format:check; npm test; npm run build
 
+# UI tests: the real Kasi.App window through UI Automation (FlaUI); needs an interactive desktop, skipped otherwise
+$env:KASI_UI='1'; $env:KASI_UI_INPUT='1'; dotnet test tests/Kasi.App.UiTests
+
 # Coverage report (engine gate requires 80% line coverage)
 dotnet test --collect:"XPlat Code Coverage"
 # the gate itself, on a merged Cobertura report from ReportGenerator:

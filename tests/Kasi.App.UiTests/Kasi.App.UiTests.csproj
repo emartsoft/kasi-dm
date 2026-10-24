@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.18362.0</TargetFramework>
+    <!-- Kasi.TestServer is an executable project; the tests only use it in process. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kasi.App/Kasi.App.csproj" />
+    <ProjectReference Include="../../src/Kasi.Ipc/Kasi.Ipc.csproj" />
+    <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.Core" />
+    <PackageReference Include="FlaUI.UIA3" />
+  </ItemGroup>
+
+</Project>

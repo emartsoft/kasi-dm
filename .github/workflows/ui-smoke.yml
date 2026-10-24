@@ -1,0 +1,47 @@
+name: UI smoke
+
+# M2.13a (docs/plans/m2-13.md, ADR 0026, TC-UI-001): the real Kasi.App window driven through UI Automation (FlaUI). A pull request
+# that touches the app, its protocol or these tests runs the short set; the nightly workflow with the full set follows in M2.13b.
+# The tests start their own Kasi.App.exe with its own data folder and endpoint names and download from Kasi.TestServer on loopback.
+
+on:
+  pull_request:
+    paths:
+      - 'src/Kasi.App/**'
+      - 'src/Kasi.Core/**'
+      - 'src/Kasi.Engine/**'
+      - 'src/Kasi.Scheduling/**'
+      - 'tests/Kasi.App.UiTests/**'
+      - 'tests/Kasi.TestServer/**'
+      - '.github/workflows/ui-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ui-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  KASI_UI: '1'
+  KASI_UI_INPUT: '1'
+
+jobs:
+  ui:
+    name: UI smoke
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run the UI tests
+        run: dotnet test tests/Kasi.App.UiTests -c Release
