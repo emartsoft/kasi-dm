@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Kasi.Core.Logging;
@@ -28,7 +29,7 @@ public sealed class FfmpegException : Exception
 
 public sealed record FfmpegOptions(string FfmpegPath, string FfprobePath, TimeSpan? Timeout = null)
 {
-    public TimeSpan ProcessTimeout { get; init; } = Timeout ?? TimeSpan.FromMinutes(2);
+    public TimeSpan ProcessTimeout { get; init; } = Timeout ?? TimeSpan.FromMinutes(30); // a multi-GB stream copy with +faststart rewrites the file
 
     internal void Validate()
     {
@@ -50,7 +51,7 @@ public sealed record FfprobeResult(double? DurationSeconds, IReadOnlyList<Ffprob
 /// </summary>
 public sealed class FfmpegRunner(FfmpegOptions options)
 {
-    private static readonly Regex WindowsPath = new(@"[A-Za-z]:\\[^\r\n""']+", RegexOptions.Compiled);
+    private static readonly Regex _windowsPath = new(@"[A-Za-z]:\\[^\r\n""']+", RegexOptions.Compiled);
 
     public FfmpegOptions Options { get; } = options ?? throw new ArgumentNullException(nameof(options));
 
@@ -74,11 +75,18 @@ public sealed class FfmpegRunner(FfmpegOptions options)
         return await RunProcessAsync(Options.FfprobePath, args, sensitivePaths, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<FfprobeResult> ProbeAsync(string path, CancellationToken cancellationToken = default)
+    public async Task<FfprobeResult> ProbeAsync(string path, string? inputFormat = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        List<string> arguments = ["-protocol_whitelist", "file"];
+        if (inputFormat is not null)
+        {
+            arguments.AddRange(["-f", inputFormat]);
+        }
+
+        arguments.AddRange(["-show_entries", "format=duration:stream=codec_type,codec_name", "-of", "json", path]);
         var result = await RunFfprobeAsync(
-            ["-show_entries", "format=duration:stream=codec_type,codec_name", "-of", "json", path],
+            arguments,
             [path],
             cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
@@ -143,8 +151,8 @@ public sealed class FfmpegRunner(FfmpegOptions options)
         timeout.CancelAfter(Options.ProcessTimeout);
         try
         {
-            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+            var stdout = ReadBoundedAsync(process.StandardOutput, MaxStdoutChars, timeout.Token);
+            var stderr = ReadBoundedAsync(process.StandardError, MaxStderrChars, timeout.Token);
             await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
             return new FfmpegResult(
                 process.ExitCode,
@@ -156,6 +164,26 @@ public sealed class FfmpegRunner(FfmpegOptions options)
             TryKill(process);
             throw new FfmpegException(FfmpegErrorKind.Timeout, "FFmpeg did not finish before the process timeout.");
         }
+    }
+
+    private const int MaxStdoutChars = 4 * 1024 * 1024;
+    private const int MaxStderrChars = 64 * 1024;
+
+    /// <summary>Keeps at most <paramref name="maxChars"/> and drains the rest, so a chatty process can neither fill memory nor block on a full pipe.</summary>
+    private static async Task<string> ReadBoundedAsync(TextReader reader, int maxChars, CancellationToken cancellationToken)
+    {
+        var text = new StringBuilder();
+        var buffer = new char[4096];
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            if (text.Length < maxChars)
+            {
+                text.Append(buffer, 0, Math.Min(read, maxChars - text.Length));
+            }
+        }
+
+        return text.ToString();
     }
 
     private static void TryKill(Process process)
@@ -191,6 +219,6 @@ public sealed class FfmpegRunner(FfmpegOptions options)
             }
         }
 
-        return WindowsPath.Replace(value, match => Redact.Path(match.Value.Trim()));
+        return _windowsPath.Replace(value, match => Redact.Path(match.Value.Trim()));
     }
 }

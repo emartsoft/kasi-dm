@@ -3,20 +3,28 @@
 Kasi ships an **LGPL-2.1-or-later** FFmpeg/ffprobe build, invoked as an external process. No GPL or non-free components are
 enabled and no FFmpeg code is linked into a Kasi assembly (KASI-NFR-020, ADR 0030).
 
-## Build configuration
+## Build configuration (planned recipe)
 
-The minimal build uses:
+The recipe below is the plan for Kasi's own minimal build. It is **not yet built or verified**: the manual workflow
+`.github/workflows/ffmpeg-minimal-build.yml` compiles it from the pinned source tarball, checks that the result is LGPL and runs
+the media tests against it. Until that workflow is green and its artifact is the release asset, builds use the pinned stock
+LGPL build described in ADR 0030. If a run fails with "Could not find codec parameters", the recipe gains the native decoders
+the streams need and this section is updated.
+
+Planned options:
 
 ```
 --disable-gpl --disable-nonfree --disable-autodetect --disable-everything
 --enable-protocol=file
---enable-demuxer=mpegts,mov,matroska,aac,mp3
+--enable-demuxer=mpegts,mov,matroska,aac,mp3,ac3,eac3
 --enable-muxer=mp4,matroska,ipod,mp3
---enable-bsf=aac_adtstoasc
+--enable-parser=h264,hevc,av1,aac,aac_latm,ac3,mpegaudio,vp9,opus
+--enable-bsf=aac_adtstoasc,extract_extradata
 ```
 
 `--disable-everything` plus the explicit list keeps the binary small and limits the attack surface. The wrapper only ever
-passes local file inputs and `-protocol_whitelist file`.
+passes local file inputs, `-protocol_whitelist file` before every input and, when the stream type is known, a forced
+input demuxer (`-f mpegts` or `-f mp4`) so it never sniffs downloaded bytes into a playlist or script format.
 
 ## Release asset
 

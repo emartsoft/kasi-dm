@@ -71,7 +71,7 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         muxed.DurationSeconds.Should().BeApproximately(24, 1);
         muxed.WorkDirectoryDeleted.Should().BeTrue();
         File.Exists(output).Should().BeTrue();
-        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, TestContext.Current.CancellationToken);
+        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, cancellationToken: TestContext.Current.CancellationToken);
         probe.DurationSeconds.Should().BeApproximately(24, 1);
         probe.Streams.Should().Contain(stream => stream.CodecType == "video");
         probe.Streams.Should().Contain(stream => stream.CodecType == "audio");
@@ -94,7 +94,7 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         }, TestContext.Current.CancellationToken);
 
         muxed.Container.Should().Be("mkv");
-        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, TestContext.Current.CancellationToken);
+        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, cancellationToken: TestContext.Current.CancellationToken);
         probe.DurationSeconds.Should().BeApproximately(24, 1);
         probe.Streams.Should().Contain(stream => stream.CodecType == "video");
     }
@@ -112,7 +112,7 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         var muxed = await Muxer().MuxAsync(result, new MediaMuxOptions { OutputPath = output }, TestContext.Current.CancellationToken);
 
         muxed.Container.Should().Be("mp4");
-        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, TestContext.Current.CancellationToken);
+        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, cancellationToken: TestContext.Current.CancellationToken);
         probe.DurationSeconds.Should().BeApproximately(24, 1);
         probe.Streams.Should().Contain(stream => stream.CodecType == "video");
     }
@@ -149,7 +149,7 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         var muxed = await Muxer().MuxAsync(result, new MediaMuxOptions { OutputPath = output }, TestContext.Current.CancellationToken);
 
         muxed.DurationSeconds.Should().BeApproximately(24, 1);
-        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, TestContext.Current.CancellationToken);
+        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, cancellationToken: TestContext.Current.CancellationToken);
         probe.Streams.Should().Contain(stream => stream.CodecType == "video");
         probe.Streams.Should().Contain(stream => stream.CodecType == "audio");
     }
@@ -172,6 +172,70 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         var failure = (await mux.Should().ThrowAsync<MediaMuxException>()).Which;
         failure.Kind.Should().Be(MediaMuxErrorKind.DurationMismatch);
         Directory.Exists(result.WorkDirectory).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_failed_check_leaves_no_file_at_the_output_path()
+    {
+        if (!TryGetFfmpeg())
+        {
+            return;
+        }
+
+        var result = await DownloadAsync("/hls/muxable/master.m3u8");
+        var mismatch = result with { Variant = result.Variant! with { Video = result.Variant.Video with { DurationSeconds = 30 } } };
+        var directory = Path.Combine(_folder, "out-failed");
+
+        Func<Task> mux = () => Muxer().MuxAsync(mismatch, new MediaMuxOptions { OutputPath = Path.Combine(directory, "x.mp4") }, TestContext.Current.CancellationToken);
+
+        await mux.Should().ThrowAsync<MediaMuxException>();
+        Directory.EnumerateFiles(directory).Should().BeEmpty("neither the output nor its .part file may remain after a failed check");
+    }
+
+    [Fact]
+    public async Task An_existing_file_is_never_replaced_and_dots_in_the_title_are_kept()
+    {
+        if (!TryGetFfmpeg())
+        {
+            return;
+        }
+
+        var result = await DownloadAsync("/hls/muxable/master.m3u8");
+        var directory = Path.Combine(_folder, "out-unique");
+        Directory.CreateDirectory(directory);
+        var taken = Path.Combine(directory, "My.Show.S01E02.mp4");
+        await File.WriteAllTextAsync(taken, "keep me", TestContext.Current.CancellationToken);
+
+        var muxed = await Muxer().MuxAsync(
+            result, new MediaMuxOptions { OutputPath = Path.Combine(directory, "My.Show.S01E02") }, TestContext.Current.CancellationToken);
+
+        muxed.OutputPath.Should().Be(Path.Combine(directory, "My.Show.S01E02 (1).mp4"));
+        (await File.ReadAllTextAsync(taken, TestContext.Current.CancellationToken)).Should().Be("keep me");
+    }
+
+    [Fact]
+    public async Task A_manifest_without_codecs_is_classified_by_probing_the_joined_file()
+    {
+        if (!TryGetFfmpeg())
+        {
+            return;
+        }
+
+        var result = await DownloadAsync("/hls/muxable/master.m3u8");
+        var variant = result.Variant!;
+        var unknown = result with
+        {
+            Variant = variant with
+            {
+                Video = variant.Video with { Codecs = null },
+                Audio = variant.Audio is { } audio ? audio with { Codecs = null } : null,
+            },
+        };
+
+        var muxed = await Muxer().MuxAsync(
+            unknown, new MediaMuxOptions { OutputPath = Path.Combine(_folder, "out-probe", "capture") }, TestContext.Current.CancellationToken);
+
+        muxed.Container.Should().Be("mp4", "the joined H.264/AAC stream fits MP4 once its codecs are read from the file");
     }
 
     [Fact]
@@ -200,7 +264,7 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
 
         muxed.Container.Should().Be("m4a");
         Directory.Exists(work).Should().BeFalse();
-        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, TestContext.Current.CancellationToken);
+        var probe = await new FfmpegRunner(_ffmpeg).ProbeAsync(output, cancellationToken: TestContext.Current.CancellationToken);
         probe.DurationSeconds.Should().BeApproximately(24, 1);
         probe.Streams.Should().OnlyContain(stream => stream.CodecType == "audio");
     }

@@ -74,8 +74,7 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
             throw new MediaMuxException(MediaMuxErrorKind.NoStreams, "The capture has no audio or video stream.");
         }
 
-        var output = options.OutputPath;
-        var container = ChooseContainer(variant, video, options.Container);
+        var container = await ChooseContainerAsync(variant, video, audio, options.Container, cancellationToken).ConfigureAwait(false);
         var extension = container switch
         {
             "mkv" => ".mkv",
@@ -83,49 +82,12 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
             "mka" => ".mka",
             _ => ".mp4",
         };
-        output = Path.ChangeExtension(output, extension);
+        var output = UniquePath(WithExtension(options.OutputPath, extension));
         Directory.CreateDirectory(Path.GetDirectoryName(output)!);
         var temporary = output + ".part" + extension;
         File.Delete(temporary);
 
-        var arguments = new List<string> { "-protocol_whitelist", "file" };
-        if (video is not null)
-        {
-            arguments.Add("-i");
-            arguments.Add(video.Path);
-        }
-
-        if (audio is not null)
-        {
-            arguments.Add("-i");
-            arguments.Add(audio.Path);
-        }
-
-        if (video is not null)
-        {
-            arguments.AddRange(["-map", "0:v:0?"]);
-            if (audio is not null)
-            {
-                arguments.AddRange(["-map", "1:a:0?"]);
-            }
-            else
-            {
-                // An HLS TS rendition usually carries its audio in the same joined stream.
-                arguments.AddRange(["-map", "0:a:0?"]);
-            }
-        }
-        else
-        {
-            arguments.AddRange(["-map", "0:a:0", "-vn"]);
-        }
-
-        arguments.AddRange(["-c", "copy"]);
-        if (container == "mp4")
-        {
-            arguments.AddRange(["-movflags", "+faststart"]);
-        }
-
-        arguments.Add(temporary);
+        var arguments = BuildArguments(video, audio, container, temporary);
         var sensitive = new[] { video?.Path, audio?.Path, output, temporary }.OfType<string>().ToArray();
         var result = await ffmpeg.RunAsync(arguments, sensitive, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
@@ -137,28 +99,41 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
                 result.StandardError);
         }
 
-        File.Move(temporary, output, overwrite: true);
+        // The file is verified under its temporary name; only a good file ever appears at the real output path.
         FfprobeResult probe;
         try
         {
-            probe = await ffmpeg.ProbeAsync(output, cancellationToken).ConfigureAwait(false);
+            probe = await ffmpeg.ProbeAsync(temporary, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (FfmpegException exception)
         {
+            TryDelete(temporary);
             throw new MediaMuxException(MediaMuxErrorKind.ProbeFailed, "ffprobe could not read the muxed file.", null, exception);
         }
 
         if (probe.DurationSeconds is not { } actual)
         {
+            TryDelete(temporary);
             throw new MediaMuxException(MediaMuxErrorKind.ProbeFailed, "ffprobe did not report a duration.");
         }
 
         var expected = job.DurationSeconds;
         if (expected > 0 && Math.Abs(actual - expected) > options.DurationTolerance.TotalSeconds)
         {
+            TryDelete(temporary);
             throw new MediaMuxException(
                 MediaMuxErrorKind.DurationMismatch,
                 "The muxed duration does not match the manifest.");
+        }
+
+        try
+        {
+            File.Move(temporary, output, overwrite: false);
+        }
+        catch (IOException exception)
+        {
+            TryDelete(temporary);
+            throw new MediaMuxException(MediaMuxErrorKind.Io, "The muxed file could not be moved into place.", null, exception);
         }
 
         var deleted = false;
@@ -172,7 +147,55 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
         return new MediaMuxResult(output, container, actual, deleted);
     }
 
-    private static string ChooseContainer(MediaVariant variant, MediaJoinedTrack? video, MediaMuxContainer requested)
+    /// <summary>Every input gets its own protocol whitelist and, when known, a forced demuxer (never content sniffing).</summary>
+    internal static List<string> BuildArguments(MediaJoinedTrack? video, MediaJoinedTrack? audio, string container, string output)
+    {
+        var arguments = new List<string>();
+        AddInput(arguments, video);
+        AddInput(arguments, audio);
+        if (video is not null)
+        {
+            arguments.AddRange(["-map", "0:v:0?"]);
+            // An HLS TS rendition usually carries its audio in the same joined stream.
+            arguments.AddRange(audio is not null ? ["-map", "1:a:0?"] : ["-map", "0:a:0?"]);
+        }
+        else
+        {
+            arguments.AddRange(["-map", "0:a:0", "-vn"]);
+        }
+
+        arguments.AddRange(["-c", "copy"]);
+        if (container == "mp4")
+        {
+            arguments.AddRange(["-movflags", "+faststart"]);
+        }
+
+        arguments.Add(output);
+        return arguments;
+    }
+
+    private static void AddInput(List<string> arguments, MediaJoinedTrack? track)
+    {
+        if (track is null)
+        {
+            return;
+        }
+
+        arguments.AddRange(["-protocol_whitelist", "file"]);
+        if (track.InputFormat is { } format)
+        {
+            arguments.AddRange(["-f", format]);
+        }
+
+        arguments.AddRange(["-i", track.Path]);
+    }
+
+    private async Task<string> ChooseContainerAsync(
+        MediaVariant variant,
+        MediaJoinedTrack? video,
+        MediaJoinedTrack? audio,
+        MediaMuxContainer requested,
+        CancellationToken cancellationToken)
     {
         if (requested == MediaMuxContainer.Mp4)
         {
@@ -184,29 +207,96 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
             return "mkv";
         }
 
-        if (video is null)
-        {
-            var codec = variant.Audio?.Codecs ?? "";
-            return codec.StartsWith("mp4a", StringComparison.OrdinalIgnoreCase) ? "m4a" : "mka";
-        }
-
-        return IsMp4Compatible(variant) ? "mp4" : "mkv";
-    }
-
-    private static readonly string[] Mp4VideoCodecs = ["avc", "h264", "hev", "hvc", "av01"];
-
-    private static readonly string[] Mp4AudioCodecs = ["mp4a", "aac", "ac-3", "ec-3", "ac3", "eac3"];
-
-    private static bool IsMp4Compatible(MediaVariant variant)
-    {
         var videoCodec = variant.Video.Codecs ?? "";
         var audioCodec = variant.Audio?.Codecs ?? "";
-        var videoOk = Mp4VideoCodecs
+        if (video is null)
+        {
+            if (audioCodec.Length == 0 && audio is not null)
+            {
+                audioCodec = (await DescribeAsync(audio, "audio", cancellationToken).ConfigureAwait(false)).Audio;
+            }
+
+            return audioCodec.StartsWith("mp4a", StringComparison.OrdinalIgnoreCase)
+                || audioCodec.Contains("aac", StringComparison.OrdinalIgnoreCase) ? "m4a" : "mka";
+        }
+
+        // The manifest had no CODECS: read the codec names from the joined file itself.
+        if (videoCodec.Length == 0)
+        {
+            var described = await DescribeAsync(video, "video", cancellationToken).ConfigureAwait(false);
+            videoCodec = described.Video;
+            if (audio is null)
+            {
+                audioCodec = described.Audio;
+            }
+        }
+
+        if (audio is not null && audioCodec.Length == 0)
+        {
+            audioCodec = (await DescribeAsync(audio, "audio", cancellationToken).ConfigureAwait(false)).Audio;
+        }
+
+        return IsMp4Compatible(videoCodec, audioCodec) ? "mp4" : "mkv";
+    }
+
+    private async Task<(string Video, string Audio)> DescribeAsync(MediaJoinedTrack track, string _, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var probe = await ffmpeg.ProbeAsync(track.Path, track.InputFormat, cancellationToken).ConfigureAwait(false);
+            return (
+                string.Join(',', probe.Streams.Where(stream => stream.CodecType == "video").Select(stream => stream.CodecName)),
+                string.Join(',', probe.Streams.Where(stream => stream.CodecType == "audio").Select(stream => stream.CodecName)));
+        }
+        catch (FfmpegException)
+        {
+            return ("", ""); // unknown codecs fall back to MKV, which holds anything
+        }
+    }
+
+    private static readonly string[] _mp4VideoCodecs = ["avc", "h264", "hev", "hvc", "av01", "av1"];
+
+    private static readonly string[] _mp4AudioCodecs = ["mp4a", "aac", "ac-3", "ec-3", "ac3", "eac3", "mp3"];
+
+    private static bool IsMp4Compatible(string videoCodec, string audioCodec)
+    {
+        var videoOk = _mp4VideoCodecs
             .Any(codec => videoCodec.Contains(codec, StringComparison.OrdinalIgnoreCase));
         var audioOk = string.IsNullOrEmpty(audioCodec)
-            || Mp4AudioCodecs
+            || _mp4AudioCodecs
                 .Any(codec => audioCodec.Contains(codec, StringComparison.OrdinalIgnoreCase));
         return videoOk && audioOk;
+    }
+
+    private static readonly string[] _containerExtensions = [".mp4", ".mkv", ".m4a", ".mka", ".m4v", ".webm"];
+
+    /// <summary>Swaps a container extension but keeps dots that are part of the title (My.Show.S01E02 becomes My.Show.S01E02.mp4).</summary>
+    internal static string WithExtension(string path, string extension) =>
+        _containerExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)
+            ? Path.ChangeExtension(path, extension)
+            : path + extension;
+
+    /// <summary>Never replaces a file that is already there: name (1).mp4, name (2).mp4, ...</summary>
+    internal static string UniquePath(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return path;
+        }
+
+        var directory = Path.GetDirectoryName(path)!;
+        var name = Path.GetFileNameWithoutExtension(path);
+        var extension = Path.GetExtension(path);
+        for (var number = 1; number < 1000; number++)
+        {
+            var candidate = Path.Combine(directory, $"{name} ({number}){extension}");
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new MediaMuxException(MediaMuxErrorKind.Io, "No free output file name was found.");
     }
 
     private static bool IsWithin(string path, string directory)
