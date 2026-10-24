@@ -5,74 +5,89 @@
              x:Class="Kasi.App.Views.CategoriesView"
              x:DataType="vm:CategoriesViewModel">
   <ScrollViewer>
-    <StackPanel Spacing="8" Margin="0,12,0,0">
-      <TextBlock Text="{Binding Note}" Opacity="0.7" TextWrapping="Wrap" />
+    <StackPanel Spacing="12" Margin="0,12,0,0">
+      <TextBlock Text="{Binding Note}" Classes="kasi-secondary" TextWrapping="Wrap" />
 
-      <TextBlock Text="{Binding CategoriesLabel}" FontWeight="SemiBold" />
-      <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Height="130" AutomationProperties.Name="{Binding CategoriesLabel}">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="core:Category">
-            <TextBlock Text="{Binding Name}" />
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
+      <Border Classes="kasi-card">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding CategoriesLabel}" FontWeight="SemiBold" />
+          <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Height="130" AutomationProperties.Name="{Binding CategoriesLabel}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="core:Category">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
 
-      <Grid ColumnDefinitions="*,12,*">
-        <StackPanel Grid.Column="0" Spacing="4">
-          <TextBlock Text="{Binding NameLabel}" />
-          <TextBox Text="{Binding EditName}" IsEnabled="{Binding CanRename}" AutomationProperties.Name="{Binding NameLabel}" />
+          <Grid ColumnDefinitions="*,12,*">
+            <StackPanel Grid.Column="0" Spacing="4">
+              <TextBlock Text="{Binding NameLabel}" />
+              <TextBox Text="{Binding EditName}" IsEnabled="{Binding CanRename}" AutomationProperties.Name="{Binding NameLabel}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="4">
+              <TextBlock Text="{Binding FolderLabel}" />
+              <TextBox Text="{Binding EditFolder}" AutomationProperties.Name="{Binding FolderLabel}" />
+            </StackPanel>
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="{Binding SaveCategoryLabel}" Command="{Binding SaveCategoryCommand}" AutomationProperties.Name="{Binding SaveCategoryLabel}" />
+            <Button Content="{Binding DeleteCategoryLabel}" Command="{Binding DeleteCategoryCommand}" IsEnabled="{Binding CanDelete}" AutomationProperties.Name="{Binding DeleteCategoryLabel}" />
+          </StackPanel>
+
+          <TextBlock Text="{Binding NewCategoryLabel}" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="*,12,*,12,Auto">
+            <TextBox Grid.Column="0" Text="{Binding NewCategoryName}" PlaceholderText="{Binding NameLabel}" AutomationProperties.Name="{Binding NewCategoryLabel}" />
+            <TextBox Grid.Column="2" Text="{Binding NewCategoryFolder}" PlaceholderText="{Binding FolderLabel}" AutomationProperties.Name="{Binding NewFolderLabel}" />
+            <Button Grid.Column="4" Content="{Binding AddCategoryLabel}" Command="{Binding AddCategoryCommand}" AutomationProperties.Name="{Binding AddCategoryLabel}" />
+          </Grid>
+
         </StackPanel>
-        <StackPanel Grid.Column="2" Spacing="4">
-          <TextBlock Text="{Binding FolderLabel}" />
-          <TextBox Text="{Binding EditFolder}" AutomationProperties.Name="{Binding FolderLabel}" />
+      </Border>
+
+      <Border Classes="kasi-card">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding RulesLabel}" FontWeight="SemiBold" />
+          <ListBox ItemsSource="{Binding Rules}" SelectedItem="{Binding SelectedRule}" Height="170" AutomationProperties.Name="{Binding RulesLabel}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:RuleItem">
+                <CheckBox IsChecked="{Binding IsEnabled}" Content="{Binding Summary}" AutomationProperties.Name="{Binding Summary}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="{Binding MoveUpLabel}" Command="{Binding MoveRuleUpCommand}" AutomationProperties.Name="{Binding MoveUpLabel}" />
+            <Button Content="{Binding MoveDownLabel}" Command="{Binding MoveRuleDownCommand}" AutomationProperties.Name="{Binding MoveDownLabel}" />
+            <Button Content="{Binding DeleteRuleLabel}" Command="{Binding DeleteRuleCommand}" AutomationProperties.Name="{Binding DeleteRuleLabel}" />
+          </StackPanel>
+          <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+            <ComboBox Grid.Column="0" ItemsSource="{Binding RuleKinds}" SelectedItem="{Binding SelectedRuleKind}" MinWidth="150" AutomationProperties.Name="{Binding RuleKindLabel}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:RuleKindChoice">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBox Grid.Column="2" Text="{Binding NewRulePattern}" PlaceholderText="{Binding RulePatternLabel}" AutomationProperties.Name="{Binding RulePatternLabel}" />
+            <Button Grid.Column="4" Content="{Binding AddRuleLabel}" Command="{Binding AddRuleCommand}" AutomationProperties.Name="{Binding AddRuleLabel}" />
+          </Grid>
+
         </StackPanel>
-      </Grid>
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="{Binding SaveCategoryLabel}" Command="{Binding SaveCategoryCommand}" AutomationProperties.Name="{Binding SaveCategoryLabel}" />
-        <Button Content="{Binding DeleteCategoryLabel}" Command="{Binding DeleteCategoryCommand}" IsEnabled="{Binding CanDelete}" AutomationProperties.Name="{Binding DeleteCategoryLabel}" />
-      </StackPanel>
+      </Border>
 
-      <TextBlock Text="{Binding NewCategoryLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
-      <Grid ColumnDefinitions="*,12,*,12,Auto">
-        <TextBox Grid.Column="0" Text="{Binding NewCategoryName}" PlaceholderText="{Binding NameLabel}" AutomationProperties.Name="{Binding NewCategoryLabel}" />
-        <TextBox Grid.Column="2" Text="{Binding NewCategoryFolder}" PlaceholderText="{Binding FolderLabel}" AutomationProperties.Name="{Binding NewFolderLabel}" />
-        <Button Grid.Column="4" Content="{Binding AddCategoryLabel}" Command="{Binding AddCategoryCommand}" AutomationProperties.Name="{Binding AddCategoryLabel}" />
-      </Grid>
+      <Border Classes="kasi-card">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding TryLabel}" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="*,12,Auto">
+            <TextBox Grid.Column="0" Text="{Binding TryLink}" AutomationProperties.Name="{Binding TryLabel}" />
+            <Button Grid.Column="2" Content="{Binding TryButtonLabel}" Command="{Binding CheckLinkCommand}" AutomationProperties.Name="{Binding TryButtonLabel}" />
+          </Grid>
+          <TextBlock Text="{Binding TryResult}" TextWrapping="Wrap" AutomationProperties.Name="{Binding TryResult}" />
 
-      <TextBlock Text="{Binding RulesLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
-      <ListBox ItemsSource="{Binding Rules}" SelectedItem="{Binding SelectedRule}" Height="170" AutomationProperties.Name="{Binding RulesLabel}">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="vm:RuleItem">
-            <CheckBox IsChecked="{Binding IsEnabled}" Content="{Binding Summary}" AutomationProperties.Name="{Binding Summary}" />
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="{Binding MoveUpLabel}" Command="{Binding MoveRuleUpCommand}" AutomationProperties.Name="{Binding MoveUpLabel}" />
-        <Button Content="{Binding MoveDownLabel}" Command="{Binding MoveRuleDownCommand}" AutomationProperties.Name="{Binding MoveDownLabel}" />
-        <Button Content="{Binding DeleteRuleLabel}" Command="{Binding DeleteRuleCommand}" AutomationProperties.Name="{Binding DeleteRuleLabel}" />
-      </StackPanel>
-      <Grid ColumnDefinitions="Auto,12,*,12,Auto">
-        <ComboBox Grid.Column="0" ItemsSource="{Binding RuleKinds}" SelectedItem="{Binding SelectedRuleKind}" MinWidth="150" AutomationProperties.Name="{Binding RuleKindLabel}">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:RuleKindChoice">
-              <TextBlock Text="{Binding Label}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <TextBox Grid.Column="2" Text="{Binding NewRulePattern}" PlaceholderText="{Binding RulePatternLabel}" AutomationProperties.Name="{Binding RulePatternLabel}" />
-        <Button Grid.Column="4" Content="{Binding AddRuleLabel}" Command="{Binding AddRuleCommand}" AutomationProperties.Name="{Binding AddRuleLabel}" />
-      </Grid>
+        </StackPanel>
+      </Border>
 
-      <TextBlock Text="{Binding TryLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
-      <Grid ColumnDefinitions="*,12,Auto">
-        <TextBox Grid.Column="0" Text="{Binding TryLink}" AutomationProperties.Name="{Binding TryLabel}" />
-        <Button Grid.Column="2" Content="{Binding TryButtonLabel}" Command="{Binding CheckLinkCommand}" AutomationProperties.Name="{Binding TryButtonLabel}" />
-      </Grid>
-      <TextBlock Text="{Binding TryResult}" TextWrapping="Wrap" AutomationProperties.Name="{Binding TryResult}" />
-
-      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.Name="{Binding Error}" />
-      <TextBlock Text="{Binding Status}" Opacity="0.7" AutomationProperties.Name="{Binding Status}" />
+      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource KasiDangerBrush}" AutomationProperties.Name="{Binding Error}" />
+      <TextBlock Text="{Binding Status}" Classes="kasi-secondary" AutomationProperties.Name="{Binding Status}" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

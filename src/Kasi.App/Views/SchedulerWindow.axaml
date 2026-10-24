@@ -10,16 +10,22 @@
         Height="540"
         MinWidth="440"
         MinHeight="400"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterScreen">
-  <DockPanel Margin="16">
+  <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+  </Window.Styles>
+  <DockPanel Margin="20">
     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
-      <TextBlock Text="{Binding StatusText}" Foreground="IndianRed" VerticalAlignment="Center" AutomationProperties.Name="{Binding StatusText}" />
-      <Button Content="Save" Command="{Binding SaveCommand}" IsDefault="True" AutomationProperties.Name="Save" />
+      <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource KasiDangerBrush}" VerticalAlignment="Center" AutomationProperties.Name="{Binding StatusText}" />
+      <Button Content="Save" Command="{Binding SaveCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="Save" />
       <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="Cancel" />
     </StackPanel>
 
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-      <TextBlock Text="Queue:" VerticalAlignment="Center" />
+      <TextBlock Text="Queue:" VerticalAlignment="Center" Classes="kasi-secondary" />
       <ComboBox ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" Width="200" AutomationProperties.Name="Select Queue">
         <ComboBox.ItemTemplate>
           <DataTemplate x:DataType="core:Queue">
@@ -32,7 +38,7 @@
     <TabControl>
       <TabItem Header="Queue settings" AutomationProperties.Name="Queue settings">
         <StackPanel Spacing="12" Margin="0,12,0,0">
-          <TextBlock Text="Maximum parallel downloads (1–20):" />
+          <TextBlock Text="Maximum parallel downloads (1–20):" Classes="kasi-secondary" />
           <NumericUpDown Value="{Binding MaxParallel}" Minimum="1" Maximum="20" Width="140" HorizontalAlignment="Left" AutomationProperties.Name="Maximum parallel downloads" />
         </StackPanel>
       </TabItem>
@@ -43,10 +49,10 @@
             <CheckBox Content="Enable schedule" IsChecked="{Binding IsScheduleEnabled}" AutomationProperties.Name="Enable schedule" />
 
             <Grid ColumnDefinitions="140,140" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
-              <TextBlock Grid.Row="0" Grid.Column="0" Text="Start time (HH:mm):" />
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Start time (HH:mm):" Classes="kasi-secondary" />
               <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding StartTimeText}" Width="110" HorizontalAlignment="Left" Margin="0,4,0,0" AutomationProperties.Name="Start time" />
 
-              <TextBlock Grid.Row="0" Grid.Column="1" Text="Stop time (HH:mm):" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Text="Stop time (HH:mm):" Classes="kasi-secondary" />
               <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding StopTimeText}" IsEnabled="{Binding !RunUntilEmpty}" Width="110" HorizontalAlignment="Left" Margin="0,4,0,0" AutomationProperties.Name="Stop time" />
             </Grid>
 
@@ -69,7 +75,7 @@
       <TabItem Header="Post-completion" AutomationProperties.Name="Post-completion">
         <ScrollViewer>
           <StackPanel Spacing="12" Margin="0,12,0,0">
-            <TextBlock Text="When all downloads in this queue finish:" />
+            <TextBlock Text="When all downloads in this queue finish:" Classes="kasi-secondary" />
             <ComboBox ItemsSource="{Binding PostActions}" SelectedItem="{Binding SelectedPostAction}" Width="200" AutomationProperties.Name="Post action">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:PostActionChoice">
@@ -80,10 +86,10 @@
 
             <CheckBox Content="Execute even if other queues are downloading" IsChecked="{Binding ForcePostAction}" AutomationProperties.Name="Force even if other queues downloading" />
 
-            <TextBlock Text="Program executable path:" Margin="0,8,0,0" />
+            <TextBlock Text="Program executable path:" Margin="0,8,0,0" Classes="kasi-secondary" />
             <TextBox Text="{Binding ProgramPath}" PlaceholderText="C:\tools\app.exe" AutomationProperties.Name="Program executable path" />
 
-            <TextBlock Text="Program arguments (use %1 for completed file path):" />
+            <TextBlock Text="Program arguments (use %1 for completed file path):" Classes="kasi-secondary" />
             <TextBox Text="{Binding ProgramArguments}" PlaceholderText="--file %1" AutomationProperties.Name="Program arguments" />
           </StackPanel>
         </ScrollViewer>
