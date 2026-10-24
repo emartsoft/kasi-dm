@@ -72,6 +72,7 @@ public sealed class MediaJobRunnerTests : IAsyncLifetime, IDisposable
         result.Streams.Should().HaveCount(2);
         var video = result.Streams.Single(stream => stream.Role == "video");
         var audio = result.Streams.Single(stream => stream.Role == "audio");
+        video.InputFormat.Should().Be("mpegts", "FFmpeg must be told the demuxer instead of sniffing joined bytes");
         (await File.ReadAllBytesAsync(video.Path, TestContext.Current.CancellationToken)).Should().Equal(ExpectedHls("720p"));
         (await File.ReadAllBytesAsync(audio.Path, TestContext.Current.CancellationToken)).Should().Equal(ExpectedHls("audio"));
         _host.Metrics.RequestsForPath("/hls/clear/720p/seg0.ts").Should().Be(1);
@@ -95,6 +96,7 @@ public sealed class MediaJobRunnerTests : IAsyncLifetime, IDisposable
         var result = await runner.RunAsync(playable, Options(parallelism: 2), TestContext.Current.CancellationToken);
 
         var video = result.Streams.Single(stream => stream.Role == "video");
+        video.InputFormat.Should().Be("mp4");
         var expected = StreamFixtures.DashInit("video-720p")
             .Concat(Enumerable.Range(1, StreamFixtures.SegmentCount).SelectMany(index => StreamFixtures.DashSegment("video-720p", index)))
             .ToArray();

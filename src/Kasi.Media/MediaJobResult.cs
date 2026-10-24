@@ -25,7 +25,16 @@ public sealed class MediaJobException : Exception
 public sealed record MediaJobProgress(int CompletedSegments, int TotalSegments, long DoneBytes);
 
 /// <summary>One stream joined in order (init first, then segments) and ready for the M3.4 mux step.</summary>
-public sealed record MediaJoinedTrack(int Index, string Role, string Path, long Bytes, string? Container);
+/// <param name="InputFormat">The FFmpeg demuxer to force for this file (mpegts, mp4, aac, mp3), or null when unknown.</param>
+public sealed record MediaJoinedTrack(int Index, string Role, string Path, long Bytes, string? Container, string? InputFormat = null);
 
 /// <summary>The result of a media download; the job is left in <see cref="Kasi.Core.JobState.Muxing"/> for M3.4.</summary>
-public sealed record MediaJobResult(Kasi.Core.JobId JobId, IReadOnlyList<MediaJoinedTrack> Streams, long DoneBytes);
+public sealed record MediaJobResult(
+    Kasi.Core.JobId JobId,
+    IReadOnlyList<MediaJoinedTrack> Streams,
+    long DoneBytes,
+    MediaVariant? Variant = null,
+    string? WorkDirectory = null)
+{
+    public double DurationSeconds => Variant?.Video.DurationSeconds ?? 0;
+}

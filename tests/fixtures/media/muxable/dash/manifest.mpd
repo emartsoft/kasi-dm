@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="urn:mpeg:dash:schema:mpd:2011"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
+	profiles="urn:mpeg:dash:profile:isoff-live:2011"
+	type="static"
+	mediaPresentationDuration="PT24.0S"
+	maxSegmentDuration="PT4.0S"
+	minBufferTime="PT8.0S">
+	<ProgramInformation>
+	</ProgramInformation>
+	<ServiceDescription id="0">
+	</ServiceDescription>
+	<Period id="0" start="PT0.0S">
+		<AdaptationSet id="0" contentType="video" startWithSAP="1" segmentAlignment="true" bitstreamSwitching="true" frameRate="25/1" maxWidth="160" maxHeight="90" par="16:9">
+			<Representation id="0" mimeType="video/mp4" codecs="avc1.42c00c" bandwidth="160000" width="160" height="90" sar="1:1">
+				<SegmentList timescale="1000000" duration="4000000" startNumber="1">
+					<Initialization sourceURL="init.mp4" />
+					<SegmentURL media="seg-1.m4s" />
+					<SegmentURL media="seg-2.m4s" />
+					<SegmentURL media="seg-3.m4s" />
+					<SegmentURL media="seg-4.m4s" />
+					<SegmentURL media="seg-5.m4s" />
+					<SegmentURL media="seg-6.m4s" />
+				</SegmentList>
+			</Representation>
+		</AdaptationSet>
+	</Period>
+</MPD>
