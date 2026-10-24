@@ -1,4 +1,4 @@
--- Media capture structure (M3.3/3c). Migration 0003 was already taken; 0006 is the next free number on main.
+-- Media capture structure (M3.3/3c). Migration 0003 was already taken; 0007 is the next free number on main (0006 is the category rules).
 CREATE TABLE media_stream (
     job_id          TEXT    NOT NULL REFERENCES job(id) ON DELETE CASCADE,
     idx             INTEGER NOT NULL,

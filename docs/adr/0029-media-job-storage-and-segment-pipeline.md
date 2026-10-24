@@ -1,4 +1,4 @@
-# 0028. Media job storage, segment download and ordered assembly
+# 0029. Media job storage, segment download and ordered assembly
 
 - Status: Accepted (M3.3/3c)
 - Date: 2026-10-24
@@ -14,7 +14,7 @@ safe resume after a kill, AES-128 decryption and an ordered per-stream file that
 
 ## Decision
 
-**Rows, not grid segments.** Migration `0006_media_streams.sql` adds `media_stream` (job, index, role, language, codecs,
+**Rows, not grid segments.** Migration `0007_media_streams.sql` adds `media_stream` (job, index, role, language, codecs,
 container, variant id, estimated bytes, init URL/size) and `media_segment` (job, stream, index, URL, size, completed, IV,
 discontinuity, range start/end). A media job keeps one `job` row; the grid shows the job, not thousands of segments. Deleting the
 job cascades to both tables. `job.total_bytes` is the manifest estimate (bandwidth × duration, approximate);
@@ -59,4 +59,4 @@ segment leaves neither a completed row nor a `.part` file.
 - The app's M3.5 protocol can expose segment-level progress without a grid row per segment.
 - Signed segment URLs and init URLs are persisted in SQLite; like `job.url` they must not be logged.
 - Subtitles and live streams remain out of scope (3j/3k); the tables already have a `subtitle` role and discontinuity flag.
-- Two writers adding a migration must renumber: 3h takes the next free number after 0006.
+- Two writers adding a migration must renumber: 3h takes the next free number after 0007.
