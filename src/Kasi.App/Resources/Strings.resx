@@ -985,4 +985,7 @@
     <value>unknown bitrate</value>
     <comment>Shown when the manifest did not declare a bitrate.</comment>
   </data>
+  <data name="SelectRow" xml:space="preserve">
+    <value>Select download</value>
+  </data>
 </root>

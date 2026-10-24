@@ -18,6 +18,8 @@ internal static class Strings
 
     public static string JobColumnState => Get(nameof(JobColumnState));
 
+    public static string SelectRow => Get(nameof(SelectRow));
+
     public static string JobColumnProgress => Get(nameof(JobColumnProgress));
 
     public static string JobColumnSize => Get(nameof(JobColumnSize));

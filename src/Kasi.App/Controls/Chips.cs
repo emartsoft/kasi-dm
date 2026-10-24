@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 
@@ -26,6 +27,9 @@ internal class StatusChip : TemplatedControl
         get => GetValue(KindProperty);
         set => SetValue(KindProperty, value);
     }
+
+    // the chip is a templated control: without a peer a screen reader and UI Automation never see its text
+    protected override AutomationPeer OnCreateAutomationPeer() => new ChipPeer(this);
 
     private void UpdatePseudoClasses()
     {
@@ -61,4 +65,15 @@ internal sealed class FileTypeChip : StatusChip
 /// <summary>An icon-font glyph that takes the colour of its kind and has no background: the status icons of the sidebar.</summary>
 internal sealed class KindGlyph : StatusChip
 {
+}
+
+internal sealed class ChipPeer(StatusChip owner) : ControlAutomationPeer(owner)
+{
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Text;
+
+    protected override string? GetNameCore() => owner.Text;
+
+    protected override bool IsContentElementCore() => true;
+
+    protected override bool IsControlElementCore() => true;
 }
