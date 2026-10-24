@@ -65,8 +65,9 @@ jobs:
         shell: msys2 {0}
         run: |
           ./ffmpeg-out/bin/ffmpeg.exe -hide_banner -version | tee ffmpeg-version.txt
-          ./ffmpeg-out/bin/ffmpeg.exe -hide_banner -L | head -3 | tee ffmpeg-licence.txt
-          grep -q "GNU Lesser General Public License" ffmpeg-licence.txt
+          ./ffmpeg-out/bin/ffmpeg.exe -hide_banner -L | head -6 | tee ffmpeg-licence.txt
+          # the licence text wraps ("GNU Lesser General Public" / "License"), so match the words that stay on one line
+          grep -q "GNU Lesser General Public" ffmpeg-licence.txt
           if grep -Eq -- "--enable-(gpl|nonfree|version3)" ffmpeg-version.txt; then echo "GPL or non-free flag found"; exit 1; fi
           ls -l ffmpeg-out/bin/ffmpeg.exe ffmpeg-out/bin/ffprobe.exe
 
