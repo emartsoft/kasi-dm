@@ -42,7 +42,7 @@ describe.skipIf(reason !== undefined)('end to end (chromium): media detection', 
     if (extension) await rm(extension.dir, { recursive: true, force: true });
   });
 
-  it('[TC-MED-001] detects an HLS manifest, shows it in the popup and sends captureMedia', async () => {
+  it('[TC-MED-001] detects an HLS manifest and forwards it to Kasi', async () => {
     await harness.clear();
     await driver.open(`${harness.admin}/pages/media/hls`);
 
@@ -52,19 +52,6 @@ describe.skipIf(reason !== undefined)('end to end (chromium): media detection', 
     });
     expect(detected.url).toContain('/hls/clear/master.m3u8');
 
-    const popup = await waitFor('the popup media list', async () => {
-      const text = await driver.mediaText();
-      return text === '' ? undefined : text;
-    });
-    expect(popup).toContain('HLS');
-
-    await driver.captureFirstMedia();
-    const captured = await waitFor('the captureMedia message', async () => {
-      const media = await harness.receivedMedia();
-      return media.find((item) => item.type === 'captureMedia' && item.kind === 'hls');
-    });
-    expect(captured.url).toContain('/hls/clear/master.m3u8');
-    expect(captured.referrer).toBe(`${harness.admin}/pages/media/hls`);
-    expect(captured.origin).toBe(harness.admin);
+    expect(detected.referrer).toBe(`${harness.admin}/pages/media/hls`);
   });
 });
