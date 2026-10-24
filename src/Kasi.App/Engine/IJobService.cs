@@ -3,7 +3,10 @@ using Kasi.Engine;
 
 namespace Kasi.App.Engine;
 
-/// <summary>What the Add dialog (and later the picker) asks for. A folder of null means the category's folder under Downloads.</summary>
+/// <summary>
+/// What the Add dialog (and later the picker) asks for. A folder of null means the category's folder under Downloads. A category of null
+/// means "by file type": the category rules choose it (KASI-CAT-001, 002), using <paramref name="Mime"/> when the name has no extension.
+/// </summary>
 internal sealed record NewDownload(
     string Url,
     string FileName,
@@ -16,7 +19,8 @@ internal sealed record NewDownload(
     string? ChecksumAlgorithm = null,
     string? Checksum = null,
     IReadOnlyList<JobCookie>? Cookies = null,
-    string? UserAgent = null)
+    string? UserAgent = null,
+    string? Mime = null)
 {
     public override string ToString() => nameof(NewDownload); // the URL and cookies are secrets (CLAUDE.md rule 3)
 }
@@ -51,6 +55,10 @@ internal interface IJobService
     Task<IReadOnlyList<Category>> CategoriesAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Core.Queue>> QueuesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>The category rules, for a dialog that shows the category a link would get. None by default (a fake that has no rules).</summary>
+    Task<IReadOnlyList<CategoryRule>> CategoryRulesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<CategoryRule>>([]);
 
     /// <summary>Adds (and, when asked, starts) a job. Without a resolution a duplicate is reported and nothing is added.</summary>
     Task<AddResult> AddAsync(NewDownload request, DuplicateAction? resolution = null, CancellationToken cancellationToken = default);
