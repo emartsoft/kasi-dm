@@ -173,7 +173,8 @@ public static class HlsParser
                         pendingRange,
                         currentKey,
                         discontinuity,
-                        pendingTitle));
+                        pendingTitle,
+                        mediaSequence + (long)segments.Count));
                     duration += pendingDuration.Value;
                     lastRangeEnd = pendingRange is { } range ? range.EndInclusive + 1 : null;
                     pendingDuration = null;

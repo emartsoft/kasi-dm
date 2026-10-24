@@ -9,6 +9,10 @@ public sealed class ChaosRegistry
 
     private readonly ConcurrentDictionary<string, Entry> _entries = new();
     private int _lastId;
+    private int _defaultRequests;
+
+    /// <summary>A profile used when a request has no <c>X-Kasi-Chaos</c> header; tests that exercise the media runner use it.</summary>
+    public ChaosProfile? DefaultProfile { get; set; }
 
     public string Register(ChaosProfile profile)
     {
@@ -17,10 +21,18 @@ public sealed class ChaosRegistry
         return id;
     }
 
-    public void Clear() => _entries.Clear();
+    public void Clear()
+    {
+        _entries.Clear();
+        DefaultProfile = null;
+    }
 
-    internal ChaosSession? Begin(string id) =>
-        _entries.TryGetValue(id, out var entry) ? new ChaosSession(entry.Profile, entry.NextRequestIndex()) : null;
+    internal ChaosSession? Begin(string? id) =>
+        id is not null && _entries.TryGetValue(id, out var entry)
+            ? new ChaosSession(entry.Profile, entry.NextRequestIndex())
+            : DefaultProfile is { } fallback
+                ? new ChaosSession(fallback, Interlocked.Increment(ref _defaultRequests) - 1)
+                : null;
 
     private sealed class Entry(ChaosProfile profile)
     {
