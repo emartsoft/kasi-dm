@@ -17,4 +17,10 @@
     <PackageReference Include="FlaUI.UIA3" />
   </ItemGroup>
 
+  <!-- The app runs from its own published folder (app/): this project takes the ASP.NET shared framework in through Kasi.TestServer, which
+       makes the build leave out the Microsoft.Extensions.* assemblies the framework supplies, and Kasi.App.exe runs without that framework. -->
+  <Target Name="PublishAppForUiTests" AfterTargets="Build">
+    <MSBuild Projects="../../src/Kasi.App/Kasi.App.csproj" Targets="Publish" Properties="NoBuild=true;Configuration=$(Configuration);PublishDir=$([System.IO.Path]::GetFullPath($(OutDir)))app/" />
+  </Target>
+
 </Project>
