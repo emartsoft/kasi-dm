@@ -3,8 +3,17 @@
              xmlns:sty="using:FluentAvalonia.Styling"
              x:Class="Kasi.App.App"
              RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Kasi.App/Styles/Tokens.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
-    <sty:FluentAvaloniaTheme />
+    <!-- Kasi's own accent (the indigo of the design) in both themes, whatever accent Windows has -->
+    <sty:FluentAvaloniaTheme PreferUserAccentColor="False" CustomAccentColor="#6366f1" />
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+    <StyleInclude Source="avares://Kasi.App/Styles/Controls.axaml" />
   </Application.Styles>
 </Application>
