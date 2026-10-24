@@ -41,6 +41,10 @@ or `drm`. Two approvals and the `security` label are required on the PR.
 **Fetch before the gate is limited to manifests.** HLS media playlists are manifests, not segments; tests use a per-path server
 counter to prove zero `.ts`, `.m4s`, init and key-path requests for every refused kind.
 
+**One load has a memory budget.** Besides the 10 MB cap per manifest, a load may hold 32 MB of manifest text and 250,000 segments in total across the master and all media playlists, so many near-cap playlists cannot add up to unbounded memory (TPL 7.2).
+
+**The page referrer follows the hop's origin.** It is sent to the manifest origin, which CDNs check, and dropped on a redirect to another origin; cookies are matched per hop.
+
 ## Consequences
 
 - M3.3 can accept only a `Playable`; the type system enforces the gate.

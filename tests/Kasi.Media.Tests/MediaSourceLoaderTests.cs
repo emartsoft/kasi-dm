@@ -155,6 +155,63 @@ public sealed class MediaSourceLoaderTests : IAsyncLifetime
         SegmentPaths().Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task The_page_referrer_reaches_a_cross_origin_manifest_but_not_a_cross_origin_redirect_target()
+    {
+        var seen = new List<(string Host, string? Referer)>();
+#pragma warning disable CA2000 // HttpClient owns the handler
+        using var client = new HttpClient(new StaticHandler(request =>
+        {
+            seen.Add((request.RequestUri!.Host, request.Headers.Referrer?.ToString()));
+            if (request.RequestUri.Host == "cdn.example")
+            {
+                var redirect = new HttpResponseMessage(HttpStatusCode.Found);
+                redirect.Headers.Location = new Uri("https://other.example/media.m3u8");
+                return redirect;
+            }
+
+            return Text("#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\na.ts\n#EXT-X-ENDLIST\n");
+        }));
+#pragma warning restore CA2000
+        using var loader = new MediaSourceLoader(client);
+        var context = new MediaRequestContext(Referrer: new Uri("https://page.example/watch"));
+
+        var result = await loader.LoadAsync(MediaKind.Hls, new Uri("https://cdn.example/m.m3u8"), context, TestContext.Current.CancellationToken);
+
+        result.Should().BeOfType<MediaSourceLoader.Playable>();
+        seen.Should().Equal(("cdn.example", "https://page.example/watch"), ("other.example", null));
+    }
+
+    [Fact]
+    public async Task Many_playlists_cannot_exceed_the_total_segment_budget()
+    {
+        var master = "#EXTM3U\n" + string.Concat(Enumerable.Range(1, 3).Select(i => $"#EXT-X-STREAM-INF:BANDWIDTH={i * 100}\nv{i}.m3u8\n"));
+        var media = "#EXTM3U\n#EXT-X-TARGETDURATION:1\n" + string.Concat(Enumerable.Repeat("#EXTINF:1,\ns.ts\n", 99_000)) + "#EXT-X-ENDLIST\n";
+#pragma warning disable CA2000 // HttpClient owns the handler
+        using var client = new HttpClient(new StaticHandler(request => Text(request.RequestUri!.AbsolutePath.EndsWith("master.m3u8", StringComparison.Ordinal) ? master : media)));
+#pragma warning restore CA2000
+        using var loader = new MediaSourceLoader(client);
+
+        var load = async () => await loader.LoadAsync(MediaKind.Hls, new Uri("https://media.example/master.m3u8"), cancellationToken: TestContext.Current.CancellationToken);
+
+        (await load.Should().ThrowAsync<MediaLoadException>()).Which.Error.Should().Be(MediaLoadError.TooLarge);
+    }
+
+    [Fact]
+    public async Task A_variant_playlist_that_switches_to_sample_aes_midway_is_refused()
+    {
+        const string Master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100\nv.m3u8\n";
+        const string Media = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\na.ts\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://k\",KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXTINF:4,\nb.ts\n#EXT-X-ENDLIST\n";
+#pragma warning disable CA2000 // HttpClient owns the handler
+        using var client = new HttpClient(new StaticHandler(request => Text(request.RequestUri!.AbsolutePath.EndsWith("master.m3u8", StringComparison.Ordinal) ? Master : Media)));
+#pragma warning restore CA2000
+        using var loader = new MediaSourceLoader(client);
+
+        var result = await loader.LoadAsync(MediaKind.Hls, new Uri("https://media.example/master.m3u8"), cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Should().BeOfType<MediaSourceLoader.ProtectedResult>();
+    }
+
     private static HttpResponseMessage Text(string text) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(text, System.Text.Encoding.UTF8, "application/vnd.apple.mpegurl"),

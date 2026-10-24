@@ -15,6 +15,9 @@ public sealed class MediaSourceLoader : IDisposable
 {
     public const int MaxRedirects = 10;
     public const int MaxHlsPlaylists = 256;
+
+    /// <summary>Total manifest text one load may hold, across the master and every media playlist (TPL 7.2: no unbounded allocation).</summary>
+    public const int MaxTotalManifestBytes = 32 * 1024 * 1024;
     public const string ProtectedMessage = "This video is protected and can't be saved";
 
     private readonly HttpClient _client;
@@ -53,12 +56,13 @@ public sealed class MediaSourceLoader : IDisposable
         context = (context ?? MediaRequestContext.Empty).Validate();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_timeout);
+        var budget = new LoadBudget();
         try
         {
             return kind switch
             {
-                MediaKind.Hls => await LoadHlsAsync(manifestUri, context, timeout.Token).ConfigureAwait(false),
-                MediaKind.Dash => LoadDash(await FetchTextAsync(manifestUri, context, timeout.Token).ConfigureAwait(false)),
+                MediaKind.Hls => await LoadHlsAsync(manifestUri, context, budget, timeout.Token).ConfigureAwait(false),
+                MediaKind.Dash => LoadDash(await FetchTextAsync(manifestUri, context, budget, timeout.Token).ConfigureAwait(false)),
                 _ => throw new MediaLoadException(MediaLoadError.UnsupportedKind, "Unsupported media kind."),
             };
         }
@@ -76,9 +80,9 @@ public sealed class MediaSourceLoader : IDisposable
         }
     }
 
-    private async Task<Result> LoadHlsAsync(Uri manifestUri, MediaRequestContext context, CancellationToken cancellationToken)
+    private async Task<Result> LoadHlsAsync(Uri manifestUri, MediaRequestContext context, LoadBudget budget, CancellationToken cancellationToken)
     {
-        var masterFetch = await FetchTextAsync(manifestUri, context, cancellationToken).ConfigureAwait(false);
+        var masterFetch = await FetchTextAsync(manifestUri, context, budget, cancellationToken).ConfigureAwait(false);
         manifestUri = masterFetch.Uri;
         var masterText = masterFetch.Text;
         HlsMasterPlaylist master;
@@ -110,8 +114,10 @@ public sealed class MediaSourceLoader : IDisposable
         var playlists = new Dictionary<string, HlsMediaPlaylist>(StringComparer.Ordinal);
         foreach (var uri in playlistUris)
         {
-            var fetched = await FetchTextAsync(uri, context, cancellationToken).ConfigureAwait(false);
-            playlists[uri.AbsoluteUri] = HlsParser.ParseMedia(fetched.Text, fetched.Uri);
+            var fetched = await FetchTextAsync(uri, context, budget, cancellationToken).ConfigureAwait(false);
+            var playlist = HlsParser.ParseMedia(fetched.Text, fetched.Uri);
+            budget.AddSegments(playlist.Segments.Count);
+            playlists[uri.AbsoluteUri] = playlist;
         }
 
         if (IsProtected(
@@ -187,7 +193,7 @@ public sealed class MediaSourceLoader : IDisposable
         return new MediaPresentation(null, media.DurationSeconds, media.IsLive, [new MediaVariant(track, null, null)], [], []);
     }
 
-    private async Task<FetchedText> FetchTextAsync(Uri manifestUri, MediaRequestContext context, CancellationToken cancellationToken)
+    private async Task<FetchedText> FetchTextAsync(Uri manifestUri, MediaRequestContext context, LoadBudget budget, CancellationToken cancellationToken)
     {
         var current = manifestUri;
         for (var redirect = 0; redirect <= MaxRedirects; redirect++)
@@ -232,9 +238,12 @@ public sealed class MediaSourceLoader : IDisposable
                     throw new MediaLoadException(MediaLoadError.TooLarge, "The manifest exceeds the 10 MB cap.");
                 }
 
+                budget.EnsureRoomFor(text.Length + read);
+
                 await text.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }
 
+            budget.AddBytes(text.Length);
             return new FetchedText(current, Encoding.UTF8.GetString(text.GetBuffer(), 0, checked((int)text.Length)));
         }
 
@@ -249,7 +258,8 @@ public sealed class MediaSourceLoader : IDisposable
             request.Headers.TryAddWithoutValidation("User-Agent", context.UserAgent);
         }
 
-        if (context.Referrer is { } referrer && IsSameOrigin(referrer, initialUri))
+        // The page referrer goes to the manifest origin (CDNs check it) but not to a cross-origin redirect target.
+        if (context.Referrer is { } referrer && IsSameOrigin(uri, initialUri))
         {
             request.Headers.Referrer = referrer;
         }
@@ -309,6 +319,36 @@ public sealed class MediaSourceLoader : IDisposable
     }
 
     private sealed record FetchedText(Uri Uri, string Text);
+
+    /// <summary>Bytes and segments held by one load, so many near-cap playlists cannot add up to unbounded memory.</summary>
+    private sealed class LoadBudget
+    {
+        private long _bytes;
+        private int _segments;
+
+        public void EnsureRoomFor(long pendingBytes)
+        {
+            if (_bytes + pendingBytes > MaxTotalManifestBytes)
+            {
+                throw new MediaLoadException(MediaLoadError.TooLarge, "The manifests of this stream exceed the total size budget.");
+            }
+        }
+
+        public void AddBytes(long bytes)
+        {
+            EnsureRoomFor(bytes);
+            _bytes += bytes;
+        }
+
+        public void AddSegments(int count)
+        {
+            _segments += count;
+            if (_segments > MediaLimits.MaxSegmentsTotal)
+            {
+                throw new MediaLoadException(MediaLoadError.TooLarge, "The playlists of this stream exceed the total segment budget.");
+            }
+        }
+    }
 
     private static class MediaCookieMatcher
     {
