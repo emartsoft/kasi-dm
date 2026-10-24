@@ -38,6 +38,28 @@ internal static class StreamingEndpoints
 
     public static void Map(IEndpointRouteBuilder app)
     {
+        app.MapGet("/hls/muxable/master.m3u8", () => Results.Text(MuxableFixtures.HlsMaster(), HlsContentType));
+        app.MapGet("/hls/muxable/index.m3u8", () => Results.Text(MuxableFixtures.HlsMedia(encrypted: false), HlsContentType));
+        app.MapGet("/hls/muxable/segment-{index:int}.ts", (int index) =>
+            index is >= 0 and < MuxableFixtures.SegmentCount
+                ? Results.Bytes(MuxableFixtures.HlsSegment(index), "video/mp2t")
+                : Results.NotFound());
+
+        app.MapGet("/hls/muxable-aes128/master.m3u8", () => Results.Text(MuxableFixtures.HlsMaster(), HlsContentType));
+        app.MapGet("/hls/muxable-aes128/index.m3u8", () => Results.Text(MuxableFixtures.HlsMedia(encrypted: true), HlsContentType));
+        app.MapGet("/hls/muxable-aes128/segment-{index:int}.ts", (int index) =>
+            index is >= 0 and < MuxableFixtures.SegmentCount
+                ? Results.Bytes(MuxableFixtures.HlsEncryptedSegment(index), "video/mp2t")
+                : Results.NotFound());
+        app.MapGet("/hls/muxable-aes128/key.bin", () => Results.Bytes(MuxableFixtures.KeyBytes(), "application/octet-stream"));
+
+        app.MapGet("/dash/muxable/manifest.mpd", () => Results.Text(MuxableFixtures.DashManifestText(), DashContentType));
+        app.MapGet("/dash/muxable/init.mp4", () => Results.Bytes(MuxableFixtures.DashInit(), "video/mp4"));
+        app.MapGet("/dash/muxable/seg-{number:int}.m4s", (int number) =>
+            number is >= 1 and <= MuxableFixtures.SegmentCount
+                ? Results.Bytes(MuxableFixtures.DashSegment(number), "video/mp4")
+                : Results.NotFound());
+
         app.MapGet("/hls/{kind}/master.m3u8", (string kind) =>
             _hlsKeyLines.ContainsKey(kind) ? Results.Text(HlsMaster(), HlsContentType) : Results.NotFound());
 

@@ -130,7 +130,7 @@ public sealed class MediaJobRunner(
                 await jobs.TryChangeStateAsync(options.JobId, JobState.Downloading, JobState.Muxing, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
 
-            return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes));
+            return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes), variant, jobDirectory);
         }
         catch (OperationCanceledException)
         {
@@ -314,7 +314,7 @@ public sealed class MediaJobRunner(
                 await output.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            result.Add(new MediaJoinedTrack(stream.Index, stream.Role, path, new FileInfo(path).Length, stream.Container));
+            result.Add(new MediaJoinedTrack(stream.Index, stream.Role, path, new FileInfo(path).Length, stream.Container, InputFormatFor(stream, segments)));
         }
 
         return result;
@@ -411,6 +411,30 @@ public sealed class MediaJobRunner(
         Span<byte> iv = stackalloc byte[16];
         BinaryPrimitives.WriteInt64BigEndian(iv[8..], sequence);
         return Convert.ToHexString(iv);
+    }
+
+    /// <summary>The demuxer FFmpeg must use for a joined stream, so it never sniffs attacker-controlled bytes into a playlist or script format.</summary>
+    internal static string? InputFormatFor(MediaStreamRecord stream, IReadOnlyList<MediaSegmentRecord> segments)
+    {
+        if (stream.InitUrl is not null)
+        {
+            return "mp4";
+        }
+
+        var first = segments.Where(segment => segment.StreamIndex == stream.Index).OrderBy(segment => segment.Index).FirstOrDefault();
+        if (first is null || !Uri.TryCreate(first.Url, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        return Path.GetExtension(uri.AbsolutePath).ToLowerInvariant() switch
+        {
+            ".ts" or ".m2ts" => "mpegts",
+            ".m4s" or ".mp4" or ".m4a" or ".m4v" or ".cmfv" or ".cmfa" => "mp4",
+            ".aac" or ".adts" => "aac",
+            ".mp3" => "mp3",
+            _ => null,
+        };
     }
 
     private static string StreamDirectory(string jobDirectory, int streamIndex) =>

@@ -50,6 +50,33 @@ jobs:
           --filter "Category!=Integration"
           --collect:"XPlat Code Coverage" --results-directory TestResults/unit --logger trx
 
+      # The media mux tests need FFmpeg. This is a checksum-pinned third-party LGPL build (BtbN autobuild, FFmpeg 8.1.3, shared),
+      # used by the tests only and never shipped; Kasi's own minimal build is validated by ffmpeg-minimal-build.yml. The asset
+      # digest comes from the GitHub release API. A dated autobuild can be removed upstream: then bump the three values together.
+      - name: Cache FFmpeg for the media tests
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ffmpeg
+          key: ffmpeg-btbn-n8.1.3-24-g92611900bb-lgpl-shared-e7827a38
+
+      - name: Fetch FFmpeg for the media tests (pinned, SHA-256 verified)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: >
+          ./build/Fetch-FFmpeg.ps1
+          -Url "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-23-13-04/ffmpeg-n8.1.3-24-g92611900bb-win64-lgpl-shared-8.1.zip"
+          -Sha256 e7827a3897d0914b538c14efb8dc2d88020a4fd2b593bad3dbd668a691d076ad
+          -Destination "$env:RUNNER_TEMP/ffmpeg"
+
+      - name: Point the media tests at FFmpeg
+        shell: pwsh
+        run: |
+          $ffmpeg = Get-ChildItem "$env:RUNNER_TEMP/ffmpeg" -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+          $ffprobe = Get-ChildItem "$env:RUNNER_TEMP/ffmpeg" -Filter ffprobe.exe -Recurse | Select-Object -First 1
+          "KASI_FFMPEG=$($ffmpeg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "KASI_FFPROBE=$($ffprobe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Integration tests
         env:
           KASI_REQUIRE_VHD: '1'
