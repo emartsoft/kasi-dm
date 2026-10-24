@@ -79,6 +79,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                 main.AddUrlHandler = _add.RequestAddBlank;
                 main.DetailsRequested += row => ShowDetails(row, _add.RequestRefresh);
                 main.SettingsHandler = () => ShowSettings(browser.Settings, SettingsSection.Browser);
+                main.SchedulerHandler = () => ShowScheduler(services.GetRequiredService<IJobService>(), main.Sidebar.Selected?.Filter?.QueueId);
                 main.ConnectedBrowsers = browser.ConnectedHosts;
                 if (shell)
                 {
@@ -173,6 +174,14 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         {
             AppLog.AddFailed(factory.CreateLogger<App>(), ex.GetType().Name);
         }
+    }
+
+    private void ShowScheduler(IJobService jobService, int? selectedQueueId)
+    {
+        var model = new SchedulerViewModel(jobService);
+        var window = new SchedulerWindow { DataContext = model };
+        _ = model.LoadAsync(selectedQueueId);
+        window.Show();
     }
 
     private void ShowSettings(IBrowserSettings settings, SettingsSection section)

@@ -98,6 +98,9 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     /// <summary>Set by the app once the settings window exists.</summary>
     public Action? SettingsHandler { get; set; }
 
+    /// <summary>Set by the app: opens the Scheduler window (M2.10).</summary>
+    public Action? SchedulerHandler { get; set; }
+
     /// <summary>How many browser extensions are connected; the app sets it, the status bar reads it on <see cref="Poll"/>.</summary>
     public Func<int>? ConnectedBrowsers { get; set; }
 
@@ -184,20 +187,25 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
         }
     }
 
-    // The three queue buttons come alive with the scheduler (M2.10).
-    [RelayCommand(CanExecute = nameof(Never))]
-    private void StartQueue()
+    // The three queue buttons are active (M2.10).
+    [RelayCommand]
+    private async Task StartQueueAsync()
     {
+        int queueId = Sidebar.Selected?.Filter?.QueueId ?? 1;
+        await _service.StartQueueAsync(queueId);
     }
 
-    [RelayCommand(CanExecute = nameof(Never))]
-    private void StopQueue()
+    [RelayCommand]
+    private async Task StopQueueAsync()
     {
+        int queueId = Sidebar.Selected?.Filter?.QueueId ?? 1;
+        await _service.StopQueueAsync(queueId);
     }
 
-    [RelayCommand(CanExecute = nameof(Never))]
+    [RelayCommand]
     private void Scheduler()
     {
+        SchedulerHandler?.Invoke();
     }
 
     [RelayCommand]

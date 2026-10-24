@@ -181,14 +181,26 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task The_queue_and_scheduler_buttons_wait_for_the_scheduler()
+    public async Task The_queue_and_scheduler_buttons_are_active_and_delegate_to_service_and_dialog()
     {
         await using var rig = await MainRig.CreateAsync(TestJobs.New("q.zip", JobState.Queued));
         rig.Select("q.zip");
 
-        rig.Model.StartQueueCommand.CanExecute(null).Should().BeFalse();
-        rig.Model.StopQueueCommand.CanExecute(null).Should().BeFalse();
-        rig.Model.SchedulerCommand.CanExecute(null).Should().BeFalse();
+        rig.Model.StartQueueCommand.CanExecute(null).Should().BeTrue();
+        rig.Model.StopQueueCommand.CanExecute(null).Should().BeTrue();
+        rig.Model.SchedulerCommand.CanExecute(null).Should().BeTrue();
+
+        bool schedulerOpened = false;
+        rig.Model.SchedulerHandler = () => schedulerOpened = true;
+
+        await rig.Model.StartQueueCommand.ExecuteAsync(null);
+        rig.Service.Inner.StartedQueues.Should().Contain(1);
+
+        await rig.Model.StopQueueCommand.ExecuteAsync(null);
+        rig.Service.Inner.StoppedQueues.Should().Contain(1);
+
+        rig.Model.SchedulerCommand.Execute(null);
+        schedulerOpened.Should().BeTrue();
     }
 
     [Fact]

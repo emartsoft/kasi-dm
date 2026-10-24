@@ -26,6 +26,7 @@
     <Project Path="tests/Kasi.FaultInjection/Kasi.FaultInjection.csproj" />
     <Project Path="tests/Kasi.Fuzz/Kasi.Fuzz.csproj" />
     <Project Path="tests/Kasi.NativeHost.Tests/Kasi.NativeHost.Tests.csproj" />
+    <Project Path="tests/Kasi.Scheduling.Tests/Kasi.Scheduling.Tests.csproj" />
     <Project Path="tests/Kasi.TestServer.Tests/Kasi.TestServer.Tests.csproj" />
     <Project Path="tests/Kasi.TestServer/Kasi.TestServer.csproj" />
   </Folder>

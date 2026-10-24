@@ -125,6 +125,27 @@ internal sealed class RecordingJobService : IJobService
         Cancelled.Add((id, deleteFiles));
         return Task.CompletedTask;
     }
+
+    public List<int> StartedQueues { get; } = [];
+    public List<int> StoppedQueues { get; } = [];
+
+    public Task StartQueueAsync(int queueId, CancellationToken cancellationToken = default)
+    {
+        StartedQueues.Add(queueId);
+        return Task.CompletedTask;
+    }
+
+    public Task StopQueueAsync(int queueId, CancellationToken cancellationToken = default)
+    {
+        StoppedQueues.Add(queueId);
+        return Task.CompletedTask;
+    }
+
+    public Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default) => Task.FromResult<QueueSchedule?>(null);
+
+    public Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 internal sealed class MemorySites : ISiteDefaults

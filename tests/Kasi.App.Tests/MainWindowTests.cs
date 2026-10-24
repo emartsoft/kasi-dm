@@ -107,12 +107,12 @@ public class MainWindowTests
     }
 
     [AvaloniaFact]
-    public void The_queue_buttons_are_shown_but_off_until_the_scheduler_exists()
+    public void The_queue_buttons_are_shown_and_enabled_now_that_scheduler_exists()
     {
         var window = Open();
 
         var queue = window.GetVisualDescendants().OfType<Button>().Where(b => AutomationProperties.GetName(b) is "Start queue" or "Stop queue" or "Scheduler").ToList();
-        queue.Should().HaveCount(3).And.OnlyContain(b => !b.IsEffectivelyEnabled);
+        queue.Should().HaveCount(3).And.OnlyContain(b => b.IsEffectivelyEnabled);
     }
 
     [AvaloniaTheory]

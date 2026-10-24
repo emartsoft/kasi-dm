@@ -9,7 +9,7 @@ namespace Kasi.Engine;
 /// recovers interrupted jobs at start-up and runs one HTTP or FTP transfer at a time per job. Queues, UI and media are
 /// outside this type.
 /// </summary>
-public sealed class DownloadEngine : IAsyncDisposable
+public sealed class DownloadEngine : IAsyncDisposable, IJobControl
 {
     private readonly IJobRepository _jobs;
     private readonly ISegmentRepository _segments;

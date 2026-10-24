@@ -12,9 +12,12 @@ internal sealed class JobService(
     string downloadsFolder,
     IJobSecretRepository? secrets = null,
     BandwidthLimiter? bandwidth = null,
+    IQueueRunner? queueRunner = null,
+    IQueueScheduleRepository? schedules = null,
     TimeProvider? timeProvider = null) : IJobService
 {
     private static readonly TimeSpan _resumeWait = TimeSpan.FromSeconds(20);
+    private readonly bool _wired = WireRunner(engine, queueRunner);
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -222,5 +225,45 @@ internal sealed class JobService(
     {
         var category = categoryId is { } id ? await categories.GetAsync(id, cancellationToken).ConfigureAwait(false) : null;
         return string.IsNullOrEmpty(category?.Folder) ? downloadsFolder : Path.Combine(downloadsFolder, category.Folder);
+    }
+
+    public Task StartQueueAsync(int queueId, CancellationToken cancellationToken = default) =>
+        queueRunner?.StartQueueAsync(queueId, cancellationToken) ?? Task.CompletedTask;
+
+    public Task StopQueueAsync(int queueId, CancellationToken cancellationToken = default) =>
+        queueRunner?.StopQueueAsync(queueId, cancellationToken) ?? Task.CompletedTask;
+
+    public Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default) =>
+        schedules?.GetAsync(queueId, cancellationToken) ?? Task.FromResult<QueueSchedule?>(null);
+
+    public Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default) =>
+        schedules?.UpsertAsync(schedule, cancellationToken) ?? Task.CompletedTask;
+
+    public async Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(queue);
+        if (queue.Id > 0)
+        {
+            await queues.UpdateAsync(queue, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await queues.AddAsync(queue, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static bool WireRunner(DownloadEngine engine, IQueueRunner? runner)
+    {
+        if (runner is not null)
+        {
+            engine.EventRaised += evt =>
+            {
+                if (evt is JobStateChanged stateChanged)
+                {
+                    _ = runner.OnJobStateChangedAsync(stateChanged.Id, stateChanged.To);
+                }
+            };
+        }
+        return true;
     }
 }
