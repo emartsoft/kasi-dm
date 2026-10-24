@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
 using Kasi.App.Browser;
 using Kasi.App.Engine;
 using Kasi.Core;
@@ -6,8 +8,6 @@ using Kasi.Data;
 using Kasi.Engine;
 using Kasi.Ipc.Messages;
 using Kasi.Media;
-using Kasi.TestServer;
-using Kasi.TestServer.Chaos;
 using IpcMediaKind = Kasi.Ipc.Messages.MediaKind;
 
 namespace Kasi.App.Tests;
@@ -34,8 +34,117 @@ internal sealed class RecordingControl : IJobControl
 }
 
 /// <summary>
+/// A tiny local HTTP server for the capture tests. Kasi.TestServer is not used here: it needs the ASP.NET Core shared framework,
+/// and referencing it would stop the real second-instance test process from finding the hosting assemblies next to Kasi.App.exe.
+/// </summary>
+internal sealed class LocalStreamServer : IAsyncDisposable
+{
+    private readonly HttpListener _listener = new();
+    private readonly CancellationTokenSource _stop = new();
+    private readonly ConcurrentDictionary<string, Func<HttpListenerContext, CancellationToken, Task>> _routes = new(StringComparer.Ordinal);
+    private readonly Task _loop;
+
+    public LocalStreamServer()
+    {
+        int port;
+        using (var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+        {
+            probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            port = ((IPEndPoint)probe.LocalEndPoint!).Port;
+        }
+
+        BaseAddress = new Uri($"http://127.0.0.1:{port}/");
+        _listener.Prefixes.Add(BaseAddress.AbsoluteUri);
+        _listener.Start();
+        _loop = Task.Run(AcceptAsync);
+    }
+
+    public Uri BaseAddress { get; }
+
+    public ConcurrentQueue<string> Requests { get; } = new();
+
+    public void Text(string path, string body) =>
+        Route(path, async (context, ct) =>
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+            context.Response.ContentType = "application/vnd.apple.mpegurl";
+            await context.Response.OutputStream.WriteAsync(bytes, ct);
+        });
+
+    public void File(string path, string file) =>
+        Route(path, async (context, ct) =>
+        {
+            var bytes = await System.IO.File.ReadAllBytesAsync(file, ct);
+            context.Response.ContentType = "application/octet-stream";
+            await context.Response.OutputStream.WriteAsync(bytes, ct);
+        });
+
+    public void Route(string path, Func<HttpListenerContext, CancellationToken, Task> handler) => _routes[path] = handler;
+
+    private async Task AcceptAsync()
+    {
+        while (!_stop.IsCancellationRequested)
+        {
+            HttpListenerContext context;
+            try
+            {
+                context = await _listener.GetContextAsync();
+            }
+            catch (Exception exception) when (exception is HttpListenerException or ObjectDisposedException or InvalidOperationException)
+            {
+                return;
+            }
+
+            _ = Task.Run(() => HandleAsync(context));
+        }
+    }
+
+    private async Task HandleAsync(HttpListenerContext context)
+    {
+        try
+        {
+            var path = context.Request.Url!.AbsolutePath;
+            Requests.Enqueue(path);
+            if (_routes.TryGetValue(path, out var route))
+            {
+                await route(context, _stop.Token);
+            }
+            else
+            {
+                context.Response.StatusCode = 404;
+            }
+        }
+        catch (Exception)
+        {
+            // a cancelled or aborted request: the client went away
+        }
+        finally
+        {
+            try
+            {
+                context.Response.Close();
+            }
+            catch (Exception)
+            {
+                // already closed
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        _listener.Close();
+#pragma warning disable VSTHRD003 // the accept loop is this server's own task
+        await _loop;
+#pragma warning restore VSTHRD003
+        _stop.Dispose();
+    }
+}
+
+/// <summary>
 /// The media capture path in the app (M3.5): the capture service, the executor that runs a media job, start-up recovery and the
-/// routing control, against the real repositories, the real loader and runner, and the local test server.
+/// routing control, against the real repositories, the real loader and runner, and a local server.
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("Requirement", "KASI-MED-001")]
@@ -44,7 +153,7 @@ public sealed class MediaCaptureTests : IAsyncLifetime
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "kasi-media-app-" + Guid.NewGuid().ToString("N"));
     private readonly ConcurrentQueue<EngineEvent> _events = new();
-    private TestServerHost _host = null!;
+    private LocalStreamServer _host = null!;
     private CheckpointWriter _checkpoints = null!;
     private DownloadEngine _engine = null!;
     private JobRepository _jobs = null!;
@@ -72,7 +181,8 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         _engine.EventRaised += _events.Enqueue;
         _runner = new MediaJobRunner(new MediaRepository(factory), _jobs);
         _loader = new MediaSourceLoader();
-        _host = await TestServerHost.StartAsync(cancellationToken: ct);
+        _host = new LocalStreamServer();
+        AddStreams(_host);
     }
 
     public async ValueTask DisposeAsync()
@@ -101,7 +211,7 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         result.Status.Should().Be(MediaCaptureStatus.Protected);
         result.Detail.Should().Be("This video is protected and can't be saved");
         (await _jobs.ListAsync(cancellationToken: TestContext.Current.CancellationToken)).Should().BeEmpty();
-        _host.Metrics.PathRequests.Keys.Should().NotContain(path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase));
+        _host.Requests.Should().NotContain(path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -109,7 +219,10 @@ public sealed class MediaCaptureTests : IAsyncLifetime
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new RecordingControl();
-        var message = Message("/hls/clear/master.m3u8", IpcMediaKind.Hls) with { Cookies = [new IpcCookie { Name = "sid", Value = "s3cret", Domain = _host.BaseAddress.Host, Path = "/", Secure = false, HttpOnly = false }] };
+        var message = Message("/hls/clear/master.m3u8", IpcMediaKind.Hls) with
+        {
+            Cookies = [new IpcCookie { Name = "sid", Value = "s3cret", Domain = _host.BaseAddress.Host, Path = "/", Secure = false, HttpOnly = false }],
+        };
 
         var result = await Capture(control).CaptureAsync(message, ct);
 
@@ -196,30 +309,23 @@ public sealed class MediaCaptureTests : IAsyncLifetime
     public async Task Pausing_stops_the_download_and_parks_the_job_as_paused_and_it_can_be_resumed()
     {
         var ct = TestContext.Current.CancellationToken;
-        var job = await AddJobAsync(JobKind.Media, JobState.Queued, "stream.mp4", url: "/hls/clear/master.m3u8");
+        var job = await AddJobAsync(JobKind.Media, JobState.Queued, "stream.mp4", path: "/hls/stall/master.m3u8");
         var executor = Executor(new FfmpegOptions("ffmpeg-not-used.exe", "ffprobe-not-used.exe"));
-        _host.Chaos.DefaultProfile = new ChaosProfile { LatencyMs = 20_000 }; // every request stalls, so the run is still going when we pause
-        try
-        {
-            await executor.StartJobAsync(job.Id, ct);
-            (await _jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Downloading);
 
-            await executor.PauseJobAsync(job.Id, ct);
+        await executor.StartJobAsync(job.Id, ct);
+        (await _jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Downloading);
 
-            var paused = (await _jobs.GetAsync(job.Id, ct))!;
-            paused.State.Should().Be(JobState.Paused);
-            paused.PauseReason.Should().Be(PauseReason.UserRequested);
-            await WaitUntilAsync(() => _events.OfType<JobStateChanged>().Any(change => change.Id == job.Id && change.To == JobState.Paused));
+        await executor.PauseJobAsync(job.Id, ct);
 
-            await executor.StartJobAsync(job.Id, ct);
-            (await _jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Downloading);
-            await executor.PauseJobAsync(job.Id, ct);
-            (await _jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Paused);
-        }
-        finally
-        {
-            _host.Chaos.Clear();
-        }
+        var paused = (await _jobs.GetAsync(job.Id, ct))!;
+        paused.State.Should().Be(JobState.Paused);
+        paused.PauseReason.Should().Be(PauseReason.UserRequested);
+        await WaitUntilAsync(() => _events.OfType<JobStateChanged>().Any(change => change.Id == job.Id && change.To == JobState.Paused));
+
+        await executor.StartJobAsync(job.Id, ct);
+        (await _jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Downloading);
+        await executor.PauseJobAsync(job.Id, ct);
+        (await _jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Paused);
     }
 
     [Fact]
@@ -310,6 +416,37 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         catalogue.All().Should().HaveCount(BrowserMediaCatalog.MaxTabs);
     }
 
+    private static void AddStreams(LocalStreamServer server)
+    {
+        const string Master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=200000,RESOLUTION=160x90,CODECS=\"avc1.42c00c,mp4a.40.2\"\nv.m3u8\n";
+        const string Clear = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\nseg0.ts\n#EXTINF:4,\nseg1.ts\n#EXT-X-ENDLIST\n";
+        const string Protected = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://k\",KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXTINF:4,\nseg0.ts\n#EXT-X-ENDLIST\n";
+        server.Text("/hls/clear/master.m3u8", Master);
+        server.Text("/hls/clear/v.m3u8", Clear);
+        server.Text("/hls/sample-aes/master.m3u8", Master);
+        server.Text("/hls/sample-aes/v.m3u8", Protected);
+        server.Route("/hls/stall/master.m3u8", async (_, ct) => await Task.Delay(TimeSpan.FromMinutes(5), ct)); // answers only when the test pauses the job
+
+        var fixtures = Path.Combine(RepositoryRoot(), "tests", "fixtures", "media", "muxable", "hls");
+        server.File("/hls/muxable/master.m3u8", Path.Combine(fixtures, "master.m3u8"));
+        server.File("/hls/muxable/index.m3u8", Path.Combine(fixtures, "index.m3u8"));
+        foreach (var segment in Directory.GetFiles(fixtures, "segment-*.ts"))
+        {
+            server.File("/hls/muxable/" + Path.GetFileName(segment), segment);
+        }
+    }
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Kasi.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Kasi.slnx was not found.");
+    }
+
     private static MediaDetected Detected(int tab, string url) =>
         new() { Id = "m" + tab, TabId = tab, PageUrl = "https://example.com/", Kind = IpcMediaKind.Hls, Url = url };
 
@@ -338,7 +475,7 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         UserAgent = "Kasi-Test/1.0",
     };
 
-    private async Task<Job> AddJobAsync(JobKind kind, JobState state, string fileName, string? url = null)
+    private async Task<Job> AddJobAsync(JobKind kind, JobState state, string fileName, string? path = null)
     {
         var folder = Path.Combine(_root, "Downloads");
         Directory.CreateDirectory(folder);
@@ -346,7 +483,7 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         {
             Id = JobId.New(TimeProvider.System),
             Kind = kind,
-            Url = new Uri(_host.BaseAddress, url ?? "/files/x/100").AbsoluteUri,
+            Url = new Uri(_host.BaseAddress, path ?? "/hls/clear/master.m3u8").AbsoluteUri,
             FileName = fileName,
             Folder = folder,
             QueueId = 1,
