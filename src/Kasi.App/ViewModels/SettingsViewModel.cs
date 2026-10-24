@@ -42,6 +42,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private ThemeChoice _selectedTheme;
 
     [ObservableProperty]
+    private bool _scanDownloads;
+
+    [ObservableProperty]
     private bool _enabled;
 
     [ObservableProperty]
@@ -107,6 +110,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
             new(ThemePreference.Dark, Strings.ThemeDark),
         ];
         _selectedTheme = Themes.First(t => t.Preference == (ui?.Current.Theme ?? ThemePreference.System));
+        _scanDownloads = ui?.Current.ScanDownloads ?? false;
         BypassKeys =
         [
             new(BypassKey.Alt, Strings.BypassKeyAlt),
@@ -219,6 +223,10 @@ internal sealed partial class SettingsViewModel : ObservableObject
 
     public string ThemeLabel => Strings.ThemeLabel;
 
+    public string ScanDownloadsLabel => Strings.SettingsScanDownloads;
+
+    public string ScanDownloadsDescription => Strings.SettingsScanDownloadsDescription;
+
     public string Title => Strings.SettingsTitle;
 
     public string AutomationName => Strings.SettingsAutomationName;
@@ -289,6 +297,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
         }
 
         yield return new SettingHit(ThemeLabel, 0);
+        yield return new SettingHit(ScanDownloadsLabel, 0);
         foreach (var label in new[] { EnabledLabel, ShowAddDialogLabel, ClipboardCaptureLabel, ExtensionsLabel, MimeTypesLabel, ExcludedSitesLabel, BypassKeyLabel, MinSizeLabel })
         {
             yield return new SettingHit(label, 1);
@@ -320,6 +329,7 @@ internal sealed partial class SettingsViewModel : ObservableObject
     {
         Load(new BrowserSettings { AckTimeoutMs = _store.Current.AckTimeoutMs });
         SelectedTheme = Themes.First(t => t.Preference == ThemePreference.System);
+        ScanDownloads = false;
     }
 
     [RelayCommand]
@@ -354,9 +364,9 @@ internal sealed partial class SettingsViewModel : ObservableObject
         try
         {
             await _store.SaveAsync(ToSettings(), CancellationToken.None).ConfigureAwait(true);
-            if (_ui is not null && _ui.Current.Theme != SelectedTheme.Preference)
+            if (_ui is not null && (_ui.Current.Theme != SelectedTheme.Preference || _ui.Current.ScanDownloads != ScanDownloads))
             {
-                await _ui.SaveAsync(_ui.Current with { Theme = SelectedTheme.Preference }).ConfigureAwait(true);
+                await _ui.SaveAsync(_ui.Current with { Theme = SelectedTheme.Preference, ScanDownloads = ScanDownloads }).ConfigureAwait(true);
             }
 
             StatusText = string.Empty;

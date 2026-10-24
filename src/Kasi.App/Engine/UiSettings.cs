@@ -29,6 +29,9 @@ internal sealed record UiSettings
 
     public bool SortDescending { get; init; }
 
+    /// <summary>Scan each finished download through the installed antivirus (AMSI) before it gets its final name; off by default (KASI-CAT-004).</summary>
+    public bool ScanDownloads { get; init; }
+
     /// <summary>Ask before deleting downloads; the delete window's "Do not ask again" turns it off.</summary>
     public bool ConfirmDelete { get; init; } = true;
 }

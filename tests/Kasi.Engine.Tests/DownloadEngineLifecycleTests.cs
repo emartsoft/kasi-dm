@@ -785,6 +785,30 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         log.Should().OnlyContain(l => !l.Contains("http", StringComparison.OrdinalIgnoreCase) && !l.Contains(harness.Folder, StringComparison.OrdinalIgnoreCase) && !l.Contains("127.0.0.1", StringComparison.Ordinal));
     }
 
+    private sealed class FlaggingScanner : IFileScanner
+    {
+        public bool IsEnabled => true;
+
+        public Task<ScanResult> ScanAsync(string path, CancellationToken cancellationToken) => Task.FromResult(ScanResult.Detected);
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-004")]
+    public async Task A_flagged_download_ends_the_job_as_Failed_with_the_fixed_message_and_no_final_file()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root, scanner: new FlaggingScanner());
+        var job = harness.NewJob("/files/flagged/1048576", "flagged.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Failed);
+        stored.Error.Should().Be("Flagged by antivirus. Kasi leaves the file where the antivirus put it.");
+        File.Exists(Path.Combine(job.Folder, "flagged.bin")).Should().BeFalse();
+    }
+
     [Fact]
     public async Task The_engine_refuses_a_transition_the_state_machine_does_not_allow()
     {
@@ -931,7 +955,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 
         public DownloadEngine Engine { get; }
 
-        public static async Task<Harness> CreateAsync(TestServerHost host, string root, bool startEngine = true, INetworkStatus? network = null, IPostProbeRouter? router = null)
+        public static async Task<Harness> CreateAsync(TestServerHost host, string root, bool startEngine = true, INetworkStatus? network = null, IPostProbeRouter? router = null, IFileScanner? scanner = null)
         {
             var folder = Path.Combine(root, "downloads-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(folder);
@@ -945,7 +969,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 #pragma warning disable CA2000 // Harness owns the writer and engine and disposes both
             var writer = new CheckpointWriter(factory);
             writer.Start();
-            var engine = new DownloadEngine(jobs, segments, writer, new BandwidthLimiter(), secrets: secrets, timeProvider: TimeProvider.System, network: network, postProbeRouter: router);
+            var engine = new DownloadEngine(jobs, segments, writer, new BandwidthLimiter(), secrets: secrets, timeProvider: TimeProvider.System, network: network, postProbeRouter: router, scanner: scanner);
 #pragma warning restore CA2000
             if (startEngine)
             {

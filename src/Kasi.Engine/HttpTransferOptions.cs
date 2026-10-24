@@ -85,6 +85,9 @@ public sealed record HttpTransferOptions
     /// <summary>Called with a short line (numbers and fixed words only) when the runner decides something worth showing: the probe result, a retry.</summary>
     internal Action<string>? Log { get; init; }
 
+    /// <summary>The scan of the finished file before it gets its final name; null or disabled scans nothing (M2.11e).</summary>
+    internal IFileScanner? Scanner { get; init; }
+
     internal RequestScope? Scope { get; init; }
 
     /// <summary>Called after the part file is sealed and before the published checksum is computed; the facade shows Verifying.</summary>

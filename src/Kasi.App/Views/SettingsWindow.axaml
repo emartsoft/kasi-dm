@@ -82,6 +82,7 @@
                 </ComboBox>
               </Grid>
             </Border>
+            <c:ToggleRow Title="{Binding ScanDownloadsLabel}" Description="{Binding ScanDownloadsDescription}" IsChecked="{Binding ScanDownloads}" />
           </StackPanel>
 
           <!-- Browser integration -->

@@ -20,6 +20,10 @@ internal static class Strings
 
     public static string SelectRow => Get(nameof(SelectRow));
 
+    public static string SettingsScanDownloads => Get(nameof(SettingsScanDownloads));
+
+    public static string SettingsScanDownloadsDescription => Get(nameof(SettingsScanDownloadsDescription));
+
     public static string SchedulerTitle => Get(nameof(SchedulerTitle));
 
     public static string SchedulerQueueLabel => Get(nameof(SchedulerQueueLabel));
