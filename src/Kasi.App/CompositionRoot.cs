@@ -3,6 +3,7 @@ using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Startup;
 using Kasi.App.ViewModels;
+using Kasi.App.Views;
 using Kasi.Core;
 using Kasi.Data;
 using Kasi.Engine;
@@ -117,6 +118,7 @@ internal static class CompositionRoot
             sp.GetRequiredService<IQueueRunner>(),
             sp.GetRequiredService<IQueueScheduleRepository>(),
             categoryRules: sp.GetRequiredService<ICategoryRuleRepository>()));
+        services.AddSingleton<IMediaPicker, AvaloniaMediaPicker>();
         services.AddSingleton<IBrowserMediaCapture>(sp => new BrowserMediaCapture(
             sp.GetRequiredService<MediaSourceLoader>(),
             sp.GetRequiredService<IJobRepository>(),
@@ -128,7 +130,8 @@ internal static class CompositionRoot
             sp.GetRequiredService<DownloadEngine>().PublishExternal,
             AppPaths.DownloadsFolder(),
             timeProvider: TimeProvider.System,
-            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<BrowserMediaCapture>()));
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<BrowserMediaCapture>(),
+            picker: sp.GetRequiredService<IMediaPicker>()));
         services.AddSingleton<IHostedService>(sp => new EngineLifetime(
             sp.GetRequiredService<MigrationRunner>(),
             sp.GetRequiredService<CheckpointWriter>(),

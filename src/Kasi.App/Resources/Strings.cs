@@ -58,6 +58,41 @@ internal static class Strings
 
     public static string PickerCategoryAutomatic => Get(nameof(PickerCategoryAutomatic));
 
+    public static string MediaPickerTitle => Get(nameof(MediaPickerTitle));
+
+    public static string MediaPickerAutomationName => Get(nameof(MediaPickerAutomationName));
+
+    public static string MediaPickerQualityLabel => Get(nameof(MediaPickerQualityLabel));
+
+    public static string MediaPickerFormatLabel => Get(nameof(MediaPickerFormatLabel));
+
+    public static string MediaPickerSubtitlesLabel => Get(nameof(MediaPickerSubtitlesLabel));
+
+    public static string MediaPickerSubtitlesUnavailable => Get(nameof(MediaPickerSubtitlesUnavailable));
+
+    public static string MediaPickerAdd => Get(nameof(MediaPickerAdd));
+
+    public static string MediaPickerCancel => Get(nameof(MediaPickerCancel));
+
+    public static string MediaPickerAudioLabel => Get(nameof(MediaPickerAudioLabel));
+
+    public static string MediaPickerAudioOnly => Get(nameof(MediaPickerAudioOnly));
+
+    public static string MediaPickerMp4 => Get(nameof(MediaPickerMp4));
+
+    public static string MediaPickerMkv => Get(nameof(MediaPickerMkv));
+
+
+    public static string MediaPickerSubtitle => Get(nameof(MediaPickerSubtitle));
+
+    public static string MediaPickerNoQuality => Get(nameof(MediaPickerNoQuality));
+
+    public static string MediaPickerNoAudio => Get(nameof(MediaPickerNoAudio));
+
+    public static string MediaPickerUnknownCodec => Get(nameof(MediaPickerUnknownCodec));
+
+    public static string MediaPickerUnknownBitrate => Get(nameof(MediaPickerUnknownBitrate));
+
     public static string AddQueueLabel => Get(nameof(AddQueueLabel));
 
     public static string AddConnectionsLabel => Get(nameof(AddConnectionsLabel));

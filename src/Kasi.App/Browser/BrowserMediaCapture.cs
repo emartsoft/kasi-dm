@@ -1,4 +1,5 @@
 using Kasi.App.Engine;
+using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Ipc.Messages;
 using Kasi.Media;
@@ -13,6 +14,7 @@ namespace Kasi.App.Browser;
 /// The M3.5 capture path: parse with the page's context, refuse DRM, or add a media job with the default quality and start it.
 /// Direct media is a normal HTTP download, not a media job (M3 plan decision 3).
 /// </summary>
+#pragma warning disable CA1001 // see _pickGate
 internal sealed partial class BrowserMediaCapture(
     MediaSourceLoader loader,
     IJobRepository jobs,
@@ -24,10 +26,15 @@ internal sealed partial class BrowserMediaCapture(
     Action<EngineEvent> publish,
     string downloadsFolder,
     TimeProvider? timeProvider = null,
-    ILogger? logger = null) : IBrowserMediaCapture
+    ILogger? logger = null,
+    IMediaPicker? picker = null) : IBrowserMediaCapture
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
+    private readonly SemaphoreSlim _pickGate = new(1, 1); // never waited on through a handle, so it holds nothing to dispose; the service lives as long as the process
+
+    /// <summary>Optional detection metadata (title/poster) supplied by the browser services after start-up.</summary>
+    public Func<CaptureMedia, (string Title, string? ThumbnailUrl)>? Metadata { get; set; }
 
     public async Task<MediaCaptureResult> CaptureAsync(CaptureMedia message, CancellationToken cancellationToken)
     {
@@ -60,43 +67,17 @@ internal sealed partial class BrowserMediaCapture(
                 return new MediaCaptureResult(MediaCaptureStatus.Protected, MediaSourceLoader.ProtectedMessage);
             }
 
-            if (await FindActiveAsync(message.Url, cancellationToken).ConfigureAwait(false) is { } existing)
-            {
-                LogDuplicate(existing.Id); // the same stream clicked twice is one capture
-                return new MediaCaptureResult(MediaCaptureStatus.Accepted);
-            }
-
-            var id = JobId.New(_time);
-            var fileName = CaptureFileName(message.Url, id);
-            var (categoryId, folder) = await PlaceAsync(message.Url, fileName, cancellationToken).ConfigureAwait(false);
-            var queue = await jobs.ListAsync(1, cancellationToken: cancellationToken).ConfigureAwait(false);
-            var job = new Job
-            {
-                Id = id,
-                Kind = JobKind.Media,
-                Url = message.Url,
-                Referrer = message.Referrer,
-                FileName = fileName,
-                Folder = folder,
-                QueueId = 1,
-                QueuePos = queue.Select(item => item.QueuePos).DefaultIfEmpty(0).Max() + 1,
-                CategoryId = categoryId,
-                CreatedUtc = _time.GetUtcNow(),
-            };
-            await jobs.AddAsync(job, cancellationToken).ConfigureAwait(false);
-            publish(new JobAdded(job)); // the grid learns about a job from this event
-            await secrets.SetAsync(id, SecretOf(message), cancellationToken).ConfigureAwait(false);
+            var presentation = ((MediaSourceLoader.Playable)loaded).Presentation;
+            // One picker at a time: a second click on the same stream waits, then finds the first one's job instead of adding another.
+            await _pickGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await control.StartJobAsync(id, cancellationToken).ConfigureAwait(false);
+                return await AddCapturedJobAsync(message, presentation, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            finally
             {
-                LogStartFailed(id, exception.GetType().Name); // the job is in the list, queued: the queue or the user can start it
+                _pickGate.Release();
             }
-
-            LogAccepted(id);
-            return new MediaCaptureResult(MediaCaptureStatus.Accepted);
         }
         catch (MediaLoadException exception)
         {
@@ -113,6 +94,58 @@ internal sealed partial class BrowserMediaCapture(
             LogCaptureFailed(exception);
             return new MediaCaptureResult(MediaCaptureStatus.Failed, "The media capture could not be started.");
         }
+    }
+
+    private async Task<MediaCaptureResult> AddCapturedJobAsync(CaptureMedia message, MediaPresentation presentation, CancellationToken cancellationToken)
+    {
+        if (await FindActiveAsync(message.Url, cancellationToken).ConfigureAwait(false) is { } existing)
+        {
+            LogDuplicate(existing.Id); // the same stream clicked twice is one capture
+            return new MediaCaptureResult(MediaCaptureStatus.Accepted);
+        }
+
+        MediaPickerSelection? selection = null;
+        if (picker is not null)
+        {
+            var (title, thumbnail) = Metadata?.Invoke(message) ?? (new Uri(message.Url).Host, null);
+            selection = await picker.PickAsync(presentation, title, thumbnail, cancellationToken).ConfigureAwait(false);
+            if (selection is null)
+            {
+                return new MediaCaptureResult(MediaCaptureStatus.Cancelled);
+            }
+        }
+
+        var id = JobId.New(_time);
+        var fileName = CaptureFileName(message.Url, id, selection?.Format);
+        var (categoryId, folder) = await PlaceAsync(message.Url, fileName, cancellationToken).ConfigureAwait(false);
+        var queue = await jobs.ListAsync(1, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var job = new Job
+        {
+            Id = id,
+            Kind = JobKind.Media,
+            Url = message.Url,
+            Referrer = message.Referrer,
+            FileName = fileName,
+            Folder = folder,
+            QueueId = 1,
+            QueuePos = queue.Select(item => item.QueuePos).DefaultIfEmpty(0).Max() + 1,
+            CategoryId = categoryId,
+            CreatedUtc = _time.GetUtcNow(),
+        };
+        await jobs.AddAsync(job, cancellationToken).ConfigureAwait(false);
+        publish(new JobAdded(job)); // the grid learns about a job from this event
+        await secrets.SetAsync(id, SecretOf(message, selection), cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await control.StartJobAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogStartFailed(id, exception.GetType().Name); // the job is in the list, queued: the queue or the user can start it
+        }
+
+        LogAccepted(id);
+        return new MediaCaptureResult(MediaCaptureStatus.Accepted);
     }
 
     private async Task<Job?> FindActiveAsync(string url, CancellationToken cancellationToken) =>
@@ -182,7 +215,7 @@ internal sealed partial class BrowserMediaCapture(
     [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Direct media capture failed.")]
     private partial void LogDirectFailed(Exception exception);
 
-    private static JobSecret SecretOf(CaptureMedia message)
+    private static JobSecret SecretOf(CaptureMedia message, MediaPickerSelection? selection)
     {
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -205,13 +238,14 @@ internal sealed partial class BrowserMediaCapture(
                 HttpOnly = cookie.HttpOnly,
             }).ToArray(),
             Headers = headers,
+            Media = selection?.ToJobSelection(),
         };
     }
 
     private static Uri? TryUri(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) ? uri : null;
 
-    private static string CaptureFileName(string url, JobId id)
+    private static string CaptureFileName(string url, JobId id, MediaPickerFormat? format)
     {
         var name = Path.GetFileName(new Uri(url).AbsolutePath);
         var stem = Path.GetFileNameWithoutExtension(name);
@@ -220,7 +254,13 @@ internal sealed partial class BrowserMediaCapture(
             stem = "capture";
         }
 
-        return $"{stem}-{id.ToString()[..8]}.mp4";
+        var extension = format switch
+        {
+            MediaPickerFormat.Matroska => ".mkv",
+            MediaPickerFormat.AudioOnly => ".m4a",
+            _ => ".mp4",
+        };
+        return $"{stem}-{id.ToString()[..8]}{extension}";
     }
 
     private static string FileNameFromUrl(string url)
