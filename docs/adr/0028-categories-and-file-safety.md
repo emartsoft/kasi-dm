@@ -34,6 +34,10 @@ A download takes its category from the dialog or a remembered site, otherwise it
 13. **"Try a link"** runs the resolver on a typed link and says which category and folder it would get and which rule decided, or that nothing matched and General is used.
 14. **Moving a rule** swaps its position with the next rule of the same kind shown for that category; rules of other categories keep their own positions.
 
+## Decision (11d)
+
+15. **The Mark-of-the-Web is written on every completed file, with no switch.** `MarkOfTheWeb.TryWrite` puts `[ZoneTransfer]`, `ZoneId=3` and `HostUrl=<address without user name, password, query and fragment>` into the `Zone.Identifier` stream of the sealed part file, after the checksum check and before the rename, in the one finalisation step all three transfer paths (empty file, single stream, segmented) share. The stream travels with the rename. A volume that cannot hold streams (FAT32, exFAT, some shares) is not an error: the job log gets one fixed line, "Mark-of-the-Web not supported on this volume", and the download completes, because it must not fail for a mark the volume cannot hold. A resumed download reaches finalisation once, so it is marked once.
+
 ## Consequences
 
 - 11a changes no behaviour a user can see: nothing calls the resolver yet. 11b makes every way of creating a job use it.

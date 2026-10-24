@@ -664,7 +664,7 @@ public sealed class HttpTransferRunner
             TransferFailure? emptyFailure;
             try
             {
-                emptyFailure = await FinalizePartAsync(writer, 0, 0, options, cancellationToken).ConfigureAwait(false);
+                emptyFailure = await FinalizePartAsync(writer, 0, 0, options, probe.FinalUrl, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -732,7 +732,7 @@ public sealed class HttpTransferRunner
                 throw new TransferException(Protocol($"The server sent {readTotal} bytes but declared {expected}."));
             }
 
-            var finalFailure = await FinalizePartAsync(writer, readTotal, readTotal, options, cancellationToken).ConfigureAwait(false);
+            var finalFailure = await FinalizePartAsync(writer, readTotal, readTotal, options, probe.FinalUrl, cancellationToken).ConfigureAwait(false);
             if (finalFailure is not null)
             {
                 throw new TransferException(finalFailure);
@@ -966,7 +966,7 @@ public sealed class HttpTransferRunner
         TransferFailure? finalFailure;
         try
         {
-            finalFailure = await FinalizePartAsync(writer, totalBytes, scheduler.TotalWritten, options, cancellationToken).ConfigureAwait(false);
+            finalFailure = await FinalizePartAsync(writer, totalBytes, scheduler.TotalWritten, options, finalUrl, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1528,6 +1528,7 @@ public sealed class HttpTransferRunner
         long expectedLength,
         long bytesWritten,
         HttpTransferOptions options,
+        Uri? source,
         CancellationToken cancellationToken)
     {
         var seal = await writer.SealAsync(expectedLength, bytesWritten, cancellationToken).ConfigureAwait(false);
@@ -1559,6 +1560,11 @@ public sealed class HttpTransferRunner
                     TransferErrorKind.VerificationFailed,
                     $"Checksum mismatch: expected {expected.Hex.ToLowerInvariant()}, computed {computed}.");
             }
+        }
+
+        if (!MarkOfTheWeb.TryWrite(writer.PartPath, source))
+        {
+            options.Log?.Invoke("Mark-of-the-Web not supported on this volume");
         }
 
         var commit = await writer.CommitAsync(options.OverwriteDestination, cancellationToken).ConfigureAwait(false);
