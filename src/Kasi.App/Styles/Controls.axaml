@@ -37,6 +37,21 @@
       </Style>
     </ControlTheme>
 
+    <ControlTheme x:Key="KasiKindGlyphTheme" TargetType="c:KindGlyph">
+      <Setter Property="Foreground" Value="{DynamicResource KasiTextSecondaryBrush}" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <TextBlock Text="{TemplateBinding Text}" Foreground="{TemplateBinding Foreground}" FontFamily="{DynamicResource KasiIconFont}" FontSize="15" HorizontalAlignment="Center" />
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:accent"><Setter Property="Foreground" Value="{DynamicResource KasiAccentTextBrush}" /></Style>
+      <Style Selector="^:info"><Setter Property="Foreground" Value="{DynamicResource KasiInfoBrush}" /></Style>
+      <Style Selector="^:success"><Setter Property="Foreground" Value="{DynamicResource KasiSuccessBrush}" /></Style>
+      <Style Selector="^:warning"><Setter Property="Foreground" Value="{DynamicResource KasiWarningBrush}" /></Style>
+      <Style Selector="^:danger"><Setter Property="Foreground" Value="{DynamicResource KasiDangerBrush}" /></Style>
+    </ControlTheme>
+
     <ControlTheme x:Key="KasiToggleRowTheme" TargetType="c:ToggleRow">
       <Setter Property="Template">
         <ControlTemplate>
@@ -59,6 +74,9 @@
   <Style Selector=":is(c|StatusChip)">
     <Setter Property="Theme" Value="{StaticResource KasiStatusChipTheme}" />
   </Style>
+  <Style Selector="c|KindGlyph">
+    <Setter Property="Theme" Value="{StaticResource KasiKindGlyphTheme}" />
+  </Style>
   <Style Selector="c|ToggleRow">
     <Setter Property="Theme" Value="{StaticResource KasiToggleRowTheme}" />
   </Style>
@@ -70,6 +88,37 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{DynamicResource KasiCardCornerRadius}" />
     <Setter Property="Padding" Value="16" />
+  </Style>
+
+  <!-- toolbar button of the main window -->
+  <Style Selector="Button.kasi-tool, DropDownButton.kasi-tool">
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KasiControlCornerRadius}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Button.kasi-tool:not(.accent), DropDownButton.kasi-tool">
+    <Setter Property="Background" Value="{DynamicResource KasiCardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KasiBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <!-- a keyboard shortcut shown in a box, a count in a sidebar pill, a state dot -->
+  <Style Selector="Border.kasi-key">
+    <Setter Property="BorderBrush" Value="{DynamicResource KasiBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KasiChipCornerRadius}" />
+    <Setter Property="Padding" Value="5,1" />
+  </Style>
+  <Style Selector="Border.kasi-count">
+    <Setter Property="Background" Value="{DynamicResource KasiNeutralSoftBrush}" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="7,1" />
+    <Setter Property="MinWidth" Value="22" />
+  </Style>
+  <Style Selector="Ellipse.kasi-dot">
+    <Setter Property="Fill" Value="{DynamicResource KasiSubtleBrush}" />
+  </Style>
+  <Style Selector="Ellipse.kasi-dot.on">
+    <Setter Property="Fill" Value="{DynamicResource KasiSuccessBrush}" />
   </Style>
 
   <!-- text roles -->

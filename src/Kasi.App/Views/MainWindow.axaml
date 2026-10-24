@@ -3,19 +3,27 @@
         xmlns:vm="using:Kasi.App.ViewModels"
         xmlns:tray="using:Kasi.App.Tray"
         xmlns:res="using:Kasi.App.Resources"
+        xmlns:c="using:Kasi.App.Controls"
         x:Class="Kasi.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
         AutomationProperties.Name="{Binding AutomationName}"
-        Width="1280"
+        Width="1360"
         Height="720"
         MinWidth="760"
         MinHeight="420"
         WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        Background="Transparent"
         TransparencyLevelHint="Mica, AcrylicBlur, None"
-        TransparencyBackgroundFallback="{DynamicResource SolidBackgroundFillColorBaseBrush}">
+        TransparencyBackgroundFallback="{DynamicResource KasiMicaBrush}">
   <Window.Styles>
     <!-- the DataGrid's own header colours are not defined by FluentAvalonia's theme, which left the header text black on a dark window -->
+    <Style Selector="ListBox.kasi-sidebar ListBoxItem">
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
     <Style Selector="DataGridColumnHeader">
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
       <Setter Property="Background" Value="Transparent" />
@@ -26,26 +34,68 @@
     <KeyBinding Gesture="Ctrl+F" Command="{Binding FocusSearchCommand}" />
   </Window.KeyBindings>
   <DockPanel>
+    <!-- title strip: the app mark and name at the left, the tagline in the middle; the system's own caption buttons sit over the right end -->
+    <Grid DockPanel.Dock="Top" Height="40" ColumnDefinitions="Auto,*,148" Background="{DynamicResource KasiPanelBrush}">
+      <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="SemiBold" Margin="44,0,0,0" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="1" Text="{x:Static res:Strings.AppTagline}" Classes="kasi-secondary" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+    </Grid>
+
     <!-- toolbar, left to right as in the wireframe, then the search box -->
-    <Border DockPanel.Dock="Top" Padding="8,6" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+    <Border DockPanel.Dock="Top" Padding="10,6" Background="{DynamicResource KasiPanelBrush}" BorderThickness="0,1,0,1" BorderBrush="{DynamicResource KasiBorderBrush}">
       <Grid ColumnDefinitions="*,Auto" AutomationProperties.Name="{x:Static res:Strings.ToolbarAutomationName}">
-        <TextBox x:Name="SearchBox" Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top" Width="220" Text="{Binding Jobs.SearchText}" PlaceholderText="{x:Static res:Strings.SearchPlaceholder}" AutomationProperties.Name="{x:Static res:Strings.SearchAutomationName}" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Top">
+        <TextBox x:Name="SearchBox" Margin="0,0,6,0" VerticalAlignment="Top" Width="224" Text="{Binding Jobs.SearchText}" PlaceholderText="{x:Static res:Strings.SearchPlaceholder}" AutomationProperties.Name="{x:Static res:Strings.SearchAutomationName}">
+          <TextBox.InnerLeftContent>
+            <TextBlock Classes="kasi-icon kasi-secondary" Text="&#xE721;" FontSize="14" Margin="10,0,0,0" VerticalAlignment="Center" />
+          </TextBox.InnerLeftContent>
+          <TextBox.InnerRightContent>
+            <Border Classes="kasi-key" Margin="0,0,8,0" VerticalAlignment="Center">
+              <TextBlock Text="{x:Static res:Strings.SearchShortcut}" Classes="kasi-secondary kasi-mono" FontSize="11" />
+            </Border>
+          </TextBox.InnerRightContent>
+        </TextBox>
+          <Button Classes="kasi-tool" Command="{Binding OpenSettingsCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarSettings}">
+            <Grid>
+              <TextBlock Classes="kasi-icon" Text="&#xE713;" FontSize="16" />
+              <Ellipse Classes="kasi-dot" Classes.on="{Binding ExtensionConnected}" Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-4,0" />
+            </Grid>
+          </Button>
+        </StackPanel>
         <WrapPanel Grid.Column="0" Orientation="Horizontal">
           <WrapPanel.Styles>
             <Style Selector="WrapPanel > Button, WrapPanel > DropDownButton">
               <Setter Property="Margin" Value="0,0,4,4" />
             </Style>
           </WrapPanel.Styles>
-          <Button Content="{x:Static res:Strings.ToolbarAddUrl}" Command="{Binding AddUrlCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarAddUrl}" />
-          <Button Content="{x:Static res:Strings.ToolbarResume}" Command="{Binding ResumeCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarResume}" />
-          <Button Content="{x:Static res:Strings.ToolbarPause}" Command="{Binding PauseCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarPause}" />
-          <Button Content="{x:Static res:Strings.ToolbarStop}" Command="{Binding StopCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarStop}" />
-          <Button Content="{x:Static res:Strings.ToolbarDelete}" Command="{Binding DeleteCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarDelete}" />
-          <Button Content="{x:Static res:Strings.ToolbarDeleteCompleted}" Command="{Binding DeleteCompletedCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarDeleteCompleted}" />
-          <Button Content="{x:Static res:Strings.ToolbarStartQueue}" Command="{Binding StartQueueCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarStartQueue}" />
-          <Button Content="{x:Static res:Strings.ToolbarStopQueue}" Command="{Binding StopQueueCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarStopQueue}" />
-          <Button Content="{x:Static res:Strings.ToolbarScheduler}" Command="{Binding SchedulerCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarScheduler}" />
-          <DropDownButton Content="{Binding ToolbarSpeedLimitText}" AutomationProperties.Name="{Binding ToolbarSpeedLimitText}">
+          <Button Classes="accent kasi-tool" Command="{Binding AddUrlCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarAddUrl}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE710;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarAddUrl}" FontWeight="SemiBold" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding ResumeCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarResume}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE768;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarResume}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding PauseCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarPause}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE769;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarPause}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding StopCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarStop}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE71A;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarStop}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding DeleteCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarDelete}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE74D;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarDelete}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding DeleteCompletedCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarDeleteCompleted}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE73E;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarDeleteCompleted}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding StartQueueCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarStartQueue}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE8FD;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarStartQueue}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding StopQueueCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarStopQueue}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE71A;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarStopQueue}" /></StackPanel>
+          </Button>
+          <Button Classes="kasi-tool" Command="{Binding SchedulerCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarScheduler}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE787;" FontSize="14" /><TextBlock Text="{x:Static res:Strings.ToolbarScheduler}" /></StackPanel>
+          </Button>
+          <DropDownButton Classes="kasi-tool" AutomationProperties.Name="{Binding ToolbarSpeedLimitText}">
+            <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="kasi-icon" Text="&#xE945;" FontSize="14" Foreground="{DynamicResource KasiInfoBrush}" /><TextBlock Text="{Binding ToolbarSpeedLimitText}" /></StackPanel>
             <DropDownButton.Flyout>
               <MenuFlyout ItemsSource="{Binding SpeedPresets}">
                 <MenuFlyout.ItemContainerTheme>
@@ -58,32 +108,66 @@
               </MenuFlyout>
             </DropDownButton.Flyout>
           </DropDownButton>
-          <Button Content="{x:Static res:Strings.ToolbarSettings}" Command="{Binding OpenSettingsCommand}" AutomationProperties.Name="{x:Static res:Strings.ToolbarSettings}" />
         </WrapPanel>
       </Grid>
     </Border>
 
     <!-- status bar -->
-    <Border DockPanel.Dock="Bottom" Padding="12,4" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
-      <Grid ColumnDefinitions="Auto,24,Auto,24,Auto,*,Auto" AutomationProperties.Name="{x:Static res:Strings.StatusBarAutomationName}">
-        <TextBlock Grid.Column="0" Text="{Binding Jobs.TotalSpeedText}" AutomationProperties.Name="{Binding Jobs.TotalSpeedText}" />
-        <TextBlock Grid.Column="2" Text="{Binding CountsText}" AutomationProperties.Name="{Binding CountsText}" />
-        <TextBlock Grid.Column="4" Text="{Binding SpeedLimitText}" AutomationProperties.Name="{Binding SpeedLimitText}" />
-        <TextBlock Grid.Column="6" Text="{Binding ExtensionStatusText}" AutomationProperties.Name="{Binding ExtensionStatusText}" />
+    <Border DockPanel.Dock="Bottom" Padding="14,5" Background="{DynamicResource KasiPanelBrush}" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource KasiBorderBrush}">
+      <Grid ColumnDefinitions="Auto,20,Auto,20,Auto,*,Auto,20,Auto" AutomationProperties.Name="{x:Static res:Strings.StatusBarAutomationName}">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+          <Ellipse Classes="kasi-dot" Classes.on="{Binding Jobs.HasActive}" Width="8" Height="8" />
+          <TextBlock Text="{Binding CountsText}" Classes="kasi-secondary" AutomationProperties.Name="{Binding CountsText}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="{x:Static res:Strings.StatusDown}" Classes="kasi-secondary" />
+          <TextBlock Text="{Binding Jobs.SpeedNumberText}" Classes="kasi-mono" FontWeight="SemiBold" AutomationProperties.Name="{Binding Jobs.SpeedNumberText}" />
+        </StackPanel>
+        <TextBlock Grid.Column="4" Text="{Binding SpeedLimitText}" Classes="kasi-secondary" AutomationProperties.Name="{Binding SpeedLimitText}" />
+        <TextBlock Grid.Column="6" Text="{Binding DiskFreeText}" Classes="kasi-secondary kasi-mono" AutomationProperties.Name="{Binding DiskFreeText}" />
+        <TextBlock Grid.Column="8" Text="{Binding ExtensionStatusText}" Classes="kasi-secondary" AutomationProperties.Name="{Binding ExtensionStatusText}" />
       </Grid>
     </Border>
 
-    <!-- sidebar: status filters, categories, queues -->
-    <ListBox DockPanel.Dock="Left" Width="190" ItemsSource="{Binding Sidebar.Entries}" SelectedItem="{Binding Sidebar.Selected}" AutomationProperties.Name="{Binding Sidebar.AutomationName}">
-      <ListBox.ItemTemplate>
-        <DataTemplate x:DataType="vm:SidebarEntry">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="{Binding IsHeader, Converter={x:Static vm:SidebarFonts.Weight}}" Opacity="{Binding IsHeader, Converter={x:Static vm:SidebarFonts.Opacity}}" />
-            <TextBlock Grid.Column="1" Text="{Binding CountText}" Opacity="0.7" />
-          </Grid>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
+    <!-- sidebar: status filters, categories and queues, then the speed and extension cards -->
+    <Border DockPanel.Dock="Left" Width="250" Background="{DynamicResource KasiPanelBrush}" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource KasiBorderBrush}">
+      <Grid RowDefinitions="*,Auto">
+        <ListBox Grid.Row="0" Classes="kasi-sidebar" Background="Transparent" ItemsSource="{Binding Sidebar.Entries}" SelectedItem="{Binding Sidebar.Selected}" AutomationProperties.Name="{Binding Sidebar.AutomationName}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SidebarEntry">
+              <Grid ColumnDefinitions="24,*,Auto" MinHeight="26">
+                <c:KindGlyph Grid.Column="0" Text="{Binding Glyph}" Kind="{Binding GlyphKind}" IsVisible="{Binding !IsHeader}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Label}" FontWeight="{Binding IsHeader, Converter={x:Static vm:SidebarFonts.Weight}}" FontSize="{Binding IsHeader, Converter={x:Static vm:SidebarFonts.Size}}" Opacity="{Binding IsHeader, Converter={x:Static vm:SidebarFonts.Opacity}}" />
+                  <TextBlock Text="{Binding Detail}" IsVisible="{Binding HasDetail}" Classes="kasi-secondary kasi-mono" FontSize="11" />
+                </StackPanel>
+                <Border Grid.Column="2" Classes="kasi-count" IsVisible="{Binding HasCount}" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding CountText}" Classes="kasi-secondary" FontSize="11" FontWeight="SemiBold" />
+                </Border>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Grid.Row="1" Margin="10,6,10,10" Spacing="8">
+          <Border Classes="kasi-card" Padding="12">
+            <StackPanel Spacing="4">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{x:Static res:Strings.SidebarAggregateSpeed}" Classes="kasi-secondary" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Jobs.SpeedNumberText}" Classes="kasi-mono" FontWeight="SemiBold" Foreground="{DynamicResource KasiSuccessBrush}" />
+              </Grid>
+              <c:Sparkline Height="44" Samples="{Binding Jobs.SpeedSamples}" LineBrush="{DynamicResource KasiSuccessBrush}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="kasi-card" Padding="12,8">
+            <Grid ColumnDefinitions="Auto,8,*,Auto">
+              <Ellipse Classes="kasi-dot" Classes.on="{Binding ExtensionConnected}" Width="8" Height="8" />
+              <TextBlock Grid.Column="2" Text="{x:Static res:Strings.SidebarExtension}" />
+              <TextBlock Grid.Column="3" Text="{Binding ExtensionCardText}" Classes="kasi-secondary kasi-mono" />
+            </Grid>
+          </Border>
+        </StackPanel>
+      </Grid>
+    </Border>
 
     <DataGrid x:Name="Grid"
               ItemsSource="{Binding Jobs.Visible}"

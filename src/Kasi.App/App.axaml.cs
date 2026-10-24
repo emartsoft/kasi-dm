@@ -81,6 +81,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                 main.SettingsHandler = () => ShowSettings(browser.Settings, SettingsSection.Browser);
                 main.SchedulerHandler = () => ShowScheduler(services.GetRequiredService<IJobService>(), main.Sidebar.Selected?.Filter?.QueueId);
                 main.ConnectedBrowsers = browser.ConnectedHosts;
+                main.DiskFree = DiskFreeOfDownloads;
                 if (shell)
                 {
                     // a copied download link opens the Add dialog; the watcher listens only while the setting is on
@@ -182,6 +183,20 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         var window = new SchedulerWindow { DataContext = model };
         _ = model.LoadAsync(selectedQueueId);
         window.Show();
+    }
+
+    /// <summary>The drive Downloads is on and the space left on it, for the status bar; null when the drive cannot be read (a disconnected share).</summary>
+    private static (string Drive, long FreeBytes)? DiskFreeOfDownloads()
+    {
+        try
+        {
+            var root = Path.GetPathRoot(AppPaths.DownloadsFolder());
+            return string.IsNullOrEmpty(root) ? null : (root.TrimEnd('\\'), new DriveInfo(root).AvailableFreeSpace);
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private void ShowSettings(IBrowserSettings settings, SettingsSection section)

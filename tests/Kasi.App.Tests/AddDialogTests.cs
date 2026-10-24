@@ -145,7 +145,9 @@ internal sealed class RecordingJobService : IJobService
         return Task.CompletedTask;
     }
 
-    public Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default) => Task.FromResult<QueueSchedule?>(null);
+    public Dictionary<int, QueueSchedule> Schedules { get; } = [];
+
+    public Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default) => Task.FromResult(Schedules.GetValueOrDefault(queueId));
 
     public Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default) => Task.CompletedTask;
 

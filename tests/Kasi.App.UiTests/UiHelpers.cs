@@ -45,8 +45,9 @@ internal static class UiHelpers
     /// <summary>Presses the button once it is enabled: a command that cannot run yet (no row selected, a state not reached) disables its button.</summary>
     public static void Press(this AutomationElement root, string name)
     {
-        var button = root.Named(ControlType.Button, name, "a button").AsButton();
-        WaitFor(() => button.IsEnabled ? button : null, $"the '{name}' button to be enabled", root, TimeSpan.FromSeconds(10)).Invoke();
+        root.Named(ControlType.Button, name, "a button");
+        // the extended title bar exposes a disabled placeholder 'Close' beside the live one: take whichever is enabled
+        WaitFor(() => root.FindAllDescendants(c => c.ByControlType(ControlType.Button).And(c.ByName(name))).FirstOrDefault(b => b.IsEnabled)?.AsButton(), $"the '{name}' button to be enabled", root, TimeSpan.FromSeconds(10)).Invoke();
     }
 
     public static void SetText(this AutomationElement root, string name, string text) =>

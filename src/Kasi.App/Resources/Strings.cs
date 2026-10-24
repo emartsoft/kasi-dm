@@ -433,4 +433,22 @@ internal static class Strings
     public static string RuleErrorExtension => Get(nameof(RuleErrorExtension));
 
     public static string RuleErrorChars => Get(nameof(RuleErrorChars));
+
+    public static string StatusDiskFree => Get(nameof(StatusDiskFree));
+
+    public static string StatusDown => Get(nameof(StatusDown));
+
+    public static string SidebarAggregateSpeed => Get(nameof(SidebarAggregateSpeed));
+
+    public static string SidebarExtension => Get(nameof(SidebarExtension));
+
+    public static string SidebarExtensionConnected => Get(nameof(SidebarExtensionConnected));
+
+    public static string SidebarExtensionNone => Get(nameof(SidebarExtensionNone));
+
+    public static string SearchShortcut => Get(nameof(SearchShortcut));
+
+    public static string AppTagline => Get(nameof(AppTagline));
+
+    public static string QueueFrom => Get(nameof(QueueFrom));
 }

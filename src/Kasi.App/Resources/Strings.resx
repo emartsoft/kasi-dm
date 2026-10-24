@@ -881,4 +881,40 @@
     <value>A pattern cannot have spaces or control characters.</value>
     <comment>Error: the pattern has spaces or control characters.</comment>
   </data>
+  <data name="StatusDiskFree" xml:space="preserve">
+    <value>Disk ({0}): {1} free</value>
+    <comment>Status bar: the drive Downloads is on and the space left on it.</comment>
+  </data>
+  <data name="StatusDown" xml:space="preserve">
+    <value>Down</value>
+    <comment>Status bar and sidebar card: the download speed.</comment>
+  </data>
+  <data name="SidebarAggregateSpeed" xml:space="preserve">
+    <value>Aggregate speed</value>
+    <comment>Title of the sidebar card with the total speed and its chart.</comment>
+  </data>
+  <data name="SidebarExtension" xml:space="preserve">
+    <value>Extension</value>
+    <comment>Title of the sidebar card with the browser extension state.</comment>
+  </data>
+  <data name="SidebarExtensionConnected" xml:space="preserve">
+    <value>Connected</value>
+    <comment>State on the extension card: a browser is connected.</comment>
+  </data>
+  <data name="SidebarExtensionNone" xml:space="preserve">
+    <value>Not connected</value>
+    <comment>State on the extension card: no browser is connected.</comment>
+  </data>
+  <data name="SearchShortcut" xml:space="preserve">
+    <value>Ctrl+F</value>
+    <comment>The shortcut shown inside the search box.</comment>
+  </data>
+  <data name="AppTagline" xml:space="preserve">
+    <value>Kasi Download Manager &amp; Accelerator</value>
+    <comment>Centre of the title strip.</comment>
+  </data>
+  <data name="QueueFrom" xml:space="preserve">
+    <value>from</value>
+    <comment>Before the start time of a queue that runs until it is empty: from 02:00.</comment>
+  </data>
 </root>

@@ -57,3 +57,8 @@ internal sealed class FileTypeChip : StatusChip
         Kind = FileTypeColors.For(FileName);
     }
 }
+
+/// <summary>An icon-font glyph that takes the colour of its kind and has no background: the status icons of the sidebar.</summary>
+internal sealed class KindGlyph : StatusChip
+{
+}
