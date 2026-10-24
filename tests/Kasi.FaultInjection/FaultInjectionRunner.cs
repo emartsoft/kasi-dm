@@ -155,6 +155,7 @@ public static class FaultInjectionRunner
             var environment = commitKill ? ChildEnvironment.CommitKill(marker, random.Next(1, 6)) : new Dictionary<string, string>();
             environment[ChildEnvironment.FlushFile] = flushFile;
             using var child = harness.StartChild(job.Id, options.BytesPerSecond, environment);
+            var runClock = Stopwatch.StartNew();
             var hit = commitKill
                 ? await WaitForMarkerOrExitAsync(child, marker, _commitWait, cancellationToken).ConfigureAwait(false)
                 : !await FaultHarness.WaitOrTimeoutAsync(child, TimeSpan.FromSeconds(random.Next(1, options.MaxKillSeconds + 1)), cancellationToken).ConfigureAwait(false);
@@ -186,7 +187,8 @@ public static class FaultInjectionRunner
             FaultHarness.KillIfRunning(child);
             await child.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             var killLatency = (sinceHook > TimeSpan.Zero ? sinceHook : TimeSpan.Zero) + killClock.Elapsed;
-            var flushLatency = ReadFlushLatency(flushFile);
+            var inFlight = ReadInFlight(ChildEnvironment.InFlightFile(flushFile), TimeProvider.System.GetUtcNow());
+            var flushLatency = TimeSpan.FromTicks(Math.Max(ReadFlushLatency(flushFile).Ticks, inFlight.Ticks));
             var bound = RefetchBound(options, killLatency, flushLatency);
             kills++;
             SqliteConnection.ClearAllPools();
@@ -203,10 +205,10 @@ public static class FaultInjectionRunner
 
             if (problem is null && refetched > bound)
             {
-                problem = $"{refetched} B had to be fetched again, above the {bound} B bound (the kill took {killLatency.TotalSeconds:0.00} s to land, the slowest checkpoint commit {flushLatency.TotalSeconds:0.00} s)";
+                problem = $"{refetched} B had to be fetched again, above the {bound} B bound (the kill took {killLatency.TotalSeconds:0.00} s to land, the slowest or still-running checkpoint {flushLatency.TotalSeconds:0.00} s, {inFlight.TotalSeconds:0.00} s of it unfinished at the kill; {Math.Max(0, after.DoneBytes - before.DoneBytes)} B of {served} B served had been saved after {runClock.Elapsed.TotalSeconds:0.0} s)";
             }
 
-            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3), Math.Round(flushLatency.TotalSeconds, 3)));
+            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3), Math.Round(flushLatency.TotalSeconds, 3), Math.Max(0, after.DoneBytes - before.DoneBytes), Math.Round(inFlight.TotalSeconds, 3), Math.Round(runClock.Elapsed.TotalSeconds, 3)));
             error ??= problem;
         }
 
@@ -243,7 +245,25 @@ public static class FaultInjectionRunner
             results);
     }
 
-    /// <summary>The child's slowest commit; zero when it wrote nothing, or was killed while writing and left a partial number.</summary>
+    /// <summary>
+    /// How long the checkpoint the child was in the middle of when it died had been running: a flush stuck on a slow disk never
+    /// completes, so the slowest completed commit cannot show it. Zero when the child was between checkpoints or the file is unreadable.
+    /// </summary>
+    internal static TimeSpan ReadInFlight(string path, DateTimeOffset now)
+    {
+        try
+        {
+            return long.TryParse(File.ReadAllText(path), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks) && ticks > 0
+                ? TimeSpan.FromTicks(Math.Max(0, now.UtcTicks - ticks))
+                : TimeSpan.Zero;
+        }
+        catch (IOException)
+        {
+            return TimeSpan.Zero;
+        }
+    }
+
+    /// <summary>The child's slowest checkpoint; zero when it wrote nothing, or was killed while writing and left a partial number.</summary>
     internal static TimeSpan ReadFlushLatency(string path)
     {
         try

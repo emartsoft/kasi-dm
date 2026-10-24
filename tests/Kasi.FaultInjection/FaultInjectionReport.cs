@@ -13,7 +13,10 @@ public sealed record FaultIterationResult(
     long RefetchedBytes,
     int Kills,
     double KillLatencySeconds = 0,
-    double FlushLatencySeconds = 0);
+    double FlushLatencySeconds = 0,
+    long SavedBytes = 0,
+    double InFlightSeconds = 0,
+    double RanSeconds = 0);
 
 /// <summary>The nightly report. It never contains URLs, query strings or user paths (CLAUDE.md rule 3).</summary>
 public sealed record FaultInjectionReport(

@@ -73,4 +73,24 @@ public sealed class RefetchBoundTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void A_checkpoint_still_running_at_the_kill_is_counted_by_how_long_it_has_run()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"inflight-{Guid.NewGuid():N}");
+        var now = new DateTimeOffset(2026, 10, 24, 1, 0, 30, TimeSpan.Zero);
+        try
+        {
+            File.WriteAllText(path, now.AddSeconds(-7).UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            FaultInjectionRunner.ReadInFlight(path, now).Should().Be(TimeSpan.FromSeconds(7));
+
+            File.WriteAllText(path, "0");
+            FaultInjectionRunner.ReadInFlight(path, now).Should().Be(TimeSpan.Zero, "between checkpoints nothing is running");
+            FaultInjectionRunner.ReadInFlight(path + ".missing", now).Should().Be(TimeSpan.Zero);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }
