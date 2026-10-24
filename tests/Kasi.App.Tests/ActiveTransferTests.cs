@@ -89,4 +89,25 @@ public class ActiveTransferTests
         service.Raise(Shape(row.Id, (0, 0, 1)));
         details.ElapsedText.Should().Be("01:20");
     }
+
+    [Fact]
+    [Trait("Requirement", "KASI-UI-003")]
+    public async Task The_window_shows_the_jobs_saved_choices_and_saves_a_change_at_once()
+    {
+        var job = TestJobs.New("a.iso", JobState.Downloading, total: 10) with { SpeedLimitBps = 1_048_576, OpenWhenCompleted = true };
+        var service = new RecordingJobService();
+        service.Stored[job.Id] = job;
+        using var details = new DetailsViewModel(new JobRowViewModel(job), service, new ShellSpy(), action => action());
+        await details.StartAsync(TestContext.Current.CancellationToken);
+
+        details.OpenWhenCompleted.Should().BeTrue();
+        details.SelectedLimit.BytesPerSecond.Should().Be(1_048_576);
+        service.OptionsSaved.Should().BeEmpty("loading the saved choices is not a change");
+
+        details.OpenWhenCompleted = false;
+        details.SelectedLimit = details.SpeedLimits[0];
+
+        details.SpeedLimits[0].BytesPerSecond.Should().BeNull("the first choice is Unlimited");
+        service.OptionsSaved.Select(o => (o.Limit, o.Open)).Should().Equal((1_048_576L, false), (null, false));
+    }
 }
