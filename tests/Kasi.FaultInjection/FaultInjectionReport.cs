@@ -16,7 +16,8 @@ public sealed record FaultIterationResult(
     double FlushLatencySeconds = 0,
     long SavedBytes = 0,
     double InFlightSeconds = 0,
-    double RanSeconds = 0);
+    double RanSeconds = 0,
+    string? InFlightPhase = null);
 
 /// <summary>The nightly report. It never contains URLs, query strings or user paths (CLAUDE.md rule 3).</summary>
 public sealed record FaultInjectionReport(
@@ -36,6 +37,9 @@ public sealed record FaultInjectionReport(
     string? SkipReason = null,
     string? Replay = null)
 {
+    /// <summary>A checkpoint unfinished this long at a kill is called a stall in the summary.</summary>
+    public const double StallSeconds = 5;
+
     /// <summary>A suite that could not run here (for example no Administrator rights to mount a volume) is neither a pass nor a failure.</summary>
     public bool Skipped => SkipReason is not null;
 
@@ -65,6 +69,13 @@ public sealed record FaultInjectionReport(
         if (Error is not null)
         {
             text.AppendLine().AppendLine(CultureInfo.InvariantCulture, $"**Error:** {Error}");
+        }
+
+        var stalled = Results.Where(r => r.InFlightSeconds >= StallSeconds).ToList();
+        if (stalled.Count > 0)
+        {
+            var longest = stalled.MaxBy(r => r.InFlightSeconds)!;
+            text.AppendLine().AppendLine(CultureInfo.InvariantCulture, $"**Checkpoints unfinished at the kill for {StallSeconds} s or more:** {stalled.Count} of {Results.Count}; longest {longest.InFlightSeconds:0.0} s, in the {longest.InFlightPhase ?? "unknown"} step ({stalled.Count(r => r.InFlightPhase == "flush")} in the part-file flush, {stalled.Count(r => r.InFlightPhase == "commit")} in the database commit).");
         }
 
         foreach (var failure in Results.Where(r => !r.Success))

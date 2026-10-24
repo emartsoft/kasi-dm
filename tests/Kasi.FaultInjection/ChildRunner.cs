@@ -49,7 +49,8 @@ internal static class ChildRunner
 
         // Slowest checkpoint so far, for the parent's refetch bound: a slow flush delays the checkpoint, so more is lost to a kill.
         // A checkpoint is the part-file flush plus the database commit. One that is still running when the kill lands never
-        // completes, so its start is written to the in-flight file too and the parent counts the time it has been running.
+        // completes, so the in-flight file says which step it is in ("flush:start" or "commit:flushStart:commitStart", UTC ticks)
+        // and the parent counts the time it has been running.
         var flushFile = Environment.GetEnvironmentVariable(ChildEnvironment.FlushFile);
         var engineDecorator = (Func<Job, HttpTransferOptions, HttpTransferOptions>?)null;
         if (flushFile is not null)
@@ -62,9 +63,19 @@ internal static class ChildRunner
                 FlushFaultInjector = () =>
                 {
                     lastStart = TimeProvider.System.GetUtcNow().UtcTicks;
-                    WriteQuietly(inFlightFile, lastStart.ToString(CultureInfo.InvariantCulture));
+                    WriteQuietly(inFlightFile, $"flush:{lastStart.ToString(CultureInfo.InvariantCulture)}");
                     return null;
                 },
+            };
+            var killHook = checkpoints.BeforeCommit;
+            checkpoints.BeforeCommit = async () =>
+            {
+                // the part file is flushed by now: the checkpoint is in its database commit
+                WriteQuietly(inFlightFile, string.Create(CultureInfo.InvariantCulture, $"commit:{lastStart}:{TimeProvider.System.GetUtcNow().UtcTicks}"));
+                if (killHook is not null)
+                {
+                    await killHook().ConfigureAwait(false);
+                }
             };
             checkpoints.CommitCompleted = commit =>
             {

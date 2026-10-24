@@ -71,6 +71,12 @@ public static class FaultInjectionRunner
     }
 
     /// <summary>
+    /// The longest one checkpoint (part-file flush plus commit) may take. The bound above allows for a slow one, so without a limit
+    /// a checkpoint that never finishes would pass; the longest seen on a CI runner was 27 s.
+    /// </summary>
+    public static readonly TimeSpan MaxCheckpointTime = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// What one kill may cost (KASI-RES-001) when the kill is instant, as a power cut is: 2 s of data (the checkpoint interval and the
     /// write buffer's age, KASI-NFR-007) plus what sat in the socket buffers. This is the bound for gate evidence on a dedicated machine.
     /// </summary>
@@ -187,7 +193,7 @@ public static class FaultInjectionRunner
             FaultHarness.KillIfRunning(child);
             await child.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             var killLatency = (sinceHook > TimeSpan.Zero ? sinceHook : TimeSpan.Zero) + killClock.Elapsed;
-            var inFlight = ReadInFlight(ChildEnvironment.InFlightFile(flushFile), TimeProvider.System.GetUtcNow());
+            var (inFlightPhase, inFlight) = ReadInFlight(ChildEnvironment.InFlightFile(flushFile), TimeProvider.System.GetUtcNow());
             var flushLatency = TimeSpan.FromTicks(Math.Max(ReadFlushLatency(flushFile).Ticks, inFlight.Ticks));
             var bound = RefetchBound(options, killLatency, flushLatency);
             kills++;
@@ -203,12 +209,14 @@ public static class FaultInjectionRunner
                 problem = "the commit hook never fired, so the kill did not land inside a commit";
             }
 
+            problem ??= CeilingProblem(flushLatency, inFlight, inFlightPhase, refetched);
+
             if (problem is null && refetched > bound)
             {
                 problem = $"{refetched} B had to be fetched again, above the {bound} B bound (the kill took {killLatency.TotalSeconds:0.00} s to land, the slowest or still-running checkpoint {flushLatency.TotalSeconds:0.00} s, {inFlight.TotalSeconds:0.00} s of it unfinished at the kill; {Math.Max(0, after.DoneBytes - before.DoneBytes)} B of {served} B served had been saved after {runClock.Elapsed.TotalSeconds:0.0} s)";
             }
 
-            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3), Math.Round(flushLatency.TotalSeconds, 3), Math.Max(0, after.DoneBytes - before.DoneBytes), Math.Round(inFlight.TotalSeconds, 3), Math.Round(runClock.Elapsed.TotalSeconds, 3)));
+            results.Add(new FaultIterationResult(results.Count, problem is null, problem, served, refetched, kills, Math.Round(killLatency.TotalSeconds, 3), Math.Round(flushLatency.TotalSeconds, 3), Math.Max(0, after.DoneBytes - before.DoneBytes), Math.Round(inFlight.TotalSeconds, 3), Math.Round(runClock.Elapsed.TotalSeconds, 3), inFlightPhase));
             error ??= problem;
         }
 
@@ -245,22 +253,33 @@ public static class FaultInjectionRunner
             results);
     }
 
+    /// <summary>The failure for a checkpoint longer than <see cref="MaxCheckpointTime"/>, or null.</summary>
+    internal static string? CeilingProblem(TimeSpan slowest, TimeSpan unfinished, string? phase, long refetched) =>
+        slowest > MaxCheckpointTime
+            ? $"a checkpoint took {slowest.TotalSeconds:0.0} s ({(unfinished == slowest ? $"unfinished at the kill, in the {phase ?? "unknown"} step" : "completed")}), above the {MaxCheckpointTime.TotalSeconds:0} s ceiling; {refetched} B would be fetched again"
+            : null;
+
     /// <summary>
     /// How long the checkpoint the child was in the middle of when it died had been running: a flush stuck on a slow disk never
     /// completes, so the slowest completed commit cannot show it. Zero when the child was between checkpoints or the file is unreadable.
     /// </summary>
-    internal static TimeSpan ReadInFlight(string path, DateTimeOffset now)
+    internal static (string? Phase, TimeSpan Elapsed) ReadInFlight(string path, DateTimeOffset now)
     {
         try
         {
-            return long.TryParse(File.ReadAllText(path), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks) && ticks > 0
-                ? TimeSpan.FromTicks(Math.Max(0, now.UtcTicks - ticks))
-                : TimeSpan.Zero;
+            // "flush:start" or "commit:flushStart:commitStart"; the total is counted from the checkpoint's start either way
+            var parts = File.ReadAllText(path).Split(':');
+            if (parts.Length >= 2 && parts[0] is "flush" or "commit" && long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var start) && start > 0)
+            {
+                return (parts[0], TimeSpan.FromTicks(Math.Max(0, now.UtcTicks - start)));
+            }
         }
         catch (IOException)
         {
-            return TimeSpan.Zero;
+            // the child may hold the file, or it never wrote one: nothing is known to be running
         }
+
+        return (null, TimeSpan.Zero);
     }
 
     /// <summary>The child's slowest checkpoint; zero when it wrote nothing, or was killed while writing and left a partial number.</summary>
