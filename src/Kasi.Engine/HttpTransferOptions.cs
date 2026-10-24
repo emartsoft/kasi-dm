@@ -57,6 +57,12 @@ public sealed record HttpTransferOptions
     /// <summary>Persists the segment structure (initial download and every split).</summary>
     public ISegmentRepository? SegmentRepository { get; init; }
 
+    /// <summary>
+    /// Asked once after the probe, before the part file exists, with the file's name and the MIME type the server reported: returns the folder to
+    /// save in instead of the one the transfer was started with, or null to keep it (KASI-CAT-001). A failure here never fails the download.
+    /// </summary>
+    public Func<string, string?, CancellationToken, Task<string?>>? RouteAfterProbe { get; init; }
+
     /// <summary>Persists the probe's URL, filename, size and validators so a restart can resume (M1.9).</summary>
     public IJobRepository? JobRepository { get; init; }
 

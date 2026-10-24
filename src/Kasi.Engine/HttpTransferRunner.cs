@@ -114,6 +114,7 @@ public sealed class HttpTransferRunner
             }
 
             var fileName = ResolveFileName(probe.FileName, settings.OverrideFileName);
+            destinationFolder = await RouteAfterProbeAsync(settings, destinationFolder, fileName, probe.ContentType, cancellationToken).ConfigureAwait(false);
             settings.Log?.Invoke(probe.RangesSupported
                 ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Probe: ranges supported, {(probe.TotalBytes is { } known ? known.ToString(System.Globalization.CultureInfo.InvariantCulture) + " bytes" : "size unknown")}")
                 : "Probe: ranges not supported, one connection");
@@ -171,6 +172,30 @@ public sealed class HttpTransferRunner
         {
             await probe.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>The folder after the router has had its say (KASI-CAT-001); the router failing leaves the folder as it was.</summary>
+    private static async Task<string> RouteAfterProbeAsync(HttpTransferOptions settings, string folder, string fileName, string? contentType, CancellationToken cancellationToken)
+    {
+        if (settings.RouteAfterProbe is not { } route)
+        {
+            return folder;
+        }
+
+        try
+        {
+            if (await route(fileName, contentType, cancellationToken).ConfigureAwait(false) is { Length: > 0 } routed)
+            {
+                settings.Log?.Invoke("Category: saved by file type");
+                return routed;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            settings.Log?.Invoke("Category: not re-checked");
+        }
+
+        return folder;
     }
 
     public async Task<TransferOutcome> ResumeAsync(

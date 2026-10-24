@@ -125,6 +125,72 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
         (await harness.Jobs.ListAsync(cancellationToken: ct)).Should().ContainSingle();
     }
 
+    private sealed class FakeRouter(Func<Job, string, string?, Task<string?>> route) : IPostProbeRouter
+    {
+        public List<(string FileName, string? ContentType)> Asked { get; } = [];
+
+        public async Task<string?> RouteAsync(Job job, string fileName, string? contentType, CancellationToken cancellationToken = default)
+        {
+            Asked.Add((fileName, contentType));
+            return await route(job, fileName, contentType).ConfigureAwait(false);
+        }
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-001")]
+    public async Task A_job_marked_automatic_is_saved_in_the_folder_the_router_picks_after_the_probe()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var target = Path.Combine(_root, "routed-" + Guid.NewGuid().ToString("N"));
+        var router = new FakeRouter((_, _, _) => Task.FromResult<string?>(target));
+        await using var harness = await Harness.CreateAsync(_host, _root, router: router);
+        var job = harness.NewJob("/files/routed/1048576", "routed.bin") with { CategoryAuto = true };
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+
+        router.Asked.Should().ContainSingle().Which.FileName.Should().Be("routed.bin");
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
+        (await Sha256FileAsync(Path.Combine(target, "routed.bin"), ct)).Should().Be(GeneratedContent.Sha256Hex("routed", 1048576));
+        File.Exists(Path.Combine(job.Folder, "routed.bin")).Should().BeFalse("it was saved where the router said, not where the job started");
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-001")]
+    public async Task A_router_that_keeps_the_folder_or_fails_does_not_stop_the_download()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        foreach (var route in new Func<Job, string, string?, Task<string?>>[] { (_, _, _) => Task.FromResult<string?>(null), (_, _, _) => throw new InvalidOperationException("boom") })
+        {
+            var router = new FakeRouter(route);
+            await using var harness = await Harness.CreateAsync(_host, _root, router: router);
+            var job = harness.NewJob("/files/kept/1048576", "kept.bin") with { CategoryAuto = true };
+            await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+
+            await harness.Engine.StartAndWaitAsync(job.Id, ct);
+
+            router.Asked.Should().ContainSingle();
+            (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Completed);
+            File.Exists(Path.Combine(job.Folder, "kept.bin")).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-001")]
+    public async Task A_job_not_marked_automatic_is_never_routed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var router = new FakeRouter((_, _, _) => Task.FromResult<string?>(Path.Combine(_root, "never")));
+        await using var harness = await Harness.CreateAsync(_host, _root, router: router);
+        var job = harness.NewJob("/files/chosen/1048576", "chosen.bin"); // CategoryAuto stays false: a person or a rule chose
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+
+        await harness.Engine.StartAndWaitAsync(job.Id, ct);
+
+        router.Asked.Should().BeEmpty();
+        File.Exists(Path.Combine(job.Folder, "chosen.bin")).Should().BeTrue();
+    }
+
     [Fact]
     [Trait("TC", "TC-ENG-015")]
     public async Task Resume_asked_the_moment_a_job_shows_Paused_waits_for_the_pause_to_finish_instead_of_failing()
@@ -825,7 +891,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 
         public DownloadEngine Engine { get; }
 
-        public static async Task<Harness> CreateAsync(TestServerHost host, string root, bool startEngine = true, INetworkStatus? network = null)
+        public static async Task<Harness> CreateAsync(TestServerHost host, string root, bool startEngine = true, INetworkStatus? network = null, IPostProbeRouter? router = null)
         {
             var folder = Path.Combine(root, "downloads-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(folder);
@@ -839,7 +905,7 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 #pragma warning disable CA2000 // Harness owns the writer and engine and disposes both
             var writer = new CheckpointWriter(factory);
             writer.Start();
-            var engine = new DownloadEngine(jobs, segments, writer, new BandwidthLimiter(), secrets: secrets, timeProvider: TimeProvider.System, network: network);
+            var engine = new DownloadEngine(jobs, segments, writer, new BandwidthLimiter(), secrets: secrets, timeProvider: TimeProvider.System, network: network, postProbeRouter: router);
 #pragma warning restore CA2000
             if (startEngine)
             {

@@ -1,7 +1,7 @@
 namespace Kasi.Core;
 
 /// <summary>The category a download was given, and the rule that gave it (null when nothing matched and General was used).</summary>
-public sealed record CategoryMatch(Category Category, CategoryRule? Rule);
+public sealed record CategoryMatch(Category Category, CategoryRule? Rule, bool IsFallback = false);
 
 /// <summary>
 /// Chooses a download's category from its address, file name and MIME type, in the order of TRD 10.4 (KASI-CAT-001, 002). Pure: no I/O, no
@@ -104,7 +104,7 @@ public static class CategoryResolver
 
         // 4. General
         var fallback = categories.FirstOrDefault(c => string.Equals(c.Name, FallbackName, StringComparison.OrdinalIgnoreCase)) ?? (categories.Count > 0 ? categories[0] : null);
-        return fallback is null ? null : new CategoryMatch(fallback, null);
+        return fallback is null ? null : new CategoryMatch(fallback, null, IsFallback: true);
     }
 
     /// <summary>

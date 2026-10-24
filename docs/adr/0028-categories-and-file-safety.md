@@ -1,6 +1,6 @@
 # ADR 0028: Categories, rules and file safety
 
-- **Status:** Proposed (M2.11a and 11b; 11c to 11e extend it)
+- **Status:** Proposed (M2.11a, 11b and 11b2; 11c to 11e extend it)
 - **Requirements:** KASI-CAT-001, KASI-CAT-002 (11a); KASI-CAT-003, KASI-CAT-004 (11d, 11e) | **Test cases:** TC-CAT-001, TC-CAT-002
 - **Plan:** [`docs/plans/m2-11.md`](../plans/m2-11.md)
 
@@ -20,6 +20,12 @@ A download takes its category from the dialog or a remembered site, otherwise it
 5. **`NewDownload.CategoryId` of null means "by file type".** `JobService.AddAsync` then runs the resolver with the link, the file name and the MIME type the browser reported (`NewDownload.Mime`), and stores the chosen category and its folder. A named category, and an explicit folder, are never changed. The browser hand-off with the dialog switched off passes the remembered site's category, or null.
 6. **The Add dialog** shows the category the rules give the link when it opens, and again as the link or the file name is typed, until the person picks a category by hand or the site was remembered. **The picker** gets a first entry, "By file type", which is its default: each link gets its own category. Naming a category there applies it to all.
 7. **Not in 11b:** the one re-resolve after the probe (decision 6 of the plan). It moves where the engine creates the part file, so it is 11b2.
+
+## Decision (11b2)
+
+8. **A job knows whether only the fallback decided its category.** `job.category_auto` (migration `0008`, `Job.CategoryAuto`) is set by `JobService.AddAsync` when no category and no folder were named and the resolver found nothing in the link, the name or the browser's MIME type (`CategoryMatch.IsFallback`). A person's choice, a rule's choice and the browser's MIME type all leave it off.
+9. **The engine asks once, after the probe.** For a job with `CategoryAuto` and no saved bytes, `HttpTransferOptions.RouteAfterProbe` calls an `IPostProbeRouter` (Core; the engine does not know categories) with the file name and the `Content-Type` the probe reported, before the part file is created. The app's `CategoryRouter` runs the resolver with that MIME type; if it finds a category other than the fallback it saves the job's category and folder (`UpdateRoutingAsync`, which also clears the mark, so a job is routed once and a resume looks in the right folder) and returns the folder. A router that returns null or throws changes nothing and never fails the download (the job log says "not re-checked").
+10. **Not done:** a job whose probe reports a file name (Content-Disposition) is not re-named by it, as before: the dialog's name wins. Only the MIME type is new here.
 
 ## Consequences
 

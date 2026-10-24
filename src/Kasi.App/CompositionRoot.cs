@@ -62,7 +62,12 @@ internal static class CompositionRoot
             sp.GetRequiredService<ISegmentRepository>(),
             sp.GetRequiredService<ICheckpointWriter>(),
             sp.GetRequiredService<BandwidthLimiter>(),
-            secrets: sp.GetRequiredService<IJobSecretRepository>()));
+            secrets: sp.GetRequiredService<IJobSecretRepository>(),
+            postProbeRouter: new CategoryRouter(
+                sp.GetRequiredService<ICategoryRepository>(),
+                sp.GetRequiredService<ICategoryRuleRepository>(),
+                sp.GetRequiredService<IJobRepository>(),
+                AppPaths.DownloadsFolder())));
         services.AddSingleton<IJobControl>(sp => sp.GetRequiredService<DownloadEngine>());
         services.AddSingleton<IQueueRunner>(sp => new QueueRunner(
             sp.GetRequiredService<IQueueRepository>(),
