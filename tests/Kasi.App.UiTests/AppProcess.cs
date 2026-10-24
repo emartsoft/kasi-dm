@@ -38,7 +38,7 @@ public sealed class AppProcess : IAsyncDisposable
         Directory.CreateDirectory(data);
         Directory.CreateDirectory(work);
 
-        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "Kasi.App.exe"))
+        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "app", "Kasi.App.exe"))
         {
             UseShellExecute = false,
             RedirectStandardOutput = true,
