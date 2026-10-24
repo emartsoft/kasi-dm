@@ -92,7 +92,16 @@ public sealed class UiFlowTests
         window.SetForeground();
         row.Click();
         window.Press("Delete");
-        var dialog = app.WaitForWindow("Delete downloads");
+        Window dialog;
+        try
+        {
+            dialog = app.WaitForWindow("Delete downloads");
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException(ex.Message + Environment.NewLine + UiHelpers.Dump(window), ex);
+        }
+
         dialog.Named(ControlType.CheckBox, "Also delete the downloaded files from the disk", "the files option").AsCheckBox().IsChecked = true;
         dialog.Press("Delete");
 
@@ -108,7 +117,7 @@ public sealed class UiFlowTests
         await using var server = await TestServerHost.StartAsync(cancellationToken: Ct);
         await using var app = AppProcess.Start();
         var window = app.WaitForWindow(AppProcess.MainWindowName);
-        window.AddDownload(app, new Uri(server.BaseAddress, "/files/ui-details/34359738368").ToString(), "details.bin"); // 32 GiB: still running
+        window.AddDownload(app, new Uri(server.BaseAddress, "/files/ui-details/6442450944").ToString(), "details.bin"); // 6 GiB: still running
         var row = UiHelpers.WaitFor(() => window.FindFirstDescendant(c => c.ByName("details.bin"))?.Ancestor(ControlType.DataItem), "the row in the list", window);
 
         window.SetForeground();
