@@ -4,8 +4,9 @@ name: FFmpeg minimal LGPL build
 # LGPL, and runs the media integration tests (MediaMuxerTests, MediaJobRunnerTests, FfmpegRunnerTests ...) against it.
 # It is run by hand (workflow_dispatch) and must be green before a beta (docs/release-checklist.md). It is not part of every
 # pull request: the PR CI uses the pinned stock LGPL build in ci.yml, and this job validates the recipe that will replace it.
-# If the first run fails with "Could not find codec parameters", add the native decoders the stream needs to the configure
-# line below and record the change in docs/legal/ffmpeg-lgpl.md.
+# The first run showed that stream copy of ADTS AAC from MPEG-TS needs the native audio decoders ("Could not find codec
+# parameters ... unspecified sample rate"), so they are enabled below. If a video codec fails the same way, add its native
+# decoder to the configure line and record the change in docs/legal/ffmpeg-lgpl.md.
 
 on:
   workflow_dispatch:
@@ -57,6 +58,7 @@ jobs:
             --enable-demuxer=mpegts,mov,matroska,aac,mp3,ac3,eac3 \
             --enable-muxer=mp4,matroska,ipod,mp3 \
             --enable-parser=h264,hevc,av1,aac,aac_latm,ac3,mpegaudio,vp9,opus \
+            --enable-decoder=aac,aac_latm,ac3,eac3,mp3float \
             --enable-bsf=aac_adtstoasc,extract_extradata
           make -j"$(nproc)"
           make install
@@ -65,10 +67,28 @@ jobs:
         shell: msys2 {0}
         run: |
           ./ffmpeg-out/bin/ffmpeg.exe -hide_banner -version | tee ffmpeg-version.txt
-          ./ffmpeg-out/bin/ffmpeg.exe -hide_banner -L | head -3 | tee ffmpeg-licence.txt
-          grep -q "GNU Lesser General Public License" ffmpeg-licence.txt
+          ./ffmpeg-out/bin/ffmpeg.exe -hide_banner -L | head -6 | tee ffmpeg-licence.txt
+          # the licence text wraps ("GNU Lesser General Public" / "License"), so match the words that stay on one line
+          grep -q "GNU Lesser General Public" ffmpeg-licence.txt
           if grep -Eq -- "--enable-(gpl|nonfree|version3)" ffmpeg-version.txt; then echo "GPL or non-free flag found"; exit 1; fi
           ls -l ffmpeg-out/bin/ffmpeg.exe ffmpeg-out/bin/ffprobe.exe
+
+      # Shows FFmpeg's own error when the stream copy of the checked-in TS and fMP4 fixtures fails (the tests only see the exit code).
+      - name: Diagnose a direct stream copy
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ff = (Resolve-Path ffmpeg-out/bin/ffmpeg.exe).Path
+          $dir = 'tests/fixtures/media/muxable/hls'
+          $joined = Join-Path $env:RUNNER_TEMP 'joined.bin'
+          $out = [IO.File]::Create($joined)
+          foreach ($i in 0..5) { $b = [IO.File]::ReadAllBytes((Join-Path $dir "segment-$i.ts")); $out.Write($b, 0, $b.Length) }
+          $out.Close()
+          & $ff -hide_banner -loglevel info -protocol_whitelist file -f mpegts -i $joined -map '0:v:0?' -map '0:a:0?' -c copy -movflags +faststart (Join-Path $env:RUNNER_TEMP 'diag.mp4') 2>&1 | Select-Object -Last 40
+          & $ff -hide_banner -demuxers | Select-String 'mpegts|mov|matroska'
+          & $ff -hide_banner -parsers
+          & $ff -hide_banner -decoders
 
       - name: Media integration tests against this build
         shell: pwsh
