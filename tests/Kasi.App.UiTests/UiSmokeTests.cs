@@ -62,7 +62,7 @@ public sealed class UiSmokeTests
 
         window.Press("Add URL");
         var dialog = app.WaitForWindow("Add download");
-        dialog.SetText("Link", new Uri(server.BaseAddress, "/files/ui-pause/34359738368").ToString()); // 32 GiB: still running after the clicks
+        dialog.SetText("Link", new Uri(server.BaseAddress, "/files/ui-pause/6442450944").ToString()); // 6 GiB: still running after the clicks, and small enough for a CI disk to reserve
         dialog.SetText("Save as", "paused.bin");
         dialog.SetText("Folder (empty: the category folder)", app.WorkFolder);
         dialog.Press("Add");
