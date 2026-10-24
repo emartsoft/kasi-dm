@@ -1,0 +1,18 @@
+Kasi Download Manager — third-party notices
+=========================================
+
+FFmpeg / ffprobe
+----------------
+Kasi invokes an external FFmpeg build for stream-copy muxing and duration probing. FFmpeg is not linked into any Kasi
+assembly and is not distributed in this repository.
+
+- Project: https://ffmpeg.org/
+- Licence of the shipped build: GNU Lesser General Public License, version 2.1 or later (LGPL-2.1-or-later), without
+  GPL components and without `--enable-nonfree`.
+- The exact build, version and SHA-256 are recorded in `docs/legal/ffmpeg-lgpl.md` and pinned in the release asset.
+- Source code offer: the corresponding FFmpeg source, the build configuration and the scripts used to produce the shipped
+  binary are offered with the release; see `docs/legal/ffmpeg-lgpl.md`.
+- The binary is replaceable: Kasi locates it by path and never embeds it in an assembly.
+
+Other dependencies are listed in the repository's package manifests and their licences are recorded in the release
+checklist. No GPL, AGPL or non-free component is part of a Kasi build.

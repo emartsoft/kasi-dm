@@ -130,7 +130,7 @@ public sealed class MediaJobRunner(
                 await jobs.TryChangeStateAsync(options.JobId, JobState.Downloading, JobState.Muxing, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
 
-            return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes));
+            return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes), variant, jobDirectory);
         }
         catch (OperationCanceledException)
         {

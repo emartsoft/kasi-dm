@@ -28,4 +28,12 @@ public sealed record MediaJobProgress(int CompletedSegments, int TotalSegments, 
 public sealed record MediaJoinedTrack(int Index, string Role, string Path, long Bytes, string? Container);
 
 /// <summary>The result of a media download; the job is left in <see cref="Kasi.Core.JobState.Muxing"/> for M3.4.</summary>
-public sealed record MediaJobResult(Kasi.Core.JobId JobId, IReadOnlyList<MediaJoinedTrack> Streams, long DoneBytes);
+public sealed record MediaJobResult(
+    Kasi.Core.JobId JobId,
+    IReadOnlyList<MediaJoinedTrack> Streams,
+    long DoneBytes,
+    MediaVariant? Variant = null,
+    string? WorkDirectory = null)
+{
+    public double DurationSeconds => Variant?.Video.DurationSeconds ?? 0;
+}
