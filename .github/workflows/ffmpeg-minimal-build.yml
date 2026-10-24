@@ -71,6 +71,23 @@ jobs:
           if grep -Eq -- "--enable-(gpl|nonfree|version3)" ffmpeg-version.txt; then echo "GPL or non-free flag found"; exit 1; fi
           ls -l ffmpeg-out/bin/ffmpeg.exe ffmpeg-out/bin/ffprobe.exe
 
+      # Shows FFmpeg's own error when the stream copy of the checked-in TS and fMP4 fixtures fails (the tests only see the exit code).
+      - name: Diagnose a direct stream copy
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ff = (Resolve-Path ffmpeg-out/bin/ffmpeg.exe).Path
+          $dir = 'tests/fixtures/media/muxable/hls'
+          $joined = Join-Path $env:RUNNER_TEMP 'joined.bin'
+          $out = [IO.File]::Create($joined)
+          foreach ($i in 0..5) { $b = [IO.File]::ReadAllBytes((Join-Path $dir "segment-$i.ts")); $out.Write($b, 0, $b.Length) }
+          $out.Close()
+          & $ff -hide_banner -loglevel info -protocol_whitelist file -f mpegts -i $joined -map '0:v:0?' -map '0:a:0?' -c copy -movflags +faststart (Join-Path $env:RUNNER_TEMP 'diag.mp4') 2>&1 | Select-Object -Last 40
+          & $ff -hide_banner -demuxers | Select-String 'mpegts|mov|matroska'
+          & $ff -hide_banner -parsers
+          & $ff -hide_banner -decoders
+
       - name: Media integration tests against this build
         shell: pwsh
         run: |
