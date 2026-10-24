@@ -1,6 +1,6 @@
 # UI redesign plan: the Fluent redesign of the main window, the active-transfer window and Settings
 
-- **Phase:** M2 (proposed as **M2.14**; see question 1 for whether it belongs before the alpha gate) ([`plan.md`](../../plan.md) section 5)
+- **Phase:** M2, as **M2.14**, before the internal-alpha gate (question 1) ([`plan.md`](../../plan.md) section 5)
 - **Requirements:** `KASI-UI-001`, `KASI-UI-003`, `KASI-UI-006`, `KASI-UI-007`, `KASI-UI-008`, `KASI-UI-010`, `KASI-NFR-006` ([TRD](../specs/KASI-TRD-2026-001.md) section 12); touches `KASI-UI-002` and `KASI-UI-004` for consistency only
 - **Test cases:** `TC-UI-001`, `TC-UI-002`, `TC-UI-005`, `TC-UI-006`, `TC-UI-007` ([TPL](../specs/KASI-TPL-2026-001.md) section 5.9), all of which must stay green; the existing FlaUI flows are the regression net
 - **Design source:** [`docs/wireframes/app_ui_redesign/`](../wireframes/app_ui_redesign/) (three screens, each a `screen.png` and the HTML it was drawn from), added by the owner:
@@ -9,8 +9,8 @@
   3. `kasi_download_manager_dedicated_settings_window`: Settings and Preferences.
 - **ADR:** `docs/adr/NNNN-ui-design-system.md` (tokens, controls, icons, fonts; written with UIR-0)
 - **Dependencies:** none new if questions 4 and 5 are answered as recommended (system fonts and the Segoe Fluent Icons font that ships with Windows 11; no chart library).
-- **Delivery:** seven reviewable PRs, UIR-0 to UIR-6 (section 3). Each leaves the app working and the tests green; the old look is never half-replaced.
-- **Status:** Proposed. No code is written until the owner approves this plan and answers section 8.
+- **Delivery:** eight reviewable PRs, UIR-0 to UIR-7 (section 3). Each leaves the app working and the tests green; the old look is never half-replaced.
+- **Status:** Approved by the owner on 2026-10-24, who accepted every recommendation in section 8 as written and asked that the items first left out of scope (section 7) take the same design language. **UIR-0** is next.
 
 ---
 
@@ -45,7 +45,7 @@ The screens are a design, not a spec: some of what they show is not in the TRD o
 | Sidebar counts, categories, queues | there, as plain text | icons, count pills, queue schedule window from `queue_schedule` (UIR-1) |
 | Aggregate speed chart in the sidebar | the status bar shows the total speed as text | new: a 60-sample history of the total speed, kept by the view model from the 250 ms tick (UIR-1) |
 | Extension "Connected" card | text in the status bar | a card in the sidebar (UIR-1) |
-| **Up** speed | none: Kasi only downloads (torrent upload is M4) | **drop** until torrents; the status bar shows Down only |
+| **Up** speed | none: Kasi only downloads (torrent upload is M4) | the sidebar card and the status bar are built with an **Up slot** that stays hidden until a torrent job is active (M4), so nothing is redrawn then; today they show Down only |
 | **Free disk space** in the status bar | none | new: free space of the Downloads drive, refreshed every 5 s (UIR-1) |
 | Row chip, host line, "size / total" | name, size, progress bar, speed, time left, status, date, category | templated columns inside the same `DataGrid`; the chip comes from the category rules' extension (UIR-2) |
 | Select-all and row check boxes | multi-select by mouse and keyboard | a check-box column bound to the grid's own selection (UIR-2) |
@@ -54,16 +54,16 @@ The screens are a design, not a spec: some of what they show is not in the TRD o
 | Segment map | one bar for the whole file plus a connection table (M2.9c) | the **matrix** replaces the table; the map stays as the header's progress (UIR-3) |
 | 60-second bandwidth chart per job | none | new: a 60-sample ring of the job's speed from `JobProgressed` (once a second) (UIR-3) |
 | Elapsed time | none | new: active time since this run of the transfer began, shown as such (question 8) |
-| "Open file when completed" | the completion toast offers Open | new per-job flag, default off (UIR-3) |
+| "Open file when completed" | the completion toast offers Open | new per-job flag, default off; the footer is one "When completed" row so the queue's post-action, the scan setting and this flag read as one family (UIR-3) |
 | "Shut down computer when completed" | queue-level post-actions with a 60 s countdown (M2.10) | **not per job**: a switch that powers off the machine belongs to the queue; the control becomes a link to that queue's post-action (question 6) |
 | "Scan with Windows Defender" | M2.11e (planned, off by default, a global setting) | shows the global setting's state and links to it; no per-job override (question 6) |
 | Per-job speed limit | `job.speed_limit_bps` and the engine support it; no UI | a list of presets, as the tray has (UIR-3) |
 | Settings navigation, breadcrumb, cards, toggles | two tabs plus the Categories tab (M2.11c) | the navigation shell and the pages that have content: General, Browser Integration, File Types & Paths (the Categories page), Scheduler & Queues (opens today's window until it is folded in). Pages with nothing to show yet (Connection & Speed, Advanced & Network, About & Updates) are not shown: no empty pages (UIR-4) |
 | "Find a setting" | none | a filter over the labels of the pages that exist (UIR-4) |
-| Profile card "Local Machine Config" | none | **drop**: Kasi has no profiles |
-| Test Interception | none | later: it needs a round trip through the host to a connected extension (question 9) |
+| Profile card "Local Machine Config" | none | Kasi has no profiles, so the card becomes a **"This PC" card** of real facts in the same style: the data folder (shortened), the app version, the extension state (UIR-4) |
+| Test Interception | none | the banner is built now and shows the **live** connection state (browsers connected, from the pipe); its Test button arrives with a self-test message in the protocol, as a later change (question 9) |
 | Open Config Directory | none | new, trivial: opens the data folder (UIR-4) |
-| Export / Import Settings | `KASI-SYS-004`, P2, not started | not in this plan; the link appears when SYS-004 does |
+| Export / Import Settings | `KASI-SYS-004`, P2, not started | the sidebar footer row is designed now (section 7) and appears when SYS-004 lands |
 | Reset links, Restore Defaults | none | new, small (UIR-4) |
 | Fonts: Segoe UI, JetBrains Mono | the app uses the system font | Segoe UI Variable for text and **Consolas** for the monospace parts: both ship with Windows, so no font to bundle (question 4) |
 | Icons | text only | glyphs of the Segoe Fluent Icons font (Windows 11) with Segoe MDL2 Assets as the Windows 10 fallback (question 5) |
@@ -79,9 +79,10 @@ The screens are a design, not a spec: some of what they show is not in the TRD o
 | **UIR-3** Active Transfer window | replaces the details window: header, tiles, chart, matrix, footer; the per-job "open when completed" flag and speed limit | `UI-003` look |
 | **UIR-4** Settings window | the navigation shell, the breadcrumb, cards and toggles, the "find a setting" filter, Reset and Restore Defaults, Open Config Directory; General, Browser Integration, File Types & Paths and Scheduler & Queues pages | `UI-006` for Settings |
 | **UIR-5** the other windows | Add download, link picker, refresh link, Scheduler and the confirmation dialogs take the same tokens and controls, so nothing looks left behind (the design has no mock for these, so they follow the system, not new designs) | consistency |
+| **UIR-7** tray flyout and toasts (section 7) | a styled flyout for the tray icon in place of the native menu, and toast content in the same language | `UI-004`, `UI-005` look |
 | **UIR-6** light theme and accessibility | the light variant, a high-contrast check, a keyboard and Narrator pass over every window, the FlaUI flows updated for any name that changed | `UI-006`, `UI-010` |
 
-UIR-1 and UIR-3 are independent; UIR-2 follows UIR-1; UIR-4 needs only UIR-0. They can be built in parallel by separate sessions once UIR-0 has merged (they touch different views).
+UIR-7 needs UIR-0 and the main window's sidebar card (UIR-1). UIR-1 and UIR-3 are independent; UIR-2 follows UIR-1; UIR-4 needs only UIR-0. They can be built in parallel by separate sessions once UIR-0 has merged (they touch different views).
 
 ## 4. Decisions
 
@@ -113,13 +114,28 @@ UIR-1 and UIR-3 are independent; UIR-2 follows UIR-1; UIR-4 needs only UIR-0. Th
 | The design drifts from the TRD | UIR-0 amends TRD 12 and the wireframe reference in the same PR, with the owner's sign-off |
 | Dark-only mocks and a light theme requirement (UI-006) | questions 2 and 3; light is derived and checked in UIR-6 |
 
-## 7. Out of scope
+## 7. Beyond the three screens, in the same language
 
-Redesigning the tray menu and the toasts (Windows draws them), an installer or About page (M4), upload speed (torrents, M4), profiles, per-job power actions, and settings export and import (`KASI-SYS-004`).
+The design covers three windows. Everything else that a user sees, or will see, takes the same tokens, controls, icons and spacing, so nothing looks like it came from another app. What each one becomes, and when:
 
-## 8. Questions for the owner
+| Item | Design, in the language of the three screens | When |
+| --- | --- | --- |
+| **Tray icon menu** (`UI-004`) | a **flyout** window instead of the native menu: a header card with the total speed and a small sparkline, Pause all and Resume all as buttons, the speed-limit presets as a list, Open Kasi and Quit at the foot; keyboard-operable, with automation names, closing on Esc or when it loses focus. The native menu stays as the fallback if the flyout cannot be shown | UIR-7 |
+| **Toast notifications** (`UI-005`) | Windows draws toasts, so only their content follows the design: the Kasi mark as the app logo, the file-type glyph and name, the size and the time taken in the body, Open and Open folder as the buttons, and a failure toast that names the reason in plain words | UIR-7 |
+| **About page** | a Settings page in the same card style: the Kasi mark, the version, the build date, the licence and a list of third-party notices; the update line stays out until updates exist | UIR-4 (version and notices); updates with M4 |
+| **Installer and first run** (M4) | a welcome window and the installer's own pages use the same tokens (indigo accent, card surfaces, Segoe UI Variable), so the first thing a person sees is the app's look | with the M4 installer |
+| **Upload speed** (torrents, M4) | the Up slot of the sidebar card and the status bar (section 2), hidden until a torrent job is active; a torrent row gets the same chip, bar and badge as any download | M4 |
+| **Profiles** | not built; the "This PC" card (section 2) takes the place the design gave the profile card | UIR-4 |
+| **Per-job power actions** | not built; the "When completed" row in the Active Transfer footer shows the queue's post-action and links to it, in the same chip style | UIR-3 |
+| **Settings export and import** (`KASI-SYS-004`) | a footer row of the Settings navigation, "Export / Import settings" with a JSON chip as in screen 3, opening a small dialog in the same style | when SYS-004 is built |
+| **Test Interception** | the banner's button, with the result shown on the banner (green tick or the reason), as in screen 3 | with the protocol self-test |
+| **Media capture UI** (M3: the stream picker, the DRM refusal message, the quota and wake settings) | built in this design from the start; the M3 plan's windows use these tokens and controls, and the refusal text sits in a card with the same status chip | with each M3 PR |
 
-1. **Where does this sit?** As M2.14, before the internal-alpha gate, or after it as its own milestone? (Recommended: before the gate, since the alpha is the first thing people see; UIR-0 to UIR-4 are what matters, UIR-5 and UIR-6 can follow the alpha.)
+Not redesigned at all: the Windows shell's own surfaces (file dialogs, the SmartScreen prompt, the UAC prompt) and the browser extension's popup, which follows the browser's look.
+
+## 8. Questions for the owner (all answered 2026-10-24: every recommendation accepted)
+
+1. **Where does this sit?** As M2.14, before the internal-alpha gate, or after it as its own milestone? (Recommended: before the gate, since the alpha is the first thing people see; UIR-0 to UIR-4 are what matters, UIR-5, UIR-6 and UIR-7 can follow the alpha.)
 2. **Light theme.** The mocks are dark only. Derive a light theme from the same tokens (recommended), or ship dark only for now and keep following the system for the rest?
 3. **Accent.** Use the design's fixed indigo (`#6366f1`) as Kasi's accent in both themes (recommended: it is the brand), or follow the Windows accent colour?
 4. **Fonts.** Segoe UI Variable and Consolas, which ship with Windows (recommended), or bundle JetBrains Mono as in the mocks (SIL Open Font Licence, a font file in the installer)?
