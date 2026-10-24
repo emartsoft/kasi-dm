@@ -1,4 +1,5 @@
 using Kasi.App.Engine;
+using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Ipc.Messages;
 using Kasi.Media;
@@ -24,10 +25,14 @@ internal sealed partial class BrowserMediaCapture(
     Action<EngineEvent> publish,
     string downloadsFolder,
     TimeProvider? timeProvider = null,
-    ILogger? logger = null) : IBrowserMediaCapture
+    ILogger? logger = null,
+    IMediaPicker? picker = null) : IBrowserMediaCapture
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
+
+    /// <summary>Optional detection metadata (title/poster) supplied by the browser services after start-up.</summary>
+    public Func<CaptureMedia, (string Title, string? ThumbnailUrl)>? Metadata { get; set; }
 
     public async Task<MediaCaptureResult> CaptureAsync(CaptureMedia message, CancellationToken cancellationToken)
     {
@@ -66,8 +71,20 @@ internal sealed partial class BrowserMediaCapture(
                 return new MediaCaptureResult(MediaCaptureStatus.Accepted);
             }
 
+            var presentation = ((MediaSourceLoader.Playable)loaded).Presentation;
+            MediaPickerSelection? selection = null;
+            if (picker is not null)
+            {
+                var (title, thumbnail) = Metadata?.Invoke(message) ?? (new Uri(message.Url).Host, null);
+                selection = await picker.PickAsync(presentation, title, thumbnail, cancellationToken).ConfigureAwait(false);
+                if (selection is null)
+                {
+                    return new MediaCaptureResult(MediaCaptureStatus.Cancelled);
+                }
+            }
+
             var id = JobId.New(_time);
-            var fileName = CaptureFileName(message.Url, id);
+            var fileName = CaptureFileName(message.Url, id, selection?.Format);
             var (categoryId, folder) = await PlaceAsync(message.Url, fileName, cancellationToken).ConfigureAwait(false);
             var queue = await jobs.ListAsync(1, cancellationToken: cancellationToken).ConfigureAwait(false);
             var job = new Job
@@ -85,7 +102,7 @@ internal sealed partial class BrowserMediaCapture(
             };
             await jobs.AddAsync(job, cancellationToken).ConfigureAwait(false);
             publish(new JobAdded(job)); // the grid learns about a job from this event
-            await secrets.SetAsync(id, SecretOf(message), cancellationToken).ConfigureAwait(false);
+            await secrets.SetAsync(id, SecretOf(message, selection), cancellationToken).ConfigureAwait(false);
             try
             {
                 await control.StartJobAsync(id, cancellationToken).ConfigureAwait(false);
@@ -182,7 +199,7 @@ internal sealed partial class BrowserMediaCapture(
     [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Direct media capture failed.")]
     private partial void LogDirectFailed(Exception exception);
 
-    private static JobSecret SecretOf(CaptureMedia message)
+    private static JobSecret SecretOf(CaptureMedia message, MediaPickerSelection? selection)
     {
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -191,6 +208,17 @@ internal sealed partial class BrowserMediaCapture(
         if (TryUri(message.Origin) is { } origin)
         {
             headers["Origin"] = origin.GetLeftPart(UriPartial.Authority);
+        }
+
+        if (selection?.Variant is { } selected)
+        {
+            headers["X-Kasi-Media-Variant"] = selected.Video.Id;
+            headers["X-Kasi-Media-Format"] = selection.Format.ToString();
+        }
+        else if (selection?.AudioOnly is { } audio)
+        {
+            headers["X-Kasi-Media-Audio"] = audio.Id;
+            headers["X-Kasi-Media-Format"] = selection.Format.ToString();
         }
 
         return new JobSecret
@@ -211,7 +239,7 @@ internal sealed partial class BrowserMediaCapture(
     private static Uri? TryUri(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) ? uri : null;
 
-    private static string CaptureFileName(string url, JobId id)
+    private static string CaptureFileName(string url, JobId id, MediaPickerFormat? format)
     {
         var name = Path.GetFileName(new Uri(url).AbsolutePath);
         var stem = Path.GetFileNameWithoutExtension(name);
@@ -220,7 +248,13 @@ internal sealed partial class BrowserMediaCapture(
             stem = "capture";
         }
 
-        return $"{stem}-{id.ToString()[..8]}.mp4";
+        var extension = format switch
+        {
+            MediaPickerFormat.Matroska => ".mkv",
+            MediaPickerFormat.AudioOnly => ".m4a",
+            _ => ".mp4",
+        };
+        return $"{stem}-{id.ToString()[..8]}{extension}";
     }
 
     private static string FileNameFromUrl(string url)

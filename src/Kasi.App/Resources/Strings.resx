@@ -917,4 +917,76 @@
     <value>from</value>
     <comment>Before the start time of a queue that runs until it is empty: from 02:00.</comment>
   </data>
+  <data name="MediaPickerTitle" xml:space="preserve">
+    <value>Choose a quality</value>
+    <comment>Media picker window title when the page has no title.</comment>
+  </data>
+  <data name="MediaPickerAutomationName" xml:space="preserve">
+    <value>Media quality picker</value>
+    <comment>Automation name of the media picker window.</comment>
+  </data>
+  <data name="MediaPickerQualityLabel" xml:space="preserve">
+    <value>Quality</value>
+    <comment>Label above the quality list.</comment>
+  </data>
+  <data name="MediaPickerFormatLabel" xml:space="preserve">
+    <value>Format</value>
+    <comment>Label above the output format list.</comment>
+  </data>
+  <data name="MediaPickerSubtitlesLabel" xml:space="preserve">
+    <value>Subtitles</value>
+    <comment>Label above the subtitle track list.</comment>
+  </data>
+  <data name="MediaPickerSubtitlesUnavailable" xml:space="preserve">
+    <value>Subtitle download arrives after M3.</value>
+    <comment>Explains why subtitle tracks are listed but disabled.</comment>
+  </data>
+  <data name="MediaPickerAdd" xml:space="preserve">
+    <value>Download</value>
+    <comment>Media picker confirm button.</comment>
+  </data>
+  <data name="MediaPickerCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Media picker cancel button.</comment>
+  </data>
+  <data name="MediaPickerAudioLabel" xml:space="preserve">
+    <value>Audio track</value>
+    <comment>Label for the audio-only track selector.</comment>
+  </data>
+  <data name="MediaPickerAudioOnly" xml:space="preserve">
+    <value>Audio only</value>
+    <comment>Output format that saves only the audio track.</comment>
+  </data>
+  <data name="MediaPickerMp4" xml:space="preserve">
+    <value>MP4</value>
+    <comment>MP4 output format.</comment>
+  </data>
+  <data name="MediaPickerMkv" xml:space="preserve">
+    <value>MKV</value>
+    <comment>Matroska output format.</comment>
+  </data>
+  <data name="MediaPickerThumbnail" xml:space="preserve">
+    <value>Thumbnail available</value>
+    <comment>Shown in the picker when the page supplied a poster image.</comment>
+  </data>
+  <data name="MediaPickerSubtitle" xml:space="preserve">
+    <value>Subtitle</value>
+    <comment>Fallback label for a subtitle track with no language.</comment>
+  </data>
+  <data name="MediaPickerNoQuality" xml:space="preserve">
+    <value>Choose a video quality first.</value>
+    <comment>Error when the quality list has no selection.</comment>
+  </data>
+  <data name="MediaPickerNoAudio" xml:space="preserve">
+    <value>Choose an audio track first.</value>
+    <comment>Error when audio-only has no audio track.</comment>
+  </data>
+  <data name="MediaPickerUnknownCodec" xml:space="preserve">
+    <value>Unknown codec</value>
+    <comment>Shown when the manifest did not declare codecs.</comment>
+  </data>
+  <data name="MediaPickerUnknownBitrate" xml:space="preserve">
+    <value>unknown bitrate</value>
+    <comment>Shown when the manifest did not declare a bitrate.</comment>
+  </data>
 </root>

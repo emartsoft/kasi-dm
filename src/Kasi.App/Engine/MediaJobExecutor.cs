@@ -207,11 +207,22 @@ internal sealed partial class MediaJobExecutor(
                 RequestContext = context,
                 BandwidthLimiter = bandwidth,
                 Events = publish,
+                SelectedVariant = SelectedVariant(playable.Presentation, secret),
             }, cancellationToken).ConfigureAwait(false);
 
+            var format = Header(secret, "X-Kasi-Media-Format");
             var muxed = await new MediaMuxer(new FfmpegRunner(ffmpeg)).MuxAsync(
                 downloaded,
-                new MediaMuxOptions { OutputPath = Path.Combine(job.Folder, job.FileName) },
+                new MediaMuxOptions
+                {
+                    OutputPath = Path.Combine(job.Folder, job.FileName),
+                    Container = format switch
+                    {
+                        "Matroska" => MediaMuxContainer.Matroska,
+                        "Mp4" => MediaMuxContainer.Mp4,
+                        _ => MediaMuxContainer.Auto,
+                    },
+                },
                 cancellationToken).ConfigureAwait(false);
             var current = await jobs.GetAsync(id, cancellationToken).ConfigureAwait(false);
             if (current is null)
@@ -220,10 +231,11 @@ internal sealed partial class MediaJobExecutor(
             }
 
             await jobs.UpdateAsync(current with { FileName = Path.GetFileName(muxed.OutputPath) }, cancellationToken).ConfigureAwait(false);
-            if (await ChangeAsync(id, JobState.Muxing, JobState.Verifying, null, null, cancellationToken).ConfigureAwait(false)
-                && await ChangeAsync(id, JobState.Verifying, JobState.Completed, null, null, cancellationToken).ConfigureAwait(false))
+            if (await ChangeAsync(id, JobState.Muxing, JobState.Verifying, null, null, cancellationToken).ConfigureAwait(false))
             {
-                await secrets.DeleteAsync(id, cancellationToken).ConfigureAwait(false); // TRD 11.1: cookies go with the job's work
+                // Delete before the terminal transition so a Completed job never has a secret left to clean up.
+                await secrets.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+                await ChangeAsync(id, JobState.Verifying, JobState.Completed, null, null, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -269,6 +281,19 @@ internal sealed partial class MediaJobExecutor(
                 return;
             }
         }
+    }
+
+    private static MediaVariant? SelectedVariant(MediaPresentation presentation, JobSecret? secret)
+    {
+        var variantId = Header(secret, "X-Kasi-Media-Variant");
+        if (!string.IsNullOrEmpty(variantId))
+        {
+            return presentation.Variants.FirstOrDefault(variant => variant.Video.Id == variantId);
+        }
+
+        var audioId = Header(secret, "X-Kasi-Media-Audio");
+        var track = string.IsNullOrEmpty(audioId) ? null : presentation.AudioOnly.FirstOrDefault(audio => audio.Id == audioId);
+        return track is null ? null : new MediaVariant(track, track, null);
     }
 
     private static string? Header(JobSecret? secret, string name) =>

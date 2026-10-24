@@ -153,6 +153,9 @@ internal sealed partial class BrowserMessageHandler(
             case MediaCaptureStatus.Protected:
                 RememberResult(capture.Id, result);
                 return new Ack { Id = capture.Id, Ok = true, Detail = result.Detail ?? "This video is protected and can't be saved" };
+            case MediaCaptureStatus.Cancelled:
+                RememberResult(capture.Id, result);
+                return new Ack { Id = capture.Id, Ok = true };
             default:
                 return Error(capture.Id, IpcErrorCode.Internal, result.Detail);
         }

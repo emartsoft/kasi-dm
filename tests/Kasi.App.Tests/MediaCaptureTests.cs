@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using Kasi.App.Browser;
 using Kasi.App.Engine;
+using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Data;
 using Kasi.Engine;
@@ -11,6 +12,19 @@ using Kasi.Media;
 using IpcMediaKind = Kasi.Ipc.Messages.MediaKind;
 
 namespace Kasi.App.Tests;
+
+internal sealed class RecordingPicker : IMediaPicker
+{
+    public MediaPickerSelection? Selection { get; set; }
+
+    public string? Title { get; private set; }
+
+    public Task<MediaPickerSelection?> PickAsync(MediaPresentation presentation, string title, string? thumbnailUrl, CancellationToken cancellationToken)
+    {
+        Title = title;
+        return Task.FromResult(Selection);
+    }
+}
 
 internal sealed class RecordingControl : IJobControl
 {
@@ -395,6 +409,38 @@ public sealed class MediaCaptureTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_picker_choice_is_carried_into_the_media_job()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var picker = new RecordingPicker();
+        var control = new RecordingControl();
+        var capture = Capture(control, picker);
+        var presentation = await LoadPresentationAsync("/hls/clear/master.m3u8", ct);
+        picker.Selection = new MediaPickerSelection(
+            presentation.Variants.Single(variant => variant.Height == 360),
+            null,
+            MediaPickerFormat.Matroska);
+
+        var result = await capture.CaptureAsync(Message("/hls/clear/master.m3u8", IpcMediaKind.Hls), ct);
+
+        result.Status.Should().Be(MediaCaptureStatus.Accepted);
+        var job = (await _jobs.ListAsync(cancellationToken: ct)).Should().ContainSingle().Which;
+        job.FileName.Should().EndWith(".mkv");
+        control.Started.Should().ContainSingle().Which.Should().Be(job.Id);
+        var secret = await _secrets.GetAsync(job.Id, ct);
+        secret!.Headers["X-Kasi-Media-Variant"].Should().Be(presentation.Variants.Single(variant => variant.Height == 360).Video.Id);
+        secret.Headers["X-Kasi-Media-Format"].Should().Be("Matroska");
+        picker.Title.Should().NotBeNullOrWhiteSpace();
+    }
+
+    private async Task<MediaPresentation> LoadPresentationAsync(string path, CancellationToken ct)
+    {
+        var message = Message(path, IpcMediaKind.Hls);
+        var loaded = await _loader.LoadAsync(Kasi.Media.MediaKind.Hls, new Uri(message.Url), cancellationToken: ct);
+        return ((MediaSourceLoader.Playable)loaded).Presentation;
+    }
+
+    [Fact]
     public void The_catalogue_keeps_the_newest_streams_and_forgets_the_least_recently_used_tabs()
     {
         var catalogue = new BrowserMediaCatalog();
@@ -450,7 +496,7 @@ public sealed class MediaCaptureTests : IAsyncLifetime
     private static MediaDetected Detected(int tab, string url) =>
         new() { Id = "m" + tab, TabId = tab, PageUrl = "https://example.com/", Kind = IpcMediaKind.Hls, Url = url };
 
-    private BrowserMediaCapture Capture(IJobControl control) => new(
+    private BrowserMediaCapture Capture(IJobControl control, IMediaPicker? picker = null) => new(
         _loader,
         _jobs,
         _secrets,
@@ -459,7 +505,8 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         _categories,
         _rules,
         _engine.PublishExternal,
-        Path.Combine(_root, "Downloads"));
+        Path.Combine(_root, "Downloads"),
+        picker: picker);
 
     private MediaJobExecutor Executor(FfmpegOptions? ffmpeg) => new(
         _jobs, _secrets, _runner, _loader, _limiter, Path.Combine(_root, "media"), ffmpeg, _engine.PublishExternal);

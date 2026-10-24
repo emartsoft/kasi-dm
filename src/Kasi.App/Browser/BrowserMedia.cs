@@ -1,4 +1,6 @@
+using Kasi.App.ViewModels;
 using Kasi.Ipc.Messages;
+using Kasi.Media;
 
 namespace Kasi.App.Browser;
 
@@ -87,6 +89,7 @@ internal enum MediaCaptureStatus
 {
     Accepted,
     Protected,
+    Cancelled,
     Failed,
 }
 
@@ -105,6 +108,14 @@ internal sealed class BrowserMediaServices
 
     public IBrowserMediaCapture? Capture { get; set; }
 
+    public IMediaPicker? Picker { get; set; }
+
     /// <summary>How long a <c>captureMedia</c> may keep the browser waiting for its answer; a slower capture finishes in the background.</summary>
     public TimeSpan AckBudget { get; set; } = TimeSpan.FromSeconds(5);
+}
+
+/// <summary>Shows the picker and returns the selected quality; null means the user cancelled.</summary>
+internal interface IMediaPicker
+{
+    Task<MediaPickerSelection?> PickAsync(MediaPresentation presentation, string title, string? thumbnailUrl, CancellationToken cancellationToken);
 }

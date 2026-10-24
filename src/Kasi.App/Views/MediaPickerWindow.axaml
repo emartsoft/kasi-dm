@@ -1,0 +1,82 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.ViewModels"
+        x:Class="Kasi.App.Views.MediaPickerWindow"
+        x:DataType="vm:MediaPickerViewModel"
+        Title="{Binding Title}"
+        AutomationProperties.Name="{Binding AutomationName}"
+        Width="760"
+        Height="680"
+        MinWidth="560"
+        MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
+      <Border Width="160" Height="90" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="4"
+              IsVisible="{Binding HasThumbnail}">
+        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Margin="2" />
+      </Border>
+      <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.Name="{Binding Title}" />
+        <TextBlock Text="{Binding ThumbnailText}" IsVisible="{Binding HasThumbnail}" Opacity="0.7" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.Name="{Binding Error}" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsDefault="True" AutomationProperties.Name="{Binding AddLabel}" />
+        <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
+      </StackPanel>
+    </StackPanel>
+
+    <Grid DockPanel.Dock="Right" Width="260" RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="16,0,0,0">
+      <TextBlock Text="{Binding FormatLabel}" />
+      <ComboBox Grid.Row="1" ItemsSource="{Binding Formats}" SelectedItem="{Binding SelectedFormat}"
+                AutomationProperties.Name="{Binding FormatLabel}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:MediaFormatChoice">
+            <TextBlock Text="{Binding Label}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Grid.Row="2" Text="{Binding AudioLabel}" IsVisible="{Binding IsAudioOnlySelected}" Margin="0,12,0,0" />
+      <ComboBox Grid.Row="3" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudio}"
+                IsVisible="{Binding IsAudioOnlySelected}" AutomationProperties.Name="{Binding AudioLabel}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:MediaAudioChoice">
+            <TextBlock Text="{Binding Label}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <StackPanel Grid.Row="4" Spacing="4" Margin="0,12,0,0">
+        <TextBlock Text="{Binding SubtitlesLabel}" />
+        <ListBox ItemsSource="{Binding Subtitles}" SelectedItem="{Binding SelectedSubtitle}" IsEnabled="False" Height="96"
+                 AutomationProperties.Name="{Binding SubtitlesLabel}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:MediaSubtitleChoice">
+              <TextBlock Text="{Binding Label}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="{Binding SubtitlesUnavailable}" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
+    </Grid>
+
+    <Grid RowDefinitions="Auto,*">
+      <TextBlock Text="{Binding QualityLabel}" />
+      <ListBox Grid.Row="1" ItemsSource="{Binding Qualities}" SelectedItem="{Binding SelectedQuality}"
+               AutomationProperties.Name="{Binding QualityLabel}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:MediaQualityChoice">
+            <Grid ColumnDefinitions="120,*,120" AutomationProperties.Name="{Binding AutomationName}">
+              <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="1" Text="{Binding Details}" Opacity="0.75" />
+              <TextBlock Grid.Column="2" Text="{Binding SizeText}" HorizontalAlignment="Right" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Grid>
+  </DockPanel>
+</Window>
