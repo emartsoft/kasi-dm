@@ -1,7 +1,10 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Browser;
+using Kasi.App.Controls;
 using Kasi.App.Engine;
+using Kasi.App.Notifications;
 using Kasi.App.Resources;
 using Kasi.Ipc.Messages;
 
@@ -10,6 +13,15 @@ namespace Kasi.App.ViewModels;
 internal sealed record BypassKeyChoice(BypassKey Key, string Label);
 
 internal sealed record ThemeChoice(ThemePreference Preference, string Label);
+
+/// <summary>A page of the navigation: <see cref="Id"/> is stable (0 General, 1 Browser, 2 File types and paths, 3 Scheduler, 4 About).</summary>
+internal sealed record SettingsPage(int Id, string Label, string Glyph, string Description);
+
+/// <summary>A result of "Find a setting": the label that matched and the page it lives on.</summary>
+internal sealed record SettingHit(string Label, int PageId);
+
+/// <summary>What the window needs from the app beyond the stores: the facts of the "This PC" card and the two things it can open.</summary>
+internal sealed record SettingsEnvironment(string DataFolder, string Version, Func<int> ConnectedBrowsers, Action OpenScheduler, IShell Shell);
 
 /// <summary>
 /// The Settings window's Browser section (the skeleton of M2.8b): the rules Kasi pushes to the extension. Text lists hold one entry per
@@ -23,6 +35,8 @@ internal sealed partial class SettingsViewModel : ObservableObject
 
     private readonly IBrowserSettings _store;
     private readonly IUiSettings? _ui;
+    private readonly SettingsEnvironment? _environment;
+    private bool _syncingPage;
 
     [ObservableProperty]
     private ThemeChoice _selectedTheme;
@@ -55,13 +69,37 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private string _statusText = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsGeneralPage), nameof(IsBrowserPage), nameof(IsFilesPage), nameof(IsSchedulerPage), nameof(IsAboutPage),
+        nameof(PageTitle), nameof(PageDescription), nameof(Breadcrumb))]
     private int _selectedTab;
 
-    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null)
+    [ObservableProperty]
+    private SettingsPage? _selectedPage;
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null, SettingsEnvironment? environment = null)
     {
         _store = store;
         _ui = ui;
+        _environment = environment;
         Categories = categories;
+        var pages = new List<SettingsPage>
+        {
+            new(0, Strings.SettingsPageGeneral, Icons.Settings, Strings.SettingsPageGeneralDescription),
+            new(1, Strings.SettingsPageBrowser, Icons.Globe, Strings.SettingsPageBrowserDescription),
+        };
+        if (categories is not null)
+        {
+            pages.Add(new SettingsPage(2, Strings.SettingsPageFiles, Icons.Folder, Strings.SettingsPageFilesDescription));
+        }
+
+        pages.Add(new SettingsPage(3, Strings.SettingsPageScheduler, Icons.Clock, Strings.SettingsPageSchedulerDescription));
+        pages.Add(new SettingsPage(4, Strings.SettingsPageAbout, Icons.Info, Strings.SettingsPageAboutDescription));
+        Pages = pages;
+        _selectedPage = pages[0];
+        Hits = [];
         Themes =
         [
             new(ThemePreference.System, Strings.ThemeSystem),
@@ -84,6 +122,94 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public CategoriesViewModel? Categories { get; }
 
     public bool HasCategories => Categories is not null;
+
+    public IReadOnlyList<SettingsPage> Pages { get; }
+
+    /// <summary>The settings whose label contains what was typed in "Find a setting".</summary>
+    public ObservableCollection<SettingHit> Hits { get; }
+
+    public bool HasHits => Hits.Count > 0;
+
+    public bool IsGeneralPage => SelectedTab == 0;
+
+    public bool IsBrowserPage => SelectedTab == 1;
+
+    public bool IsFilesPage => SelectedTab == 2;
+
+    public bool IsSchedulerPage => SelectedTab == 3;
+
+    public bool IsAboutPage => SelectedTab == 4;
+
+    public string PageTitle => CurrentPage.Label;
+
+    public string PageDescription => CurrentPage.Description;
+
+    public string Breadcrumb => Strings.SettingsBreadcrumbRoot + " / " + CurrentPage.Label;
+
+    private SettingsPage CurrentPage => Pages.FirstOrDefault(p => p.Id == SelectedTab) ?? Pages[0];
+
+    // the "This PC" card: real facts, no profiles (Kasi has none)
+    public string ThisPcLabel => Strings.SettingsThisPc;
+
+    public string DataFolderLabel => Strings.SettingsDataFolder;
+
+    public string DataFolderText => _environment is null ? string.Empty : ShortFolder(_environment.DataFolder);
+
+    public string VersionLabel => Strings.SettingsVersion;
+
+    public string VersionText => _environment?.Version ?? string.Empty;
+
+    public string ExtensionText => _environment is { } env && env.ConnectedBrowsers() > 0 ? Strings.SidebarExtensionConnected : Strings.SidebarExtensionNone;
+
+    public string OpenDataFolderLabel => Strings.SettingsOpenDataFolder;
+
+    public string OpenSchedulerLabel => Strings.SettingsOpenScheduler;
+
+    public string FindLabel => Strings.SettingsFind;
+
+    public string FindName => Strings.SettingsFindName;
+
+    public string NavigationName => Strings.SettingsNavigation;
+
+    public string RestoreDefaultsLabel => Strings.SettingsRestoreDefaults;
+
+    public string ResetLabel => Strings.SettingsReset;
+
+    public string ResetExtensionsName => Strings.SettingsReset + " " + ExtensionsLabel;
+
+    public string ResetMimeTypesName => Strings.SettingsReset + " " + MimeTypesLabel;
+
+    public string ResetExcludedSitesName => Strings.SettingsReset + " " + ExcludedSitesLabel;
+
+    public string RulesHeading => Strings.SettingsRulesHeading;
+
+    public string RulesNote => Strings.SettingsRulesNote;
+
+    public string FooterNote => Strings.SettingsRestartNote;
+
+    public string AboutTagline => Strings.AboutTagline;
+
+    public string AboutOwner => Strings.AboutOwner;
+
+    public string AboutNoticesLabel => Strings.AboutNotices;
+
+    public IReadOnlyList<string> Notices { get; } =
+    [
+        "Avalonia, FluentAvalonia, CommunityToolkit.Mvvm - MIT",
+        "Microsoft.Data.Sqlite, SQLite - MIT, public domain",
+        "Dapper, Serilog - Apache-2.0",
+        "FluentFTP, MonoTorrent, Velopack - MIT",
+        "FFmpeg (LGPL build, run as a separate program) - LGPL-2.1",
+    ];
+
+    /// <summary>"...\Kasi" instead of the whole path of a user folder.</summary>
+    internal static string ShortFolder(string path)
+    {
+        var separators = new[] { '\\', '/' };
+        var trimmed = path.TrimEnd(separators);
+        var parts = trimmed.Split(separators, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length <= 2 ? trimmed : "..." + Path.DirectorySeparatorChar + string.Join(Path.DirectorySeparatorChar, parts[^2..]);
+    }
 
     public string CategoriesTab => Strings.CategoriesTab;
 
@@ -113,6 +239,100 @@ internal sealed partial class SettingsViewModel : ObservableObject
     }
 
     public void ShowSection(SettingsSection section) => SelectedTab = section == SettingsSection.General ? 0 : 1;
+
+    // the navigation list and the page number are one thing
+    partial void OnSelectedTabChanged(int value)
+    {
+        if (_syncingPage)
+        {
+            return;
+        }
+
+        _syncingPage = true;
+        SelectedPage = Pages.FirstOrDefault(p => p.Id == value) ?? SelectedPage;
+        _syncingPage = false;
+    }
+
+    partial void OnSelectedPageChanged(SettingsPage? value)
+    {
+        if (_syncingPage || value is null)
+        {
+            return;
+        }
+
+        _syncingPage = true;
+        SelectedTab = value.Id;
+        _syncingPage = false;
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        Hits.Clear();
+        var query = value.Trim();
+        if (query.Length > 0)
+        {
+            foreach (var hit in Searchable().Where(h => h.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase)).Take(8))
+            {
+                Hits.Add(hit);
+            }
+        }
+
+        OnPropertyChanged(nameof(HasHits));
+    }
+
+    // every label a person can look for, with the page it is on
+    private IEnumerable<SettingHit> Searchable()
+    {
+        foreach (var page in Pages)
+        {
+            yield return new SettingHit(page.Label, page.Id);
+        }
+
+        yield return new SettingHit(ThemeLabel, 0);
+        foreach (var label in new[] { EnabledLabel, ShowAddDialogLabel, ClipboardCaptureLabel, ExtensionsLabel, MimeTypesLabel, ExcludedSitesLabel, BypassKeyLabel, MinSizeLabel })
+        {
+            yield return new SettingHit(label, 1);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenHit(SettingHit? hit)
+    {
+        if (hit is not null)
+        {
+            SelectedTab = hit.PageId;
+            SearchText = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void ResetExtensions() => ExtensionsText = string.Join(Environment.NewLine, BrowserSettings.DefaultExtensions);
+
+    [RelayCommand]
+    private void ResetMimeTypes() => MimeTypesText = string.Join(Environment.NewLine, BrowserSettings.DefaultMimeTypes);
+
+    [RelayCommand]
+    private void ResetExcludedSites() => ExcludedSitesText = string.Empty;
+
+    /// <summary>Puts every setting of the form back to its default; nothing is saved until Save.</summary>
+    [RelayCommand]
+    private void RestoreDefaults()
+    {
+        Load(new BrowserSettings { AckTimeoutMs = _store.Current.AckTimeoutMs });
+        SelectedTheme = Themes.First(t => t.Preference == ThemePreference.System);
+    }
+
+    [RelayCommand]
+    private void OpenDataFolder()
+    {
+        if (_environment is { } env)
+        {
+            env.Shell.OpenFolder(env.DataFolder);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenScheduler() => _environment?.OpenScheduler();
 
     /// <summary>What the form holds, as settings (not yet cleaned; <see cref="BrowserSettings.Normalized"/> does that on save).</summary>
     public BrowserSettings ToSettings() => new()

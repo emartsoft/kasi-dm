@@ -198,6 +198,10 @@ public class NotificationTests
         public void OpenFile(string path) => Opened.Add(path);
 
         public void ShowInFolder(string path) => Shown.Add(path);
+
+        public void OpenFolder(string path)
+        {
+        }
     }
 
     private sealed class RecordingToasts : INotificationService

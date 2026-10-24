@@ -20,6 +20,64 @@ internal static class Strings
 
     public static string SelectRow => Get(nameof(SelectRow));
 
+    public static string SettingsPageGeneral => Get(nameof(SettingsPageGeneral));
+
+    public static string SettingsPageGeneralDescription => Get(nameof(SettingsPageGeneralDescription));
+
+    public static string SettingsPageBrowser => Get(nameof(SettingsPageBrowser));
+
+    public static string SettingsPageBrowserDescription => Get(nameof(SettingsPageBrowserDescription));
+
+    public static string SettingsPageFiles => Get(nameof(SettingsPageFiles));
+
+    public static string SettingsPageFilesDescription => Get(nameof(SettingsPageFilesDescription));
+
+    public static string SettingsPageScheduler => Get(nameof(SettingsPageScheduler));
+
+    public static string SettingsPageSchedulerDescription => Get(nameof(SettingsPageSchedulerDescription));
+
+    public static string SettingsPageAbout => Get(nameof(SettingsPageAbout));
+
+    public static string SettingsPageAboutDescription => Get(nameof(SettingsPageAboutDescription));
+
+    public static string SettingsBreadcrumbRoot => Get(nameof(SettingsBreadcrumbRoot));
+
+    public static string SettingsFind => Get(nameof(SettingsFind));
+
+    public static string SettingsFindName => Get(nameof(SettingsFindName));
+
+    public static string SettingsRestoreDefaults => Get(nameof(SettingsRestoreDefaults));
+
+    public static string SettingsReset => Get(nameof(SettingsReset));
+
+    public static string SettingsNavigation => Get(nameof(SettingsNavigation));
+
+    public static string SettingsThisPc => Get(nameof(SettingsThisPc));
+
+    public static string SettingsDataFolder => Get(nameof(SettingsDataFolder));
+
+    public static string SettingsVersion => Get(nameof(SettingsVersion));
+
+    public static string SettingsOpenDataFolder => Get(nameof(SettingsOpenDataFolder));
+
+    public static string SettingsOpenScheduler => Get(nameof(SettingsOpenScheduler));
+
+    public static string SettingsRulesHeading => Get(nameof(SettingsRulesHeading));
+
+    public static string SettingsRulesNote => Get(nameof(SettingsRulesNote));
+
+    public static string SettingsAutoSaved => Get(nameof(SettingsAutoSaved));
+
+    public static string SettingsRestartNote => Get(nameof(SettingsRestartNote));
+
+    public static string AboutTagline => Get(nameof(AboutTagline));
+
+    public static string AboutOwner => Get(nameof(AboutOwner));
+
+    public static string AboutNotices => Get(nameof(AboutNotices));
+
+    public static string SettingsPageNameLabel => Get(nameof(SettingsPageNameLabel));
+
     public static string DetailsPeak => Get(nameof(DetailsPeak));
 
     public static string DetailsElapsed => Get(nameof(DetailsElapsed));
