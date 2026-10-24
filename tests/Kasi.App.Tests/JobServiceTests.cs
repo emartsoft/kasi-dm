@@ -15,6 +15,7 @@ public sealed class JobServiceTests : IAsyncLifetime
     private JobService _service = null!;
     private JobSecretRepository _secrets = null!;
     private BandwidthLimiter _limiter = null!;
+    private CategoryRuleRepository _categoryRules = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -26,7 +27,7 @@ public sealed class JobServiceTests : IAsyncLifetime
         _secrets = new JobSecretRepository(factory);
         _engine = new DownloadEngine(jobs, new SegmentRepository(factory), _checkpoints, _limiter = new BandwidthLimiter());
         await _engine.StartAsync(TestContext.Current.CancellationToken);
-        _service = new JobService(_engine, jobs, new CategoryRepository(factory), new QueueRepository(factory), Path.Combine(_root, "Downloads"), _secrets, _limiter);
+        _service = new JobService(_engine, jobs, new CategoryRepository(factory), new QueueRepository(factory), Path.Combine(_root, "Downloads"), _secrets, _limiter, categoryRules: _categoryRules = new CategoryRuleRepository(factory));
     }
 
     public async ValueTask DisposeAsync()
@@ -71,6 +72,50 @@ public sealed class JobServiceTests : IAsyncLifetime
         result.Job.Kind.Should().Be(JobKind.Http);
         (await _service.ListAsync(ct)).Should().ContainSingle(j => j.Id == result.Job.Id);
         await WaitUntilAsync(() => announced.OfType<JobAdded>().Any(a => a.Job.Id == result.Job.Id));
+    }
+
+    [Theory]
+    [Trait("TC", "TC-CAT-001")]
+    [InlineData("film.mp4", 5, "Video")]
+    [InlineData("song.flac", 4, "Music")]
+    [InlineData("report.pdf", 3, "Documents")]
+    [InlineData("setup.exe", 6, "Programs")]
+    [InlineData("backup.tar.gz", 2, "Compressed")]
+    [InlineData("notes.unknown", 1, "")]
+    public async Task A_download_without_a_category_lands_in_the_folder_of_its_file_type(string name, int category, string folder)
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await _service.AddAsync(Request(name, category: null, url: "https://files.example.org/dl/" + name), cancellationToken: ct);
+
+        result.Job!.CategoryId.Should().Be(category);
+        result.Job.Folder.Should().Be(folder.Length == 0 ? Path.Combine(_root, "Downloads") : Path.Combine(_root, "Downloads", folder));
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-001")]
+    public async Task The_MIME_type_the_browser_reported_decides_when_the_name_has_no_extension()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await _service.AddAsync(Request("get", category: null, url: "https://files.example.org/get") with { Mime = "video/mp4" }, cancellationToken: ct);
+
+        result.Job!.CategoryId.Should().Be(5);
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-002")]
+    public async Task A_user_domain_rule_beats_the_extension_and_a_named_category_beats_every_rule()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _categoryRules.AddAsync(new CategoryRule { CategoryId = 3, Kind = CategoryRuleKind.Domain, Pattern = "docs.example.org", Position = 1 }, ct);
+
+        var byRule = await _service.AddAsync(Request("film.mp4", category: null, url: "https://docs.example.org/film.mp4"), cancellationToken: ct);
+        var named = await _service.AddAsync(Request("film2.mp4", category: 4, url: "https://docs.example.org/film2.mp4"), cancellationToken: ct);
+
+        byRule.Job!.CategoryId.Should().Be(3);
+        byRule.Job.Folder.Should().Be(Path.Combine(_root, "Downloads", "Documents"));
+        named.Job!.CategoryId.Should().Be(4, "a person's choice is never overridden");
     }
 
     [Fact]

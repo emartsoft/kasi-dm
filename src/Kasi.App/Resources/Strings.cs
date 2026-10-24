@@ -34,6 +34,8 @@ internal static class Strings
 
     public static string AddCategoryLabel => Get(nameof(AddCategoryLabel));
 
+    public static string PickerCategoryAutomatic => Get(nameof(PickerCategoryAutomatic));
+
     public static string AddQueueLabel => Get(nameof(AddQueueLabel));
 
     public static string AddConnectionsLabel => Get(nameof(AddConnectionsLabel));

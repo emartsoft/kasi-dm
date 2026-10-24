@@ -50,6 +50,7 @@ internal static class CompositionRoot
         services.AddSingleton<IJobRepository>(sp => new JobRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ISegmentRepository>(sp => new SegmentRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICategoryRepository>(sp => new CategoryRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<ICategoryRuleRepository>(sp => new CategoryRuleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueRepository>(sp => new QueueRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueScheduleRepository>(sp => new QueueScheduleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobSecretRepository>(sp => new JobSecretRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
@@ -89,7 +90,8 @@ internal static class CompositionRoot
             sp.GetRequiredService<IJobSecretRepository>(),
             sp.GetRequiredService<BandwidthLimiter>(),
             sp.GetRequiredService<IQueueRunner>(),
-            sp.GetRequiredService<IQueueScheduleRepository>()));
+            sp.GetRequiredService<IQueueScheduleRepository>(),
+            categoryRules: sp.GetRequiredService<ICategoryRuleRepository>()));
         services.AddSingleton<IHostedService>(sp => new EngineLifetime(
             sp.GetRequiredService<MigrationRunner>(),
             sp.GetRequiredService<CheckpointWriter>(),
