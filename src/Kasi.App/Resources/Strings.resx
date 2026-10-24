@@ -1007,4 +1007,28 @@
   <data name="SettingsPageNameLabel" xml:space="preserve">
     <value>Page</value>
   </data>
+  <data name="DetailsPeak" xml:space="preserve">
+    <value>Peak</value>
+  </data>
+  <data name="DetailsElapsed" xml:space="preserve">
+    <value>Elapsed time</value>
+  </data>
+  <data name="DetailsChart" xml:space="preserve">
+    <value>Bandwidth, last 60 seconds</value>
+  </data>
+  <data name="DetailsCopyLink" xml:space="preserve">
+    <value>Copy link</value>
+  </data>
+  <data name="DetailsIdle" xml:space="preserve">
+    <value>Idle</value>
+  </data>
+  <data name="DetailsStreamsActive" xml:space="preserve">
+    <value>{0} streams active</value>
+  </data>
+  <data name="DetailsActiveStreams" xml:space="preserve">
+    <value>Active streams: {0}/{1}</value>
+  </data>
+  <data name="DetailsMatrix" xml:space="preserve">
+    <value>Segment matrix ({0} connections)</value>
+  </data>
 </root>

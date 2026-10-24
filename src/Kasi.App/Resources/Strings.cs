@@ -78,6 +78,22 @@ internal static class Strings
 
     public static string SettingsPageNameLabel => Get(nameof(SettingsPageNameLabel));
 
+    public static string DetailsPeak => Get(nameof(DetailsPeak));
+
+    public static string DetailsElapsed => Get(nameof(DetailsElapsed));
+
+    public static string DetailsChart => Get(nameof(DetailsChart));
+
+    public static string DetailsCopyLink => Get(nameof(DetailsCopyLink));
+
+    public static string DetailsIdle => Get(nameof(DetailsIdle));
+
+    public static string DetailsStreamsActive => Get(nameof(DetailsStreamsActive));
+
+    public static string DetailsActiveStreams => Get(nameof(DetailsActiveStreams));
+
+    public static string DetailsMatrix => Get(nameof(DetailsMatrix));
+
     public static string JobColumnProgress => Get(nameof(JobColumnProgress));
 
     public static string JobColumnSize => Get(nameof(JobColumnSize));

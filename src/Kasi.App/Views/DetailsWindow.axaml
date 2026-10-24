@@ -2,76 +2,140 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Kasi.App.ViewModels"
         xmlns:views="using:Kasi.App.Views"
+        xmlns:c="using:Kasi.App.Controls"
         x:Class="Kasi.App.Views.DetailsWindow"
         x:DataType="vm:DetailsViewModel"
         Title="{Binding Title}"
         AutomationProperties.Name="{Binding AutomationName}"
-        Width="760"
-        Height="640"
-        MinWidth="560"
-        MinHeight="460"
+        Background="{DynamicResource KasiBaseBrush}"
+        Width="900"
+        Height="780"
+        MinWidth="640"
+        MinHeight="520"
         WindowStartupLocation="CenterOwner">
-  <DockPanel Margin="16">
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
-      <Button Content="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />
-      <Button Content="{Binding OpenFolderLabel}" Command="{Binding OpenFolderCommand}" AutomationProperties.Name="{Binding OpenFolderLabel}" />
-      <Button Content="{Binding PauseOrResumeLabel}" Command="{Binding PauseOrResumeCommand}" AutomationProperties.Name="{Binding PauseOrResumeLabel}" />
-      <Button Content="{Binding CloseLabel}" Command="{Binding CloseCommand}" IsCancel="True" AutomationProperties.Name="{Binding CloseLabel}" />
-    </StackPanel>
+  <DockPanel Margin="20,16">
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <TextBlock Text="{Binding ResumeLabel}" Classes="kasi-secondary" />
+        <TextBlock Text="{Binding ResumeSupportText}" Classes="kasi-secondary" FontWeight="SemiBold" AutomationProperties.Name="{Binding ResumeSupportText}" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Content="{Binding RefreshLinkLabel}" Command="{Binding RefreshLinkCommand}" AutomationProperties.Name="{Binding RefreshLinkLabel}" />
+        <Button Content="{Binding CloseLabel}" Command="{Binding CloseCommand}" IsCancel="True" AutomationProperties.Name="{Binding CloseLabel}" />
+      </StackPanel>
+    </Grid>
     <ScrollViewer>
-      <StackPanel Spacing="10">
-        <TextBlock Text="{Binding Row.FileName}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.Name="{Binding Row.FileName}" />
-        <TextBlock Text="{Binding Address}" Opacity="0.7" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Address}" />
-        <TextBlock Text="{Binding SavingToText}" Opacity="0.7" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding SavingToText}" />
-        <ProgressBar Value="{Binding Row.Percent}" Minimum="0" Maximum="100" MinWidth="0" AutomationProperties.Name="{Binding Row.State}" />
-        <Grid ColumnDefinitions="*,*,*,*">
-          <StackPanel Grid.Column="0">
-            <TextBlock Text="{Binding DownloadedLabel}" Opacity="0.65" FontSize="12" />
-            <TextBlock Text="{Binding Row.Downloaded}" AutomationProperties.Name="{Binding Row.Downloaded}" />
-          </StackPanel>
-          <StackPanel Grid.Column="1">
-            <TextBlock Text="{Binding SpeedLabel}" Opacity="0.65" FontSize="12" />
-            <TextBlock Text="{Binding Row.Speed}" AutomationProperties.Name="{Binding Row.Speed}" />
-          </StackPanel>
-          <StackPanel Grid.Column="2">
-            <TextBlock Text="{Binding TimeLeftLabel}" Opacity="0.65" FontSize="12" />
-            <TextBlock Text="{Binding Row.TimeLeft}" AutomationProperties.Name="{Binding Row.TimeLeft}" />
-          </StackPanel>
-          <StackPanel Grid.Column="3">
-            <TextBlock Text="{Binding ResumeLabel}" Opacity="0.65" FontSize="12" />
-            <TextBlock Text="{Binding ResumeSupportText}" AutomationProperties.Name="{Binding ResumeSupportText}" />
+      <StackPanel Spacing="14" Margin="0,0,14,0">
+        <Border Classes="kasi-card">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+            <c:FileTypeChip Grid.Column="0" FileName="{Binding Row.FileName}" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="{Binding Row.FileName}" Classes="kasi-title" FontSize="20" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Row.FileName}" />
+                <c:StatusChip Text="{Binding StatusLine}" Kind="{Binding Row.StatusKind}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding SavingToText}" Classes="kasi-secondary kasi-mono" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding SavingToText}" />
+                <Button Content="{Binding OpenFolderLabel}" Command="{Binding OpenFolderCommand}" Padding="8,2" AutomationProperties.Name="{Binding OpenFolderLabel}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding Address}" Classes="kasi-secondary kasi-mono" MaxWidth="560" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding Address}" />
+                <Button Click="OnCopyLink" Content="{Binding CopyLinkLabel}" Padding="8,2" AutomationProperties.Name="{Binding CopyLinkLabel}" />
+              </StackPanel>
+            </StackPanel>
+            <Button Grid.Column="2" Content="{Binding PauseOrResumeLabel}" Command="{Binding PauseOrResumeCommand}" Classes="accent" VerticalAlignment="Top" AutomationProperties.Name="{Binding PauseOrResumeLabel}" />
+          </Grid>
+        </Border>
+
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <TextBlock Grid.Column="0" Text="{Binding PercentText}" FontSize="40" FontWeight="Bold" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding PercentText}" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+            <TextBlock Text="{Binding Row.Speed}" FontFamily="{DynamicResource KasiMonoFont}" Foreground="{DynamicResource KasiSuccessBrush}" FontWeight="SemiBold" AutomationProperties.Name="{Binding Row.Speed}" />
+            <TextBlock Text="{Binding PeakLabel}" Classes="kasi-secondary" />
+            <TextBlock Text="{Binding PeakText}" FontFamily="{DynamicResource KasiMonoFont}" Classes="kasi-secondary" AutomationProperties.Name="{Binding PeakText}" />
           </StackPanel>
         </Grid>
-        <TextBlock Text="{Binding MapLabel}" FontWeight="SemiBold" />
-        <views:SegmentMapControl Segments="{Binding Segments}" FillBrush="{DynamicResource AccentFillColorDefaultBrush}" TrackBrush="{DynamicResource ControlStrokeColorDefaultBrush}" AutomationProperties.Name="{Binding MapSummaryText}" />
-        <TextBlock Text="{Binding MapSummaryText}" Opacity="0.8" AutomationProperties.Name="{Binding MapSummaryText}" />
-        <TextBlock Text="{Binding MapHint}" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
-        <Grid ColumnDefinitions="90,*,110,*" Opacity="0.65">
-          <TextBlock Grid.Column="0" Text="{Binding ConnectionColumn}" FontSize="12" />
-          <TextBlock Grid.Column="1" Text="{Binding RangeColumn}" FontSize="12" />
-          <TextBlock Grid.Column="2" Text="{Binding SpeedColumn}" FontSize="12" />
-          <TextBlock Grid.Column="3" Text="{Binding StateColumn}" FontSize="12" />
-        </Grid>
-        <ItemsControl ItemsSource="{Binding Connections}" AutomationProperties.Name="{Binding MapLabel}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:ConnectionRow">
-              <Grid ColumnDefinitions="90,*,110,*" Margin="0,2">
-                <TextBlock Grid.Column="0" Text="{Binding Connection}" />
-                <TextBlock Grid.Column="1" Text="{Binding Range}" />
-                <TextBlock Grid.Column="2" Text="{Binding Speed}" />
-                <TextBlock Grid.Column="3" Text="{Binding State}" />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Text="{Binding LogLabel}" FontWeight="SemiBold" />
-        <ItemsControl ItemsSource="{Binding Log}" AutomationProperties.Name="{Binding LogLabel}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="x:String">
-              <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <ProgressBar Value="{Binding Row.Percent}" Minimum="0" Maximum="100" MinWidth="0" Height="8" AutomationProperties.Name="{Binding Row.State}" />
+
+        <UniformGrid Columns="4">
+          <Border Classes="kasi-card" Margin="0,0,5,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding DownloadedLabel}" Classes="kasi-secondary" />
+              <TextBlock Text="{Binding Row.Downloaded}" Classes="kasi-title" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding Row.Downloaded}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="kasi-card" Margin="5,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding SpeedLabel}" Classes="kasi-secondary" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Row.Speed}" Classes="kasi-title" FontFamily="{DynamicResource KasiMonoFont}" Foreground="{DynamicResource KasiSuccessBrush}" />
+                <c:StatusChip Text="{Binding ProtocolText}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <Border Classes="kasi-card" Margin="5,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding TimeLeftLabel}" Classes="kasi-secondary" />
+              <TextBlock Text="{Binding Row.TimeLeft}" Classes="kasi-title" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding Row.TimeLeft}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="kasi-card" Margin="5,0,0,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding ElapsedLabel}" Classes="kasi-secondary" />
+              <TextBlock Text="{Binding ElapsedText}" Classes="kasi-title" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding ElapsedText}" />
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+
+        <Border Classes="kasi-card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding ChartLabel}" Classes="kasi-secondary" FontWeight="SemiBold" />
+            <c:Sparkline Samples="{Binding SpeedSamples}" Capacity="60" Height="110" LineBrush="{DynamicResource KasiAccentBrush}" AutomationProperties.Name="{Binding ChartLabel}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="kasi-card">
+          <StackPanel Spacing="10">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="{Binding MatrixTitle}" Classes="kasi-secondary" FontWeight="SemiBold" AutomationProperties.Name="{Binding MapLabel}" />
+              <TextBlock Grid.Column="1" Text="{Binding ActiveStreamsText}" Classes="kasi-secondary kasi-mono" />
+            </Grid>
+            <views:SegmentMapControl Segments="{Binding Segments}" FillBrush="{DynamicResource KasiAccentBrush}" TrackBrush="{DynamicResource KasiNeutralSoftBrush}" AutomationProperties.Name="{Binding MapSummaryText}" />
+            <TextBlock Text="{Binding MapSummaryText}" Classes="kasi-secondary" AutomationProperties.Name="{Binding MapSummaryText}" />
+            <ItemsControl ItemsSource="{Binding Tiles}" AutomationProperties.Name="{Binding MapLabel}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MatrixTile">
+                  <Border Classes="kasi-card" Padding="8,6" Margin="3">
+                    <StackPanel Spacing="3">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Number}" Classes="kasi-secondary kasi-mono" />
+                        <TextBlock Grid.Column="1" Text="{Binding PercentText}" Classes="kasi-secondary kasi-mono" />
+                      </Grid>
+                      <ProgressBar Value="{Binding Percent}" Minimum="0" Maximum="100" MinWidth="0" Height="4" />
+                      <TextBlock Text="{Binding SpeedText}" Classes="kasi-secondary kasi-mono" HorizontalAlignment="Center" FontSize="11" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding MapHint}" Classes="kasi-secondary" FontSize="11" TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Expander Header="{Binding LogLabel}" AutomationProperties.Name="{Binding LogLabel}">
+          <ItemsControl ItemsSource="{Binding Log}" AutomationProperties.Name="{Binding LogLabel}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Classes="kasi-mono kasi-secondary" TextWrapping="Wrap" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Expander>
       </StackPanel>
     </ScrollViewer>
   </DockPanel>

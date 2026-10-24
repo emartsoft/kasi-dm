@@ -14,6 +14,9 @@ namespace Kasi.App.ViewModels;
 /// <summary>One line of the connection table.</summary>
 internal sealed record ConnectionRow(string Connection, string Range, string Speed, string State);
 
+/// <summary>One tile of the segment matrix: a connection with the share of its segment received and its speed, or "Idle" when it has nothing to do.</summary>
+internal sealed record MatrixTile(string Number, int Percent, string PercentText, string SpeedText, bool IsIdle);
+
 /// <summary>
 /// The Download details window (KASI-UI-003, wireframe page 2): what is being saved and where, how far it is, the segment map, one line
 /// per connection and the log tail. It follows the engine's <see cref="SegmentsProgressed"/> (about four a second) and applies every one
@@ -25,12 +28,21 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
 
     private static readonly CompositeFormat _savingTo = CompositeFormat.Parse(Strings.DetailsSavingTo);
     private static readonly CompositeFormat _mapSummary = CompositeFormat.Parse(Strings.DetailsMapSummary);
+    private static readonly CompositeFormat _streamsActive = CompositeFormat.Parse(Strings.DetailsStreamsActive);
+    private static readonly CompositeFormat _activeStreams = CompositeFormat.Parse(Strings.DetailsActiveStreams);
+    private static readonly CompositeFormat _matrix = CompositeFormat.Parse(Strings.DetailsMatrix);
 
     private readonly IJobService _service;
     private readonly IShell _shell;
     private readonly Action<Action> _post;
     private readonly TimeProvider _time;
+    private readonly SpeedHistory _history = new();
+    private readonly Dictionary<int, MatrixTile> _tiles = [];
     private Job? _job;
+    private DateTimeOffset _lastSample;
+    private DateTimeOffset? _startedAt;
+    private TimeSpan _elapsed;
+    private double _peak;
 
     [ObservableProperty]
     private IReadOnlyList<Segment> _segments = [];
@@ -47,6 +59,27 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _resumeSupportText = string.Empty;
 
+    [ObservableProperty]
+    private IReadOnlyList<double> _speedSamples = [];
+
+    [ObservableProperty]
+    private string _peakText = string.Empty;
+
+    [ObservableProperty]
+    private string _elapsedText = "00:00";
+
+    [ObservableProperty]
+    private string _streamsText = string.Empty;
+
+    [ObservableProperty]
+    private string _protocolText = string.Empty;
+
+    [ObservableProperty]
+    private string _matrixTitle = string.Empty;
+
+    [ObservableProperty]
+    private string _activeStreamsText = string.Empty;
+
     public DetailsViewModel(JobRowViewModel row, IJobService service, IShell shell, Action<Action>? post = null, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(row);
@@ -61,6 +94,22 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
     public JobRowViewModel Row { get; }
 
     public ObservableCollection<ConnectionRow> Connections { get; } = [];
+
+    /// <summary>One tile per connection the job has used, in connection order.</summary>
+    public ObservableCollection<MatrixTile> Tiles { get; } = [];
+
+    /// <summary>"64.2%": the headline number.</summary>
+    public string PercentText => Row.Percent.ToString("0.0", CultureInfo.CurrentCulture) + "%";
+
+    public string StatusLine => string.IsNullOrEmpty(StreamsText) ? Row.State : Row.State + " (" + StreamsText + ")";
+
+    public string PeakLabel => Strings.DetailsPeak;
+
+    public string ElapsedLabel => Strings.DetailsElapsed;
+
+    public string ChartLabel => Strings.DetailsChart;
+
+    public string CopyLinkLabel => Strings.DetailsCopyLink;
 
     /// <summary>Newest first, at most <see cref="MaxLogLines"/>.</summary>
     public ObservableCollection<string> Log { get; } = [];
@@ -110,18 +159,27 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
         _service.EventRaised += OnEvent;
         Row.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(JobRowViewModel.Percent))
+            {
+                OnPropertyChanged(nameof(PercentText));
+            }
+
             if (e.PropertyName == nameof(JobRowViewModel.StateValue))
             {
+                TrackElapsed();
+                OnPropertyChanged(nameof(StatusLine));
                 OnPropertyChanged(nameof(PauseOrResumeLabel));
                 RefreshLinkCommand.NotifyCanExecuteChanged();
                 PauseOrResumeCommand.NotifyCanExecuteChanged();
             }
         };
+        TrackElapsed();
         _job = await _service.GetAsync(Row.Id, cancellationToken).ConfigureAwait(true);
         if (_job is { } job)
         {
             Address = WithoutQuery(job.FinalUrl ?? job.Url);
             SavingToText = string.Format(CultureInfo.CurrentCulture, _savingTo, job.Folder);
+            ProtocolText = (Uri.TryCreate(job.Url, UriKind.Absolute, out var uri) ? uri.Scheme : string.Empty).ToUpperInvariant();
             ResumeSupportText = job.Resumable ? Strings.DetailsResumeSupported : Strings.DetailsResumeNotSupported;
         }
 
@@ -185,8 +243,46 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
         }
     }
 
+    // the clock runs while the job transfers and stands still otherwise: it counts this run, not the sum of the earlier ones
+    private void TrackElapsed()
+    {
+        var now = _time.GetUtcNow();
+        if (Row.IsActive)
+        {
+            _startedAt ??= now;
+        }
+        else if (_startedAt is { } started)
+        {
+            _elapsed += now - started;
+            _startedAt = null;
+        }
+
+        ElapsedText = ElapsedNow(now);
+    }
+
+    private string ElapsedNow(DateTimeOffset now)
+    {
+        var total = _elapsed + (_startedAt is { } started ? now - started : TimeSpan.Zero);
+        return total.TotalHours >= 1
+            ? total.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : total.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
+    }
+
     private void Apply(SegmentsProgressed shape)
     {
+        var now = _time.GetUtcNow();
+        ElapsedText = ElapsedNow(now);
+        if (now - _lastSample >= TimeSpan.FromSeconds(1))
+        {
+            _lastSample = now;
+            var speed = shape.Connections.Sum(c => c.BytesPerSecond);
+            _history.Add(speed);
+            _peak = Math.Max(_peak, speed);
+            SpeedSamples = _history.Snapshot();
+            PeakText = JobText.Speed((long)_peak);
+        }
+
+        ApplyTiles(shape);
         Segments = shape.Segments;
         var done = shape.Segments.Sum(s => s.Written);
         var total = shape.Segments.Sum(s => s.Length);
@@ -201,6 +297,37 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
                 Strings.DetailsReceiving));
         }
     }
+
+    private void ApplyTiles(SegmentsProgressed shape)
+    {
+        var live = shape.Connections.ToDictionary(c => c.Worker);
+        foreach (var (worker, connection) in live)
+        {
+            var segment = connection.SegmentIndex >= 0 && connection.SegmentIndex < shape.Segments.Count ? shape.Segments[connection.SegmentIndex] : null;
+            var percent = segment is { Length: > 0 } ? (int)(segment.Written * 100 / segment.Length) : 0;
+            _tiles[worker] = new MatrixTile(Number(worker), percent, percent.ToString(CultureInfo.CurrentCulture) + "%", JobText.Speed(connection.BytesPerSecond), false);
+        }
+
+        foreach (var worker in _tiles.Keys.Where(w => !live.ContainsKey(w)).ToList())
+        {
+            var last = _tiles[worker];
+            _tiles[worker] = last with { SpeedText = Strings.DetailsIdle, IsIdle = true };
+        }
+
+        var ordered = _tiles.OrderBy(t => t.Key).Select(t => t.Value).ToList();
+        Tiles.Clear();
+        foreach (var tile in ordered)
+        {
+            Tiles.Add(tile);
+        }
+
+        StreamsText = string.Format(CultureInfo.CurrentCulture, _streamsActive, live.Count);
+        ActiveStreamsText = string.Format(CultureInfo.CurrentCulture, _activeStreams, live.Count, _tiles.Count);
+        MatrixTitle = string.Format(CultureInfo.CurrentCulture, _matrix, _tiles.Count);
+        OnPropertyChanged(nameof(StatusLine));
+    }
+
+    private static string Number(int worker) => "#" + (worker + 1).ToString("00", CultureInfo.CurrentCulture);
 
     private void AddLog(DateTimeOffset at, string line)
     {
