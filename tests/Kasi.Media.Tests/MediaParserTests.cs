@@ -146,14 +146,83 @@ public sealed class MediaParserTests
         Action tooMany = () => DashParser.Parse(timeline, _manifest);
         tooMany.Should().Throw<MediaParseException>().Which.Error.Should().Be(MediaParseError.TooManyItems);
 
-        var cycle = """
-            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011">
-              <BaseURL>https://media.example/dash/manifest.mpd</BaseURL>
-              <Period/>
+        var multiBytes = new string('\u20AC', MediaLimits.MaxManifestBytes / 2);
+        Action tooManyBytes = () => HlsParser.ParseMaster(multiBytes, _master);
+        tooManyBytes.Should().Throw<MediaParseException>().Which.Error.Should().Be(MediaParseError.TooLarge);
+    }
+
+    [Fact]
+    public void Hls_ignores_blank_lines_and_does_not_leak_uris_in_errors()
+    {
+        var media = HlsParser.ParseMedia("#EXTM3U\r\n#EXT-X-TARGETDURATION:4\r\n\r\n#EXTINF:4,\r\nseg0.ts\r\n\r\n#EXTINF:4,\r\nseg1.ts\r\n#EXT-X-ENDLIST\r\n\r\n\r\n", _master);
+        media.Segments.Should().HaveCount(2);
+
+        var master = HlsParser.ParseMaster("#EXTM3U\n\n#EXT-X-STREAM-INF:BANDWIDTH=100\n\nv.m3u8\n\n", _master);
+        master.Variants.Should().ContainSingle();
+
+        Action bad = () => HlsParser.ParseMaster("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100\nhttp://[bad?token=SECRET\n", _master);
+        bad.Should().Throw<MediaParseException>().Which.Message.Should().NotContain("SECRET");
+    }
+
+    [Fact]
+    public void Hls_protection_signals_include_later_segment_keys_and_session_keys()
+    {
+        var media = HlsParser.ParseMedia(
+            "#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\na.ts\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"skd://k\",KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXTINF:4,\nb.ts\n#EXT-X-ENDLIST\n",
+            _master);
+        var track = new MediaTrack("t", MediaRole.Video, null, null, null, 1, null, null, 8, false, null, media.Segments, media.Key);
+        track.ProtectionSignals.Should().Contain("SAMPLE-AES").And.Contain("com.apple.streamingkeydelivery");
+
+        var master = HlsParser.ParseMaster(
+            "#EXTM3U\n#EXT-X-SESSION-KEY:METHOD=SAMPLE-AES,URI=\"skd://k\",KEYFORMAT=\"com.apple.streamingkeydelivery\"\n#EXT-X-STREAM-INF:BANDWIDTH=100\nv.m3u8\n",
+            _master);
+        var clear = HlsParser.ParseMedia("#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\na.ts\n#EXT-X-ENDLIST\n", new Uri("https://media.example/hls/v.m3u8"));
+        var presentation = HlsPresentationBuilder.Build(master, _ => clear);
+        presentation.Variants[0].Video.ProtectionSignals.Should().Contain("SAMPLE-AES");
+    }
+
+    [Fact]
+    public void Dash_accepts_start_number_zero_and_repeated_base_urls()
+    {
+        const string Mpd = """
+            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT8S">
+              <BaseURL>https://cdn.example/x/</BaseURL>
+              <Period><BaseURL>https://cdn.example/x/</BaseURL>
+                <AdaptationSet mimeType="video/mp4">
+                  <SegmentTemplate media="s$Number$.m4s" duration="4" startNumber="0"/>
+                  <Representation id="v" bandwidth="100"/>
+                </AdaptationSet>
+              </Period>
             </MPD>
             """;
-        Action cyclic = () => DashParser.Parse(cycle, _manifest);
-        cyclic.Should().Throw<MediaParseException>().Which.Error.Should().Be(MediaParseError.CyclicBaseUrl);
+        var video = DashParser.Parse(Mpd, _manifest).Variants[0].Video;
+        video.Segments.Select(s => s.Uri.AbsolutePath).Should().Equal("/x/s0.m4s", "/x/s1.m4s");
+    }
+
+    [Fact]
+    public void Dash_refuses_open_ended_repeats_multiple_periods_and_overflow()
+    {
+        const string Open = """
+            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT8S"><Period>
+              <AdaptationSet mimeType="video/mp4"><SegmentTemplate media="s$Time$.m4s"><SegmentTimeline><S t="0" d="4" r="-1"/></SegmentTimeline></SegmentTemplate>
+              <Representation id="v" bandwidth="100"/></AdaptationSet></Period></MPD>
+            """;
+        Action open = () => DashParser.Parse(Open, _manifest);
+        open.Should().Throw<MediaParseException>().Which.Error.Should().Be(MediaParseError.Unsupported);
+
+        const string Two = """
+            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT8S"><Period/><Period/></MPD>
+            """;
+        Action two = () => DashParser.Parse(Two, _manifest);
+        two.Should().Throw<MediaParseException>().Which.Error.Should().Be(MediaParseError.Unsupported);
+
+        const string Overflow = """
+            <MPD xmlns="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT8S"><Period>
+              <AdaptationSet mimeType="video/mp4"><SegmentTemplate media="s$Time$.m4s"><SegmentTimeline><S t="9223372036854775000" d="9000000000000000000" r="5"/></SegmentTimeline></SegmentTemplate>
+              <Representation id="v" bandwidth="100"/></AdaptationSet></Period></MPD>
+            """;
+        Action overflow = () => DashParser.Parse(Overflow, _manifest);
+        overflow.Should().Throw<MediaParseException>();
     }
 
     [Property(MaxTest = 80, QuietOnSuccess = true)]

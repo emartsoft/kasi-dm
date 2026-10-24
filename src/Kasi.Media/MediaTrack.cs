@@ -33,7 +33,9 @@ public sealed record MediaTrack(
                 yield return scheme;
             }
 
-            if (Key is { } key)
+            // Every key counts, not only the first: a playlist may start clear and switch to SAMPLE-AES later.
+            var keys = Segments.Select(segment => segment.Key).Prepend(Key).OfType<MediaKey>().Distinct();
+            foreach (var key in keys)
             {
                 yield return key.Method;
                 if (key.KeyFormat is { } format)

@@ -367,7 +367,7 @@ public static class HlsParser
             throw Error(MediaParseError.Empty, "The manifest is empty.");
         }
 
-        if (text.Length > MediaLimits.MaxManifestBytes)
+        if (text.Length > MediaLimits.MaxManifestBytes || Encoding.UTF8.GetByteCount(text) > MediaLimits.MaxManifestBytes)
         {
             throw Error(MediaParseError.TooLarge, "The manifest exceeds the 10 MB cap.");
         }
@@ -378,6 +378,11 @@ public static class HlsParser
         while (reader.ReadLine() is { } raw)
         {
             var line = raw.TrimEnd('\r');
+            if (!first && line.Length == 0)
+            {
+                continue; // RFC 8216: blank lines are ignored
+            }
+
             if (first)
             {
                 line = line.TrimStart('\uFEFF');
@@ -423,7 +428,7 @@ public static class HlsParser
 
             if (at == text.Length || text[at] != '=')
             {
-                throw Error(MediaParseError.InvalidAttribute, $"Attribute list is malformed: {line}");
+                throw Error(MediaParseError.InvalidAttribute, "An attribute list is malformed.");
             }
 
             var name = text[nameStart..at].Trim();
@@ -472,7 +477,7 @@ public static class HlsParser
     {
         if (string.IsNullOrWhiteSpace(value) || !Uri.TryCreate(baseUri, value.Trim(), out var uri) || !uri.IsAbsoluteUri)
         {
-            throw Error(MediaParseError.InvalidUri, $"Invalid URI: {line}");
+            throw Error(MediaParseError.InvalidUri, "A playlist URI is invalid.");
         }
 
         if (requireHttp && uri.Scheme is not ("http" or "https"))

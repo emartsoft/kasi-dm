@@ -3,7 +3,7 @@ namespace Kasi.Media;
 /// <summary>Hard bounds applied before any manifest can allocate unbounded memory (TPL 7.2).</summary>
 public static class MediaLimits
 {
-    /// <summary>The plan's manifest cap, in characters/bytes of the manifest text.</summary>
+    /// <summary>The plan's manifest cap, measured in characters and in UTF-8 bytes of the manifest text.</summary>
     public const int MaxManifestBytes = 10 * 1024 * 1024;
 
     public const int MaxVariants = 1_000;
@@ -37,7 +37,6 @@ public enum MediaParseError
     TooManyItems,
     Unsupported,
     InvalidPlaylist,
-    CyclicBaseUrl,
 }
 
 /// <summary>The only exception the public parsers throw for malformed or hostile input.</summary>

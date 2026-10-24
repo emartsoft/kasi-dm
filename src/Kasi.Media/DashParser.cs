@@ -21,7 +21,7 @@ public static partial class DashParser
                 throw Error(MediaParseError.Empty, "The MPD is empty.");
             }
 
-            if (xml.Length > MediaLimits.MaxManifestBytes)
+            if (xml.Length > MediaLimits.MaxManifestBytes || System.Text.Encoding.UTF8.GetByteCount(xml) > MediaLimits.MaxManifestBytes)
             {
                 throw Error(MediaParseError.TooLarge, "The MPD exceeds the 10 MB cap.");
             }
@@ -57,6 +57,12 @@ public static partial class DashParser
             if (periods.Length > MediaLimits.MaxPeriods)
             {
                 throw Error(MediaParseError.TooManyItems, "The MPD has too many periods.");
+            }
+
+            if (periods.Length > 1)
+            {
+                // Each period would list its representations again as separate qualities; stitching periods is not in M3.
+                throw Error(MediaParseError.Unsupported, "Multi-period MPDs are not supported.");
             }
 
             var declaredDuration = ParseDuration(Attribute(mpd, "mediaPresentationDuration"));
@@ -264,7 +270,7 @@ public static partial class DashParser
         int bandwidth)
     {
         var timescale = ParsePositiveInt(Attribute(template, "timescale"), "timescale") ?? 1;
-        var startNumber = ParsePositiveInt(Attribute(template, "startNumber"), "startNumber") ?? 1;
+        var startNumber = ParseNonNegativeInt(Attribute(template, "startNumber"), "startNumber") ?? 1;
         var media = Attribute(template, "media");
         if (string.IsNullOrWhiteSpace(media))
         {
@@ -290,11 +296,12 @@ public static partial class DashParser
                     ?? throw Error(MediaParseError.InvalidAttribute, "SegmentTimeline S needs d.");
                 var start = ParseNonNegativeLong(Attribute(entry, "t"), "t") ?? previousEnd
                     ?? throw Error(MediaParseError.InvalidAttribute, "The first SegmentTimeline S needs t.");
-                var repeat = ParseNonNegativeInt(Attribute(entry, "r"), "r") ?? 0;
-                if (repeat < 0)
+                if (Attribute(entry, "r")?.Trim() == "-1")
                 {
-                    throw Error(MediaParseError.Unsupported, "Negative SegmentTimeline repeats are not supported.");
+                    throw Error(MediaParseError.Unsupported, "Open-ended SegmentTimeline repeats (r=-1) are not supported.");
                 }
+
+                var repeat = ParseNonNegativeInt(Attribute(entry, "r"), "r") ?? 0;
 
                 if (repeat + 1 > MediaLimits.MaxSegmentsPerStream - segments.Count)
                 {
@@ -303,7 +310,7 @@ public static partial class DashParser
 
                 for (var repeatIndex = 0; repeatIndex <= repeat; repeatIndex++)
                 {
-                    var time = start + (duration * repeatIndex);
+                    var time = checked(start + (duration * repeatIndex));
                     segments.Add(CreateTemplateSegment(
                         segments.Count,
                         media,
@@ -316,7 +323,7 @@ public static partial class DashParser
                         initialization));
                 }
 
-                previousEnd = start + (duration * (repeat + 1L));
+                previousEnd = checked(start + (duration * (repeat + 1L)));
             }
         }
         else
@@ -339,7 +346,7 @@ public static partial class DashParser
                     representationId,
                     bandwidth,
                     startNumber + index,
-                    (long)index * duration,
+                    checked((long)index * duration),
                     segmentDuration,
                     initialization));
             }
@@ -467,7 +474,6 @@ public static partial class DashParser
     private static Uri ResolveBaseChain(IReadOnlyList<XElement> chain, Uri manifestUri)
     {
         var current = manifestUri;
-        var visited = new HashSet<string>(StringComparer.Ordinal) { current.AbsoluteUri };
         var depth = 0;
         foreach (var element in chain)
         {
@@ -479,11 +485,6 @@ public static partial class DashParser
             if (++depth > MediaLimits.MaxBaseUrlDepth)
             {
                 throw Error(MediaParseError.TooManyItems, "Nested BaseURL depth exceeds the cap.");
-            }
-
-            if (!visited.Add(next.AbsoluteUri))
-            {
-                throw Error(MediaParseError.CyclicBaseUrl, "A BaseURL cycle was detected.");
             }
 
             current = next;

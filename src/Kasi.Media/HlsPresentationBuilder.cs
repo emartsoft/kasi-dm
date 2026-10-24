@@ -89,6 +89,18 @@ public static class HlsPresentationBuilder
             throw new MediaParseException(MediaParseError.TooManyItems, "The presentation exceeds the total segment cap.");
         }
 
+        var sessionSignals = master.SessionKeys
+            .SelectMany(key => key.KeyFormat is { } format ? new[] { key.Method, format } : [key.Method])
+            .ToArray();
+        if (sessionSignals.Length > 0)
+        {
+            // EXT-X-SESSION-KEY lives in the master; carry it onto every track so the M3.2 gate cannot miss it.
+            MediaTrack Tag(MediaTrack track) => track with { ProtectionSchemes = [.. track.ProtectionSchemes ?? [], .. sessionSignals] };
+            variants = [.. variants.Select(v => new MediaVariant(Tag(v.Video), v.Audio is { } a ? Tag(a) : null, v.Subtitle is { } s ? Tag(s) : null))];
+            audioOnly = [.. audioOnly.Select(Tag)];
+            subtitles = [.. subtitles.Select(Tag)];
+        }
+
         var live = variants.Any(v => v.Video.IsLive) || audioOnly.Any(a => a.IsLive) || subtitles.Any(s => s.IsLive);
         return new MediaPresentation(
             null,
