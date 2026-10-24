@@ -152,7 +152,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
             return;
         }
 
-        var model = new DetailsViewModel(row, services.GetRequiredService<IJobService>(), services.GetRequiredService<IShell>()) { RefreshLinkHandler = refresh };
+        var model = new DetailsViewModel(row, services.GetRequiredService<IJobService>(), services.GetRequiredService<IShell>()) { RefreshLinkHandler = refresh, SchedulerHandler = queueId => ShowScheduler(services.GetRequiredService<IJobService>(), queueId) };
         var window = new DetailsWindow { DataContext = model };
         model.Closed += window.Close;
         window.Closed += (_, _) =>

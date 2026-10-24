@@ -65,6 +65,9 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
     private bool _openWhenCompleted;
 
     [ObservableProperty]
+    private string _queueActionText = string.Empty;
+
+    [ObservableProperty]
     private SpeedPreset _selectedLimit;
 
     [ObservableProperty]
@@ -117,6 +120,16 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
     public IReadOnlyList<SpeedPreset> SpeedLimits { get; }
 
     public string OpenWhenCompletedLabel => Strings.DetailsOpenWhenCompleted;
+
+    public string WhenCompletedLabel => Strings.DetailsWhenCompleted;
+
+    public string ChangeQueueActionLabel => Strings.DetailsChangeQueueAction;
+
+    /// <summary>Set by the app: opens the Scheduler on the queue (the queue's finishing action is set there).</summary>
+    public Action<int>? SchedulerHandler { get; set; }
+
+    /// <summary>True when the job's queue does something when it finishes (Sleep, Shut down...): the footer then says so.</summary>
+    public bool HasQueueAction => QueueActionText.Length > 0;
 
     public string SpeedLimitLabel => Strings.DetailsSpeedLimit;
 
@@ -194,6 +207,9 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
         _job = await _service.GetAsync(Row.Id, cancellationToken).ConfigureAwait(true);
         if (_job is { } job)
         {
+            var queue = (await _service.QueuesAsync(cancellationToken).ConfigureAwait(true)).FirstOrDefault(q => q.Id == Row.QueueId);
+            var action = PostActionParser.Parse(queue?.PostAction).Kind;
+            QueueActionText = action == PostActionKind.None ? string.Empty : PostActionText.Label(action);
             _loading = true;
             OpenWhenCompleted = job.OpenWhenCompleted;
             SelectedLimit = SpeedLimits.FirstOrDefault(p => p.BytesPerSecond == job.SpeedLimitBps) ?? SpeedLimits[0];
@@ -206,6 +222,11 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
 
         OpenFolderCommand.NotifyCanExecuteChanged();
     }
+
+    partial void OnQueueActionTextChanged(string value) => OnPropertyChanged(nameof(HasQueueAction));
+
+    [RelayCommand]
+    private void ChangeQueueAction() => SchedulerHandler?.Invoke(Row.QueueId);
 
     partial void OnOpenWhenCompletedChanged(bool value) => SaveOptions();
 

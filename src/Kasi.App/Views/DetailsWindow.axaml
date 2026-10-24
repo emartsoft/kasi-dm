@@ -26,6 +26,11 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding HasQueueAction}">
+          <TextBlock Text="{Binding WhenCompletedLabel}" Classes="kasi-secondary" VerticalAlignment="Center" />
+          <c:StatusChip Text="{Binding QueueActionText}" Kind="Warning" />
+          <Button Content="{Binding ChangeQueueActionLabel}" Command="{Binding ChangeQueueActionCommand}" Padding="8,2" AutomationProperties.Name="{Binding ChangeQueueActionLabel}" />
+        </StackPanel>
         <TextBlock Text="{Binding ResumeLabel}" Classes="kasi-secondary" VerticalAlignment="Center" />
         <TextBlock Text="{Binding ResumeSupportText}" Classes="kasi-secondary" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.Name="{Binding ResumeSupportText}" />
       </StackPanel>
