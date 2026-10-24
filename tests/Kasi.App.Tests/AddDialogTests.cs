@@ -23,6 +23,8 @@ internal sealed class RecordingJobService : IJobService
 
     public IReadOnlyList<Core.Queue> QueueList { get; set; } = [new Core.Queue { Id = 1, Name = "Main", SortOrder = 0 }];
 
+    public IReadOnlyList<CategoryRule> Rules { get; set; } = [];
+
 #pragma warning disable CS0067 // never raised by this fake
     public event Action<EngineEvent>? EventRaised;
 #pragma warning restore CS0067
@@ -32,6 +34,8 @@ internal sealed class RecordingJobService : IJobService
     public Task<IReadOnlyList<Category>> CategoriesAsync(CancellationToken cancellationToken = default) => Task.FromResult(CategoryList);
 
     public Task<IReadOnlyList<Core.Queue>> QueuesAsync(CancellationToken cancellationToken = default) => Task.FromResult(QueueList);
+
+    public Task<IReadOnlyList<CategoryRule>> CategoryRulesAsync(CancellationToken cancellationToken = default) => Task.FromResult(Rules);
 
     public Task<AddResult> AddAsync(NewDownload request, DuplicateAction? resolution = null, CancellationToken cancellationToken = default)
     {
@@ -514,7 +518,8 @@ public class AddCoordinatorTests
         host.Shown.Should().BeEmpty();
         var (request, resolution) = jobs.Adds[0];
         request.FileName.Should().Be("pack.zip");
-        request.CategoryId.Should().Be(1);
+        request.CategoryId.Should().BeNull("no site was remembered, so the category rules choose it");
+        request.Mime.Should().Be("application/zip");
         request.StartNow.Should().BeTrue();
         request.Cookies.Should().ContainSingle();
         resolution.Should().BeNull();

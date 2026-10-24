@@ -124,6 +124,9 @@ internal sealed partial class LinkPickerViewModel : ObservableObject
     /// <summary>How many jobs were added; set when the add finished.</summary>
     public int AddedCount { get; private set; }
 
+    /// <summary>The first entry of the category list: no category named, so the rules choose one per link (KASI-CAT-001).</summary>
+    public static Category AutomaticCategory { get; } = new() { Id = 0, Name = Strings.PickerCategoryAutomatic, Folder = string.Empty };
+
     /// <summary>Raised when the window should close.</summary>
     public event Action? Closed;
 
@@ -139,7 +142,9 @@ internal sealed partial class LinkPickerViewModel : ObservableObject
             Queues.Add(queue);
         }
 
-        SelectedCategory = Categories.FirstOrDefault();
+        // "by file type" first: each link gets the category its own file type has, unless the person names one for all of them
+        Categories.Insert(0, AutomaticCategory);
+        SelectedCategory = AutomaticCategory;
         SelectedQueue = Queues.FirstOrDefault();
     }
 
@@ -184,7 +189,7 @@ internal sealed partial class LinkPickerViewModel : ObservableObject
                 : null;
             foreach (var row in _all.Where(r => r.IsSelected).ToList())
             {
-                var request = new NewDownload(row.Url, row.FileName, SelectedQueue.Id, SelectedCategory?.Id, folder, _batch.Referrer, StartNow: StartNow, Cookies: cookies, UserAgent: _batch.UserAgent);
+                var request = new NewDownload(row.Url, row.FileName, SelectedQueue.Id, SelectedCategory is { Id: > 0 } chosen ? chosen.Id : null, folder, _batch.Referrer, StartNow: StartNow, Cookies: cookies, UserAgent: _batch.UserAgent);
                 try
                 {
                     var result = await _jobs.AddAsync(request).ConfigureAwait(true);

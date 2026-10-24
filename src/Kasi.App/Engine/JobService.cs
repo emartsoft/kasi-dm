@@ -14,7 +14,8 @@ internal sealed class JobService(
     BandwidthLimiter? bandwidth = null,
     IQueueRunner? queueRunner = null,
     IQueueScheduleRepository? schedules = null,
-    TimeProvider? timeProvider = null) : IJobService
+    TimeProvider? timeProvider = null,
+    ICategoryRuleRepository? categoryRules = null) : IJobService
 {
     private static readonly TimeSpan _resumeWait = TimeSpan.FromSeconds(20);
     private readonly bool _wired = WireRunner(engine, queueRunner);
@@ -32,6 +33,9 @@ internal sealed class JobService(
     public Task<IReadOnlyList<Category>> CategoriesAsync(CancellationToken cancellationToken = default) => categories.ListAsync(cancellationToken);
 
     public Task<IReadOnlyList<Core.Queue>> QueuesAsync(CancellationToken cancellationToken = default) => queues.ListAsync(cancellationToken);
+
+    public Task<IReadOnlyList<CategoryRule>> CategoryRulesAsync(CancellationToken cancellationToken = default) =>
+        categoryRules is null ? Task.FromResult<IReadOnlyList<CategoryRule>>([]) : categoryRules.ListAsync(cancellationToken);
 
     public async Task<AddResult> AddAsync(NewDownload request, DuplicateAction? resolution = null, CancellationToken cancellationToken = default)
     {
@@ -54,7 +58,9 @@ internal sealed class JobService(
             checksum = expected.Hex;
         }
 
-        var folder = request.Folder ?? await FolderForAsync(request.CategoryId, cancellationToken).ConfigureAwait(false);
+        // no category named: the rules choose it from the link, the file name and the MIME type (a person's choice is never overridden)
+        var categoryId = request.CategoryId ?? await ResolveCategoryAsync(uri, request, cancellationToken).ConfigureAwait(false);
+        var folder = request.Folder ?? await FolderForAsync(categoryId, cancellationToken).ConfigureAwait(false);
         var last = (await jobs.ListAsync(request.QueueId, cancellationToken: cancellationToken).ConfigureAwait(false)).Select(j => j.QueuePos).DefaultIfEmpty(0).Max();
         var job = new Job
         {
@@ -66,7 +72,7 @@ internal sealed class JobService(
             Folder = folder,
             QueueId = request.QueueId,
             QueuePos = last + 1,
-            CategoryId = request.CategoryId,
+            CategoryId = categoryId,
             Connections = request.Connections,
             ChecksumAlgo = checksumAlgo,
             Checksum = checksum,
@@ -220,6 +226,18 @@ internal sealed class JobService(
             : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["User-Agent"] = request.UserAgent },
         SensitiveOrigin = new Uri(uri.GetLeftPart(UriPartial.Authority)),
     };
+
+    private async Task<int?> ResolveCategoryAsync(Uri uri, NewDownload request, CancellationToken cancellationToken)
+    {
+        if (categoryRules is null)
+        {
+            return null;
+        }
+
+        var all = await categories.ListAsync(cancellationToken).ConfigureAwait(false);
+        var rules = await categoryRules.ListAsync(cancellationToken).ConfigureAwait(false);
+        return CategoryResolver.Resolve(uri, request.FileName, request.Mime, rules, all)?.Category.Id;
+    }
 
     private async Task<string> FolderForAsync(int? categoryId, CancellationToken cancellationToken)
     {

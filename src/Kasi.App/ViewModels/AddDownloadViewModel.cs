@@ -11,8 +11,11 @@ using Kasi.Engine;
 namespace Kasi.App.ViewModels;
 
 /// <summary>What opens the Add dialog: a link typed or launched, or a download the browser handed over. Holds cookies, so it prints only its type.</summary>
-internal sealed class AddDownloadDraft(string url, string? fileName = null, string? referrer = null, IReadOnlyList<JobCookie>? cookies = null, string? userAgent = null)
+internal sealed class AddDownloadDraft(string url, string? fileName = null, string? referrer = null, IReadOnlyList<JobCookie>? cookies = null, string? userAgent = null, string? mime = null)
 {
+    /// <summary>The MIME type the browser reported; it only matters to the category rules when the file name has no extension.</summary>
+    public string? Mime { get; } = mime;
+
     public string Url { get; } = url;
 
     public string? FileName { get; } = fileName;
@@ -43,6 +46,9 @@ internal sealed partial class AddDownloadViewModel : ObservableObject
     private readonly ISiteDefaults _sites;
     private readonly Func<DuplicateCheckResult, Task<DuplicateAction?>> _askDuplicate;
     private readonly AddDownloadDraft _draft;
+    private IReadOnlyList<CategoryRule> _rules = [];
+    private bool _categoryChosen;
+    private bool _applyingCategory;
 
     [ObservableProperty]
     private string _url;
@@ -128,12 +134,63 @@ internal sealed partial class AddDownloadViewModel : ObservableObject
             Queues.Add(queue);
         }
 
+        _rules = await _jobs.CategoryRulesAsync(cancellationToken).ConfigureAwait(true);
         var remembered = Host() is { } host ? _sites.Get(host) : null;
-        SelectedCategory = Categories.FirstOrDefault(c => c.Id == remembered?.CategoryId) ?? Categories.FirstOrDefault();
+        var rememberedCategory = Categories.FirstOrDefault(c => c.Id == remembered?.CategoryId);
+        SetCategory(rememberedCategory ?? Categories.FirstOrDefault());
+        if (rememberedCategory is not null)
+        {
+            _categoryChosen = true; // what the person chose for this site before is not for the rules to change
+        }
+        else
+        {
+            ResolveCategory();
+        }
+
         SelectedQueue = Queues.FirstOrDefault();
         if (remembered?.Folder is { Length: > 0 } folder)
         {
             Folder = folder;
+        }
+    }
+
+    partial void OnSelectedCategoryChanged(Category? value)
+    {
+        if (!_applyingCategory)
+        {
+            _categoryChosen = true; // from here on the person decides
+        }
+    }
+
+    partial void OnUrlChanged(string value) => ResolveCategory();
+
+    partial void OnFileNameChanged(string value) => ResolveCategory();
+
+    private void SetCategory(Category? category)
+    {
+        _applyingCategory = true;
+        try
+        {
+            SelectedCategory = category;
+        }
+        finally
+        {
+            _applyingCategory = false;
+        }
+    }
+
+    /// <summary>Shows the category the rules would give this link (KASI-CAT-001, 002) until the person picks one or the site is remembered.</summary>
+    private void ResolveCategory()
+    {
+        if (_categoryChosen || Categories.Count == 0 || !Uri.TryCreate(Url.Trim(), UriKind.Absolute, out var uri))
+        {
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(FileName) ? null : FileName.Trim();
+        if (CategoryResolver.Resolve(uri, name, _draft.Mime, _rules, [.. Categories]) is { } match)
+        {
+            SetCategory(Categories.FirstOrDefault(c => c.Id == match.Category.Id));
         }
     }
 
@@ -186,7 +243,8 @@ internal sealed partial class AddDownloadViewModel : ObservableObject
             algorithm,
             algorithm is null ? null : hex,
             _draft.Cookies.Count > 0 ? _draft.Cookies : null,
-            _draft.UserAgent);
+            _draft.UserAgent,
+            _draft.Mime);
     }
 
     [RelayCommand]

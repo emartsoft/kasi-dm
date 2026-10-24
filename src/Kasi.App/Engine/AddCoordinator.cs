@@ -47,7 +47,8 @@ internal sealed class AddCoordinator(
             string.IsNullOrWhiteSpace(download.Filename) ? null : download.Filename,
             download.Referrer,
             [.. download.Cookies.Select(c => new JobCookie { Name = c.Name, Value = c.Value, Domain = c.Domain, Path = c.Path, Secure = c.Secure, HttpOnly = c.HttpOnly })],
-            download.UserAgent);
+            download.UserAgent,
+            string.IsNullOrWhiteSpace(download.Mime) ? null : download.Mime);
         Run(settings.Current.ShowAddDialog ? () => OpenAsync(draft) : () => AddDirectAsync(draft));
     }
 
@@ -177,11 +178,12 @@ internal sealed class AddCoordinator(
             draft.Url,
             draft.FileName ?? DownloadFileName.Resolve(draft.Url),
             queue.Id,
-            site?.CategoryId ?? 1,
+            site?.CategoryId, // none remembered: the category rules choose it
             site?.Folder,
             draft.Referrer,
             Cookies: draft.Cookies.Count > 0 ? draft.Cookies : null,
-            UserAgent: draft.UserAgent);
+            UserAgent: draft.UserAgent,
+            Mime: draft.Mime);
         var result = await jobs.AddAsync(request).ConfigureAwait(false);
         if (result.Job is null)
         {

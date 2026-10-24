@@ -85,6 +85,10 @@
     <value>Category</value>
     <comment>Label of the category list.</comment>
   </data>
+  <data name="PickerCategoryAutomatic" xml:space="preserve">
+    <value>By file type</value>
+    <comment>First entry of the picker's category list: each link goes to the category its file type belongs to.</comment>
+  </data>
   <data name="AddQueueLabel" xml:space="preserve">
     <value>Queue</value>
     <comment>Label of the queue list.</comment>
