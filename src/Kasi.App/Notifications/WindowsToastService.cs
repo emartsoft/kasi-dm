@@ -11,9 +11,9 @@ namespace Kasi.App.Notifications;
 /// </summary>
 internal sealed class WindowsToastService : INotificationService
 {
-    public void ShowCompleted(JobId id, string fileName) => Show(id, Strings.ToastCompleted, fileName, withButtons: true);
+    public void ShowCompleted(JobId id, string fileName, string? details = null) => Show(id, Strings.ToastCompleted, fileName, details, withButtons: true);
 
-    public void ShowFailed(JobId id, string fileName) => Show(id, Strings.ToastFailed, fileName, withButtons: false);
+    public void ShowFailed(JobId id, string fileName) => Show(id, Strings.ToastFailed, fileName, null, withButtons: false);
 
     /// <summary>Routes a clicked toast to <paramref name="router"/>. Dispose to stop listening.</summary>
     public static IDisposable Activate(NotificationRouter router)
@@ -29,7 +29,7 @@ internal sealed class WindowsToastService : INotificationService
         return new Subscription(() => ToastNotificationManagerCompat.OnActivated -= OnActivated);
     }
 
-    private static void Show(JobId id, string title, string fileName, bool withButtons)
+    private static void Show(JobId id, string title, string fileName, string? details, bool withButtons)
     {
         try
         {
@@ -38,6 +38,16 @@ internal sealed class WindowsToastService : INotificationService
                 .AddArgument(ToastActions.Job, id.ToString())
                 .AddText(title)
                 .AddText(fileName);
+            if (details is not null)
+            {
+                builder.AddText(details);
+            }
+
+            if (LogoPath() is { } logo)
+            {
+                builder.AddAppLogoOverride(new Uri(logo), ToastGenericAppLogoCrop.Circle);
+            }
+
             if (withButtons)
             {
                 builder
@@ -50,6 +60,27 @@ internal sealed class WindowsToastService : INotificationService
         catch (Exception ex) when (ex is COMException or InvalidOperationException or PlatformNotSupportedException)
         {
             // toasts are off or not available here: the download is done either way
+        }
+    }
+
+    // the Kasi mark as the toast's logo: a toast needs a file, so the embedded picture is written once beside the settings
+    private static string? LogoPath()
+    {
+        try
+        {
+            var path = Path.Combine(Kasi.App.Engine.AppPaths.DataFolder(), "toast-logo.png");
+            if (!File.Exists(path))
+            {
+                using var source = Avalonia.Platform.AssetLoader.Open(new Uri("avares://Kasi.App/Assets/kasi.png"));
+                using var target = File.Create(path);
+                source.CopyTo(target);
+            }
+
+            return path;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 

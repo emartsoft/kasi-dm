@@ -30,6 +30,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
     private AddCoordinator? _add;
     private TrayIconViewModel? _tray;
     private TrayIcon? _trayIcon;
+    private TrayFlyoutWindow? _flyout;
     private IDisposable? _toastClicks;
     private ClipboardWatcher? _clipboard;
     private readonly Dictionary<JobId, DetailsWindow> _details = [];
@@ -263,6 +264,27 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         _toastClicks = WindowsToastService.Activate(new NotificationRouter(jobs, new WindowsShell()));
     }
 
+    private void ToggleFlyout(TrayIconViewModel model)
+    {
+        if (_flyout is { IsVisible: true } open)
+        {
+            open.Close();
+            return;
+        }
+
+        try
+        {
+            _flyout = new TrayFlyoutWindow { DataContext = model };
+            _flyout.Closed += (_, _) => _flyout = null;
+            _flyout.Show();
+        }
+        catch (InvalidOperationException)
+        {
+            _flyout = null;
+            ShowMainWindow(); // the panel could not be shown: the click opens the window as it always did
+        }
+    }
+
     private TrayIcon BuildTrayIcon(TrayIconViewModel model)
     {
         var limits = new NativeMenu();
@@ -288,7 +310,8 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         };
         using var icon = AssetLoader.Open(new Uri("avares://Kasi.App/Assets/kasi.png"));
         var trayIcon = new TrayIcon { Icon = new WindowIcon(icon), ToolTipText = model.ToolTip, Menu = menu };
-        trayIcon.Clicked += (_, _) => ShowMainWindow();
+        // a click opens the panel (the native menu stays on the right button, and is what a machine without the panel shows)
+        trayIcon.Clicked += (_, _) => ToggleFlyout(model);
         model.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(TrayIconViewModel.ToolTip))

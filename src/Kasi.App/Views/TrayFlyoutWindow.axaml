@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Kasi.App.Tray"
+        xmlns:c="using:Kasi.App.Controls"
+        x:Class="Kasi.App.Views.TrayFlyoutWindow"
+        x:DataType="vm:TrayIconViewModel"
+        Title="Kasi"
+        AutomationProperties.Name="{Binding FlyoutName}"
+        Width="320"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowDecorations="None"
+        Background="Transparent"
+        WindowStartupLocation="Manual">
+  <Border Background="{DynamicResource KasiBaseBrush}" BorderBrush="{DynamicResource KasiBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14">
+    <StackPanel Spacing="12">
+      <Border Classes="kasi-card" Padding="14,12">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding FlyoutSpeedLabel}" Classes="kasi-secondary" />
+          <TextBlock Text="{Binding TotalSpeedText}" FontSize="26" FontWeight="Bold" FontFamily="{DynamicResource KasiMonoFont}"
+                     Foreground="{DynamicResource KasiSuccessBrush}" AutomationProperties.Name="{Binding TotalSpeedText}" />
+          <c:Sparkline Samples="{Binding SpeedSamples}" Capacity="60" Height="44" LineBrush="{DynamicResource KasiSuccessBrush}" />
+        </StackPanel>
+      </Border>
+
+      <UniformGrid Columns="2">
+        <Button Content="{Binding PauseAllLabel}" Command="{Binding PauseAllCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,4,0"
+                AutomationProperties.Name="{Binding PauseAllLabel}" />
+        <Button Content="{Binding ResumeAllLabel}" Command="{Binding ResumeAllCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="4,0,0,0"
+                AutomationProperties.Name="{Binding ResumeAllLabel}" />
+      </UniformGrid>
+
+      <StackPanel Spacing="4">
+        <TextBlock Text="{Binding FlyoutLimitLabel}" Classes="kasi-secondary" />
+        <ListBox x:Name="Presets" ItemsSource="{Binding SpeedPresets}" SelectedItem="{Binding SelectedPreset}" Background="Transparent"
+                 AutomationProperties.Name="{Binding FlyoutLimitLabel}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SpeedPreset">
+              <TextBlock Text="{Binding Label}" AutomationProperties.Name="{Binding Label}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+
+      <Grid ColumnDefinitions="*,Auto">
+        <Button Grid.Column="0" Content="{Binding OpenLabel}" Command="{Binding OpenCommand}" Classes="accent" HorizontalAlignment="Left"
+                AutomationProperties.Name="{Binding OpenLabel}" />
+        <Button Grid.Column="1" Content="{Binding QuitLabel}" Command="{Binding QuitCommand}" AutomationProperties.Name="{Binding QuitLabel}" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</Window>

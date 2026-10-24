@@ -1,7 +1,13 @@
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Tray;
 using Kasi.App.ViewModels;
+using Kasi.App.Views;
 using Kasi.Core;
 using Microsoft.Extensions.Time.Testing;
 
@@ -137,6 +143,65 @@ public class TrayIconViewModelTests
     }
 
     [Fact]
+    [Trait("Requirement", "KASI-UI-004")]
+    public async Task The_panel_header_follows_the_total_speed_and_keeps_a_minute_of_it_for_the_chart()
+    {
+        var (tray, jobs, _, clock) = Make();
+        var a = JobId.New(TimeProvider.System);
+        tray.TotalSpeedText.Should().Be("0 B/s");
+
+        jobs.Raise(new JobProgressed(a, 1, 100, 2 * 1024 * 1024));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForAsync(() => tray.SpeedSamples.Count == 1);
+        jobs.Raise(new JobProgressed(a, 2, 100, 4 * 1024 * 1024));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForAsync(() => tray.SpeedSamples.Count == 2);
+
+        tray.TotalSpeedText.Should().Be("4 MB/s");
+        tray.SpeedSamples.Should().Equal([2.0 * 1024 * 1024, 4.0 * 1024 * 1024]);
+        await tray.DisposeAsync();
+    }
+
+    [AvaloniaFact]
+    [Trait("Requirement", "KASI-UI-004")]
+    public async Task The_panel_has_every_tray_action_with_a_name_and_Pause_all_runs_and_closes_it()
+    {
+        var (tray, jobs, app, _) = Make();
+        var window = new TrayFlyoutWindow { DataContext = tray };
+        window.Show();
+        window.UpdateLayout();
+
+        var buttons = window.GetVisualDescendants().OfType<Button>().Select(b => AutomationProperties.GetName(b)).ToList();
+        buttons.Should().Contain(["Pause all", "Resume all", "Open Kasi", "Quit"]);
+        window.GetVisualDescendants().OfType<ListBox>().Single().ItemCount.Should().Be(5, "Unlimited and the four limits");
+        AutomationProperties.GetName(window).Should().Be("Kasi tray panel");
+
+        var pause = window.GetVisualDescendants().OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Pause all");
+        pause.Command!.Execute(null);
+        await WaitForAsync(() => jobs.Inner.PauseAlls == 1);
+        pause.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        window.IsVisible.Should().BeFalse("a button of the panel closes it");
+        await tray.DisposeAsync();
+    }
+
+    [AvaloniaFact]
+    public async Task Esc_closes_the_panel_and_the_panel_can_be_opened_again()
+    {
+        var (tray, _, _, _) = Make();
+        var window = new TrayFlyoutWindow { DataContext = tray };
+        window.Show();
+
+        window.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+
+        window.IsVisible.Should().BeFalse();
+        var again = new TrayFlyoutWindow { DataContext = tray };
+        again.Show();
+        again.IsVisible.Should().BeTrue();
+        again.Close();
+        await tray.DisposeAsync();
+    }
+
+    [Fact]
     public async Task The_tooltip_shows_the_total_speed_once_per_tick_and_goes_back_to_the_name_when_nothing_runs()
     {
         var (tray, jobs, _, clock) = Make();
@@ -208,8 +273,11 @@ public class NotificationTests
     {
         public List<(string Kind, JobId Id, string Name)> Shown { get; } = [];
 
-        public void ShowCompleted(JobId id, string fileName)
+        public List<string?> Details { get; } = [];
+
+        public void ShowCompleted(JobId id, string fileName, string? details = null)
         {
+            Details.Add(details);
             lock (Shown)
             {
                 Shown.Add(("completed", id, fileName));
@@ -333,6 +401,29 @@ public class NotificationTests
         await WaitUntilAsync(() => toasts.Shown.Count == 2);
 
         shell.Opened.Should().Equal(Path.Combine(marked.Folder, marked.FileName));
+    }
+
+    [Fact]
+    [Trait("Requirement", "KASI-UI-005")]
+    public async Task The_completion_toast_says_how_big_the_file_was_and_how_long_it_took()
+    {
+        var jobs = new EventingJobService();
+        var created = new DateTimeOffset(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
+        var job = Finished() with { TotalBytes = 1_288_490_189, CreatedUtc = created, CompletedUtc = created.AddMinutes(4) };
+        var unknown = Finished() with { TotalBytes = null };
+        jobs.Stored[job.Id] = job;
+        jobs.Stored[unknown.Id] = unknown;
+        var toasts = new RecordingToasts();
+        new CompletionNotifier(jobs, toasts).Watch();
+
+        jobs.Raise(new JobStateChanged(job.Id, JobState.Verifying, JobState.Completed, null));
+        await WaitUntilAsync(() => toasts.Shown.Count == 1);
+        jobs.Raise(new JobStateChanged(unknown.Id, JobState.Verifying, JobState.Completed, null));
+        await WaitUntilAsync(() => toasts.Shown.Count == 2);
+
+        toasts.Details.Should().Contain("1.2 GB in 4 min");
+        toasts.Details.Should().Contain((string?)null, "a file of unknown size has nothing to add");
+        toasts.Shown.Select(s => s.Name).Should().OnlyContain(n => n == "pack.zip", "the file name is still all the title says");
     }
 
     [Fact]
