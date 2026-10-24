@@ -57,10 +57,11 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _selectedTab;
 
-    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null)
+    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null)
     {
         _store = store;
         _ui = ui;
+        Categories = categories;
         Themes =
         [
             new(ThemePreference.System, Strings.ThemeSystem),
@@ -78,6 +79,13 @@ internal sealed partial class SettingsViewModel : ObservableObject
         _selectedBypassKey = BypassKeys[0];
         Load(store.Current);
     }
+
+    /// <summary>The Categories page, which saves each change at once; null when the window is opened without the category stores.</summary>
+    public CategoriesViewModel? Categories { get; }
+
+    public bool HasCategories => Categories is not null;
+
+    public string CategoriesTab => Strings.CategoriesTab;
 
     public IReadOnlyList<BypassKeyChoice> BypassKeys { get; }
 

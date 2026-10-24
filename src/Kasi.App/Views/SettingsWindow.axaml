@@ -1,12 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Kasi.App.ViewModels"
+        xmlns:views="using:Kasi.App.Views"
         x:Class="Kasi.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="{Binding Title}"
         AutomationProperties.Name="{Binding AutomationName}"
         Width="640"
-        Height="640"
+        Height="780"
         MinWidth="480"
         MinHeight="480"
         WindowStartupLocation="CenterScreen">
@@ -53,6 +54,9 @@
             <NumericUpDown Value="{Binding MinSizeMegabytes}" Minimum="0" Maximum="1000000" Increment="1" FormatString="0.##" AutomationProperties.Name="{Binding MinSizeLabel}" />
           </StackPanel>
         </ScrollViewer>
+      </TabItem>
+      <TabItem Header="{Binding CategoriesTab}" IsVisible="{Binding HasCategories}" AutomationProperties.Name="{Binding CategoriesTab}">
+        <views:CategoriesView DataContext="{Binding Categories}" />
       </TabItem>
     </TabControl>
   </DockPanel>
