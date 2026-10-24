@@ -1,7 +1,9 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Threading.Channels;
 using Kasi.Core;
@@ -19,9 +21,13 @@ public sealed class MediaJobRunner(
     IJobRepository jobs,
     TimeProvider? timeProvider = null)
 {
+    /// <summary>The largest segment or init body held in memory; an HLS/DASH segment is seconds of media, never this large.</summary>
+    internal const long MaxSegmentBytes = 64L * 1024 * 1024;
+
+    /// <summary>An AES-128 key is 16 bytes; anything much larger is not a key.</summary>
+    internal const long MaxKeyBytes = 1024;
+
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
-    private int _worker;
-    private int _parallelism = 6;
 
     public async Task<MediaJobResult> RunAsync(
         MediaSourceLoader.Playable playable,
@@ -31,7 +37,6 @@ public sealed class MediaJobRunner(
         ArgumentNullException.ThrowIfNull(playable);
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
-        _parallelism = options.Parallelism;
         var job = await jobs.GetAsync(options.JobId, cancellationToken).ConfigureAwait(false)
             ?? throw new MediaJobException(MediaJobErrorKind.InvalidJob, "The media job does not exist.");
         if (job.Kind != JobKind.Media)
@@ -96,18 +101,27 @@ public sealed class MediaJobRunner(
 
         CleanStrayParts(jobDirectory, existingStreams);
 
+        using var run = new RunState(options.Parallelism, cancellationToken);
         using var pool = new HttpHostPool(options.PoolOptions, proxy: options.Proxy);
         var client = new SegmentClient(pool, options, _time);
         var progress = new ProgressTracker(options.Progress, existingSegments.Count);
-        var completionWriter = new CompletionWriter(media, options.JobId, plan.EstimatedTotal, options.CompletionInterval, _time);
+        var completionWriter = new CompletionWriter(media, options.JobId, plan.EstimatedTotal, options.CompletionInterval, _time, run);
         try
         {
-            await DownloadInitsAsync(existingStreams, jobDirectory, client, cancellationToken).ConfigureAwait(false);
+            await DownloadInitsAsync(existingStreams, jobDirectory, client, run).ConfigureAwait(false);
             var byStream = existingSegments.GroupBy(segment => segment.StreamIndex)
                 .ToDictionary(group => group.Key, group => (IReadOnlyList<MediaSegmentRecord>)[.. group.OrderBy(segment => segment.Index)]);
             using var keyCache = new KeyCache(client);
-            await Task.WhenAll(existingStreams.Select(stream =>
-                DownloadStreamAsync(stream, byStream.GetValueOrDefault(stream.Index, []), keys, jobDirectory, client, keyCache, completionWriter, progress, cancellationToken))).ConfigureAwait(false);
+            try
+            {
+                await Task.WhenAll(existingStreams.Select(stream =>
+                    DownloadStreamAsync(stream, byStream.GetValueOrDefault(stream.Index, []), keys, jobDirectory, client, keyCache, completionWriter, progress, run))).ConfigureAwait(false);
+            }
+            catch when (run.Failure is { } failure && !cancellationToken.IsCancellationRequested)
+            {
+                // The first real failure cancelled its siblings; surface it, not a sibling's cancellation.
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
 
             await completionWriter.FlushAsync().ConfigureAwait(false);
             var joined = await JoinAsync(existingStreams, existingSegments, jobDirectory, cancellationToken).ConfigureAwait(false);
@@ -120,18 +134,18 @@ public sealed class MediaJobRunner(
         }
         catch (OperationCanceledException)
         {
-            await completionWriter.FlushAsync().ConfigureAwait(false);
+            await completionWriter.TryFlushAsync().ConfigureAwait(false);
             throw;
         }
         catch (MediaJobException)
         {
-            await completionWriter.FlushAsync().ConfigureAwait(false);
+            await completionWriter.TryFlushAsync().ConfigureAwait(false);
             await FailAsync(job, cancellationToken).ConfigureAwait(false);
             throw;
         }
         catch (Exception exception)
         {
-            await completionWriter.FlushAsync().ConfigureAwait(false);
+            await completionWriter.TryFlushAsync().ConfigureAwait(false);
             var error = Classify(exception);
             await FailAsync(job, cancellationToken).ConfigureAwait(false);
             throw new MediaJobException(error, "The media download failed.", exception);
@@ -165,7 +179,7 @@ public sealed class MediaJobRunner(
         IReadOnlyList<MediaStreamRecord> streams,
         string jobDirectory,
         SegmentClient client,
-        CancellationToken cancellationToken)
+        RunState run)
     {
         foreach (var stream in streams.Where(stream => stream.InitUrl is not null))
         {
@@ -175,11 +189,12 @@ public sealed class MediaJobRunner(
                 continue;
             }
 
-            var bytes = await client.GetBytesAsync(new Uri(stream.InitUrl!), NextWorker(0, _parallelism), null, null, cancellationToken).ConfigureAwait(false);
+            var bytes = await client.GetBytesAsync(
+                new Uri(stream.InitUrl!), run.NextWorker(0), stream.InitRangeStart, stream.InitRangeEnd, MaxSegmentBytes, run.Token).ConfigureAwait(false);
             var part = path + ".part";
             try
             {
-                await WriteFlushedAsync(part, bytes, cancellationToken).ConfigureAwait(false);
+                await WriteFlushedAsync(part, bytes, run.Token).ConfigureAwait(false);
                 File.Move(part, path, overwrite: true);
             }
             catch
@@ -199,17 +214,22 @@ public sealed class MediaJobRunner(
         KeyCache keyCache,
         CompletionWriter completionWriter,
         ProgressTracker progress,
-        CancellationToken cancellationToken)
+        RunState run)
     {
-        using var gate = new SemaphoreSlim(Math.Min(segments.Count, _parallelism));
+        using var gate = new SemaphoreSlim(Math.Min(segments.Count, run.Parallelism));
         var directory = StreamDirectory(jobDirectory, stream.Index);
         var tasks = segments.Select(async segment =>
         {
-            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await gate.WaitAsync(run.Token).ConfigureAwait(false);
             try
             {
                 keys.TryGetValue((stream.Index, segment.Index), out var key);
-                await DownloadSegmentAsync(stream, segment, key, directory, client, keyCache, completionWriter, progress, cancellationToken).ConfigureAwait(false);
+                await DownloadSegmentAsync(stream, segment, key, directory, client, keyCache, completionWriter, progress, run).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                run.Fail(exception); // stop the siblings; Release below runs after the token is cancelled
+                throw;
             }
             finally
             {
@@ -228,7 +248,7 @@ public sealed class MediaJobRunner(
         KeyCache keyCache,
         CompletionWriter completionWriter,
         ProgressTracker progress,
-        CancellationToken cancellationToken)
+        RunState run)
     {
         var final = Path.Combine(directory, segment.Index.ToString(CultureInfo.InvariantCulture));
         if (File.Exists(final))
@@ -242,9 +262,10 @@ public sealed class MediaJobRunner(
         var part = final + ".part";
         try
         {
-            var cipher = await client.GetBytesAsync(new Uri(segment.Url), NextWorker(stream.Index * _parallelism, _parallelism), segment.RangeStart, segment.RangeEnd, cancellationToken).ConfigureAwait(false);
-            var plain = await keyCache.DecryptAsync(key, segment.Iv, segment.Index, cipher, NextWorker(stream.Index * _parallelism, _parallelism), cancellationToken).ConfigureAwait(false);
-            await WriteFlushedAsync(part, plain, cancellationToken).ConfigureAwait(false);
+            var cipher = await client.GetBytesAsync(
+                new Uri(segment.Url), run.NextWorker(stream.Index * run.Parallelism), segment.RangeStart, segment.RangeEnd, MaxSegmentBytes, run.Token).ConfigureAwait(false);
+            var plain = await keyCache.DecryptAsync(key, segment.Iv, segment.Index, cipher, run.NextWorker(stream.Index * run.Parallelism), run.Token).ConfigureAwait(false);
+            await WriteFlushedAsync(part, plain, run.Token).ConfigureAwait(false);
             File.Move(part, final, overwrite: true);
             completionWriter.Enqueue(new MediaSegmentCompletion(stream.Index, segment.Index, plain.Length));
             progress.Complete(plain.Length);
@@ -300,8 +321,6 @@ public sealed class MediaJobRunner(
     }
 #pragma warning restore CA2000, CA2007
 
-    private int NextWorker(int baseId, int parallelism) => baseId + (int)((uint)Interlocked.Increment(ref _worker) % parallelism);
-
     private static void CleanStrayParts(string jobDirectory, IReadOnlyList<MediaStreamRecord> streams)
     {
         foreach (var stream in streams)
@@ -313,18 +332,33 @@ public sealed class MediaJobRunner(
         }
     }
 
-    private static bool Matches(
+    /// <summary>True when the saved structure is the one this plan would create (same streams, init and segment URLs). O(n).</summary>
+    internal static bool Matches(
         IReadOnlyList<MediaStreamRecord> existingStreams,
         IReadOnlyList<MediaSegmentRecord> existingSegments,
         IReadOnlyList<MediaStreamRecord> plannedStreams,
-        IReadOnlyList<MediaSegmentRecord> plannedSegments) =>
-        existingStreams.Count == plannedStreams.Count
-        && existingStreams.All(stream => plannedStreams.Any(planned => planned.Index == stream.Index && planned.Role == stream.Role))
-        && existingSegments.Count == plannedSegments.Count
-        && existingSegments.All(segment => plannedSegments.Any(planned =>
-            planned.StreamIndex == segment.StreamIndex && planned.Index == segment.Index && planned.Url == segment.Url));
+        IReadOnlyList<MediaSegmentRecord> plannedSegments)
+    {
+        if (existingStreams.Count != plannedStreams.Count || existingSegments.Count != plannedSegments.Count)
+        {
+            return false;
+        }
 
-    private static (IReadOnlyList<MediaStreamRecord> Streams, IReadOnlyList<MediaSegmentRecord> Segments, long EstimatedTotal) BuildPlan(
+        var streams = plannedStreams.ToDictionary(stream => stream.Index);
+        if (existingStreams.Any(stream => !streams.TryGetValue(stream.Index, out var planned)
+            || planned.Role != stream.Role
+            || planned.InitUrl != stream.InitUrl
+            || planned.InitRangeStart != stream.InitRangeStart
+            || planned.InitRangeEnd != stream.InitRangeEnd))
+        {
+            return false;
+        }
+
+        var urls = plannedSegments.ToDictionary(segment => (segment.StreamIndex, segment.Index), segment => segment.Url);
+        return existingSegments.All(segment => urls.TryGetValue((segment.StreamIndex, segment.Index), out var url) && url == segment.Url);
+    }
+
+    internal static (IReadOnlyList<MediaStreamRecord> Streams, IReadOnlyList<MediaSegmentRecord> Segments, long EstimatedTotal) BuildPlan(
         List<MediaTrack> tracks,
         long estimatedTotal)
     {
@@ -347,14 +381,16 @@ public sealed class MediaJobRunner(
                 track.Id,
                 track.EstimatedBytes,
                 track.Initialization?.Uri.AbsoluteUri,
-                track.Initialization?.Range?.Length));
+                track.Initialization?.Range?.Length,
+                track.Initialization?.Range?.Offset,
+                track.Initialization?.Range?.EndInclusive));
             foreach (var segment in track.Segments.OrderBy(segment => segment.Index))
             {
                 segments.Add(new MediaSegmentRecord(
                     index,
                     segment.Index,
                     segment.Uri.AbsoluteUri,
-                    Iv: segment.Key?.Iv,
+                    Iv: segment.Key?.Iv ?? ImplicitIv(segment),
                     Discontinuity: segment.Discontinuity,
                     RangeStart: segment.Range?.Offset,
                     RangeEnd: segment.Range?.EndInclusive));
@@ -362,6 +398,19 @@ public sealed class MediaJobRunner(
         }
 
         return (streams, segments, estimatedTotal);
+    }
+
+    /// <summary>RFC 8216: an AES-128 key without an IV uses the segment's media sequence number as a 16-byte big-endian IV.</summary>
+    private static string? ImplicitIv(MediaSegment segment) =>
+        segment.Key is { } key && key.Method.Trim().Equals("AES-128", StringComparison.OrdinalIgnoreCase) && segment.Sequence is { } sequence
+            ? SequenceIv(sequence)
+            : null;
+
+    internal static string SequenceIv(long sequence)
+    {
+        Span<byte> iv = stackalloc byte[16];
+        BinaryPrimitives.WriteInt64BigEndian(iv[8..], sequence);
+        return Convert.ToHexString(iv);
     }
 
     private static string StreamDirectory(string jobDirectory, int streamIndex) =>
@@ -408,32 +457,50 @@ public sealed class MediaJobRunner(
         private readonly long? _estimatedTotal;
         private readonly TimeSpan _interval;
         private readonly TimeProvider _time;
+        private readonly RunState _run;
         private readonly Channel<MediaSegmentCompletion> _channel = Channel.CreateUnbounded<MediaSegmentCompletion>(
             new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        private readonly CancellationTokenSource _stop = new();
         private readonly Task _loop;
+        private Exception? _fault;
 
-        public CompletionWriter(IMediaRepository media, JobId jobId, long? estimatedTotal, TimeSpan interval, TimeProvider time)
+        public CompletionWriter(IMediaRepository media, JobId jobId, long? estimatedTotal, TimeSpan interval, TimeProvider time, RunState run)
         {
             _media = media;
             _jobId = jobId;
             _estimatedTotal = estimatedTotal;
             _interval = interval;
             _time = time;
+            _run = run;
             _loop = LoopAsync();
         }
 
         public void Enqueue(MediaSegmentCompletion completion) => _channel.Writer.TryWrite(completion);
 
-#pragma warning disable VSTHRD003 // the writer loop belongs to this runner and is awaited only after it is completed
+        /// <summary>Writes what is queued, then reports a save failure as a disk error.</summary>
         public async Task FlushAsync()
         {
-            _channel.Writer.TryComplete();
-            await _loop.ConfigureAwait(false);
+            await StopAsync().ConfigureAwait(false);
+            if (_fault is { } fault)
+            {
+                throw new MediaJobException(MediaJobErrorKind.Disk, "Finished segments could not be saved.", fault);
+            }
         }
+
+        /// <summary>For failure paths: writes what is queued and never throws, so it cannot hide the original error.</summary>
+        public Task TryFlushAsync() => StopAsync();
 
         public async ValueTask DisposeAsync()
         {
+            await StopAsync().ConfigureAwait(false);
+            _stop.Dispose();
+        }
+
+#pragma warning disable VSTHRD003 // the writer loop belongs to this runner and is awaited only after it is completed
+        private async Task StopAsync()
+        {
             _channel.Writer.TryComplete();
+            await _stop.CancelAsync().ConfigureAwait(false); // ends the batch pause at once
             await _loop.ConfigureAwait(false);
         }
 #pragma warning restore VSTHRD003
@@ -451,17 +518,57 @@ public sealed class MediaJobRunner(
 
                 if (batch.Count > 0)
                 {
-                    await _media.MarkCompletedAsync(_jobId, batch, _estimatedTotal, CancellationToken.None).ConfigureAwait(false);
+                    try
+                    {
+                        await _media.MarkCompletedAsync(_jobId, batch, _estimatedTotal, CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception exception)
+                    {
+                        _fault = exception;
+                        _run.Fail(new MediaJobException(MediaJobErrorKind.Disk, "Finished segments could not be saved.", exception));
+                        return;
+                    }
                 }
 
-                await Task.Delay(_interval, _time).ConfigureAwait(false);
+                try
+                {
+                    await Task.Delay(_interval, _time, _stop.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // flush requested: drain what is left without waiting
+                }
             }
         }
     }
 
+    /// <summary>Per-run state, so one runner can serve several jobs at once. Cancelled on the first real failure.</summary>
+    private sealed class RunState(int parallelism, CancellationToken parent) : IDisposable
+    {
+        private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(parent);
+        private int _worker;
+        private Exception? _failure;
+
+        public int Parallelism { get; } = parallelism;
+
+        public CancellationToken Token => _cts.Token;
+
+        public Exception? Failure => Volatile.Read(ref _failure);
+
+        public int NextWorker(int baseId) => baseId + (int)((uint)Interlocked.Increment(ref _worker) % Parallelism);
+
+        public void Fail(Exception exception)
+        {
+            Interlocked.CompareExchange(ref _failure, exception, null);
+            _cts.Cancel();
+        }
+
+        public void Dispose() => _cts.Dispose();
+    }
+
     private sealed class SegmentClient(HttpHostPool pool, MediaJobOptions options, TimeProvider time)
     {
-        public async Task<byte[]> GetBytesAsync(Uri uri, int worker, long? rangeStart, long? rangeEnd, CancellationToken cancellationToken)
+        public async Task<byte[]> GetBytesAsync(Uri uri, int worker, long? rangeStart, long? rangeEnd, long maxBytes, CancellationToken cancellationToken)
         {
             for (var attempt = 1; ; attempt++)
             {
@@ -495,27 +602,44 @@ public sealed class MediaJobRunner(
                     }
 
                     var length = response.Content.Headers.ContentLength;
+                    if (length > maxBytes)
+                    {
+                        throw new MediaJobException(MediaJobErrorKind.Network, "A media segment is larger than the allowed size.");
+                    }
+
+                    using var body = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
+                    if (length is { } known)
+                    {
+                        // Known length: read straight into the final array, no second copy.
+                        var exact = new byte[known];
+                        var filled = 0;
+                        while (filled < exact.Length)
+                        {
+                            var read = await ReadAsync(body, exact.AsMemory(filled), timeout.Token).ConfigureAwait(false);
+                            if (read == 0)
+                            {
+                                throw new IOException("The segment body was truncated.");
+                            }
+
+                            filled += read;
+                        }
+
+                        return exact;
+                    }
+
                     var buffer = ArrayPool<byte>.Shared.Rent(16 * 1024);
                     try
                     {
-                        using var body = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
-                        using var memory = new MemoryStream(length is > 0 and < int.MaxValue ? (int)length.Value : 0);
-                        long total = 0;
-                        int read;
-                        while ((read = await ReadAsync(body, buffer, timeout.Token).ConfigureAwait(false)) > 0)
+                        using var memory = new MemoryStream();
+                        int count;
+                        while ((count = await ReadAsync(body, buffer.AsMemory(), timeout.Token).ConfigureAwait(false)) > 0)
                         {
-                            total += read;
-                            if (total > 256L * 1024 * 1024)
+                            if (memory.Length + count > maxBytes)
                             {
-                                throw new MediaJobException(MediaJobErrorKind.Network, "A media segment is larger than the 256 MB cap.");
+                                throw new MediaJobException(MediaJobErrorKind.Network, "A media segment is larger than the allowed size.");
                             }
 
-                            await memory.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                        }
-
-                        if (length is { } expected && total != expected)
-                        {
-                            throw new IOException("The segment body was truncated.");
+                            await memory.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
                         }
 
                         return memory.ToArray();
@@ -561,7 +685,7 @@ public sealed class MediaJobRunner(
             }
         }
 
-        private async Task<int> ReadAsync(Stream body, byte[] buffer, CancellationToken cancellationToken)
+        private async Task<int> ReadAsync(Stream body, Memory<byte> buffer, CancellationToken cancellationToken)
         {
             if (options.BandwidthLimiter is not { } limiter)
             {
@@ -569,7 +693,7 @@ public sealed class MediaJobRunner(
             }
 
             var granted = await limiter.AcquireAsync(buffer.Length, options.JobBandwidthLimit, cancellationToken).ConfigureAwait(false);
-            var read = await body.ReadAsync(buffer.AsMemory(0, granted), cancellationToken).ConfigureAwait(false);
+            var read = await body.ReadAsync(buffer[..granted], cancellationToken).ConfigureAwait(false);
             limiter.ReturnUnused(granted - read, options.JobBandwidthLimit);
             return read;
         }
@@ -579,7 +703,8 @@ public sealed class MediaJobRunner(
             var current = uri;
             for (var redirect = 0; redirect <= 5; redirect++)
             {
-                using var request = MediaSourceLoader.BuildRequest(current, options.ManifestUri, options.RequestContext);
+                // The referrer goes to this resource's own origin (CDNs check it) but not to a cross-origin redirect target.
+                using var request = MediaSourceLoader.BuildRequest(current, uri, options.RequestContext);
                 if (rangeStart is { } start && rangeEnd is { } end)
                 {
                     request.Headers.Range = new RangeHeaderValue(start, end);
@@ -662,7 +787,7 @@ public sealed class MediaJobRunner(
             {
                 if (!_keys.TryGetValue(keyUri, out keyBytes!))
                 {
-                    keyBytes = await client.GetBytesAsync(key.Uri, worker, null, null, cancellationToken).ConfigureAwait(false);
+                    keyBytes = await client.GetBytesAsync(key.Uri, worker, null, null, MaxKeyBytes, cancellationToken).ConfigureAwait(false);
                     _keys[keyUri] = keyBytes;
                 }
             }

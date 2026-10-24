@@ -8,7 +8,8 @@ public sealed class MediaRepository(SqliteConnectionFactory factory) : IMediaRep
 {
     private const string StreamSelect =
         "SELECT idx AS \"Index\", role AS Role, language AS Language, codecs AS Codecs, container AS Container, " +
-        "variant_id AS VariantId, estimated_bytes AS EstimatedBytes, init_url AS InitUrl, init_size AS InitSize FROM media_stream";
+        "variant_id AS VariantId, estimated_bytes AS EstimatedBytes, init_url AS InitUrl, init_size AS InitSize, " +
+        "init_range_start AS InitRangeStart, init_range_end AS InitRangeEnd FROM media_stream";
 
     private const string SegmentSelect =
         "SELECT stream_idx AS StreamIndex, idx AS \"Index\", url AS Url, size AS Size, completed AS Completed, " +
@@ -34,8 +35,8 @@ public sealed class MediaRepository(SqliteConnectionFactory factory) : IMediaRep
         foreach (var stream in streams)
         {
             await connection.ExecuteAsync(new CommandDefinition(
-                "INSERT INTO media_stream (job_id, idx, role, language, codecs, container, variant_id, estimated_bytes, init_url, init_size) " +
-                "VALUES (@job, @index, @role, @language, @codecs, @container, @variantId, @estimatedBytes, @initUrl, @initSize);",
+                "INSERT INTO media_stream (job_id, idx, role, language, codecs, container, variant_id, estimated_bytes, init_url, init_size, init_range_start, init_range_end) " +
+                "VALUES (@job, @index, @role, @language, @codecs, @container, @variantId, @estimatedBytes, @initUrl, @initSize, @initRangeStart, @initRangeEnd);",
                 new
                 {
                     job = jobId.ToString(),
@@ -48,6 +49,8 @@ public sealed class MediaRepository(SqliteConnectionFactory factory) : IMediaRep
                     estimatedBytes = stream.EstimatedBytes,
                     initUrl = stream.InitUrl,
                     initSize = stream.InitSize,
+                    initRangeStart = stream.InitRangeStart,
+                    initRangeEnd = stream.InitRangeEnd,
                 },
                 transaction,
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -97,7 +100,9 @@ public sealed class MediaRepository(SqliteConnectionFactory factory) : IMediaRep
             row.VariantId,
             row.EstimatedBytes,
             row.InitUrl,
-            row.InitSize))];
+            row.InitSize,
+            row.InitRangeStart,
+            row.InitRangeEnd))];
     }
 
     public async Task<IReadOnlyList<MediaSegmentRecord>> LoadSegmentsAsync(JobId jobId, CancellationToken cancellationToken = default)
@@ -175,6 +180,10 @@ public sealed class MediaRepository(SqliteConnectionFactory factory) : IMediaRep
         public string? InitUrl { get; set; }
 
         public long? InitSize { get; set; }
+
+        public long? InitRangeStart { get; set; }
+
+        public long? InitRangeEnd { get; set; }
     }
 
     private sealed class MediaSegmentRow

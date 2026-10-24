@@ -33,6 +33,16 @@ public sealed class MediaRepositoryTests : IAsyncLifetime, IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
+    public async Task An_init_byte_range_round_trips()
+    {
+        var stream = new MediaStreamRecord(0, "video", InitUrl: "https://media.example/f.mp4", InitSize: 90, InitRangeStart: 10, InitRangeEnd: 99);
+
+        await _media.ReplaceAsync(_jobId, [stream], [], null, TempDatabase.Ct);
+
+        (await _media.LoadStreamsAsync(_jobId, TempDatabase.Ct)).Should().ContainSingle().Which.Should().Be(stream);
+    }
+
+    [Fact]
     public async Task Replace_load_and_batched_completion_update_the_job_progress()
     {
         await _media.ReplaceAsync(_jobId, Streams(), Segments(), 3000, TempDatabase.Ct);

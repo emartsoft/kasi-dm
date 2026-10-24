@@ -10,6 +10,8 @@ CREATE TABLE media_stream (
     estimated_bytes INTEGER,
     init_url        TEXT,
     init_size       INTEGER,
+    init_range_start INTEGER,
+    init_range_end  INTEGER,
     PRIMARY KEY (job_id, idx)
 ) WITHOUT ROWID;
 

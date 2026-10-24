@@ -425,6 +425,12 @@ public static partial class DashParser
         double periodDuration)
     {
         var initialization = InitializationFromSource(Child(segmentBase, "Initialization"), baseUri);
+        if (initialization is not null && initialization.Uri == baseUri)
+        {
+            // The init range is the start of the same file the single segment fetches whole; keeping it would duplicate it.
+            initialization = null;
+        }
+
         // Without parsing sidx, an on-demand SegmentBase representation is one whole-resource segment.
         return (initialization, [new MediaSegment(0, baseUri, periodDuration)]);
     }

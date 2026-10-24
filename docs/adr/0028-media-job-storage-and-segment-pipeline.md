@@ -34,8 +34,16 @@ responses, truncated bodies and timeouts retry through the policy; a 4xx failure
 
 **AES-128.** Only the `Playable` plan from ADR 0027 reaches this runner. Keys are fetched once per key URI, held in memory
 only, never written to SQLite or logs; the key URI must be HTTPS. CBC/PKCS#7 uses the explicit `IV` when present, otherwise the
-segment's media sequence number as 16 big-endian bytes (RFC 8216). Decryption happens before the segment file is renamed and
+segment's media sequence number (`EXT-X-MEDIA-SEQUENCE` + index, carried on `MediaSegment.Sequence` and stored as an explicit IV in `media_segment`) as 16 big-endian bytes (RFC 8216). Decryption happens before the segment file is renamed and
 before it is marked complete.
+
+**Init byte ranges, limits and failure.** `media_stream` keeps the init range (`init_range_start`/`init_range_end`) so a
+`BYTERANGE` init segment fetches only its range; a DASH `SegmentBase` whose init is the media file itself is one whole segment
+with no separate init. A segment or init body is held in memory up to 64 MB and a key up to 1 KiB. The first non-cancellation
+failure cancels the run's other segment fetches and is the error reported. All per-run state (parallelism, worker counter,
+cancellation) lives in the run, so one `MediaJobRunner` serves several jobs at once. A failed completion save fails the run as a
+disk error, and a flush never waits out the batch interval. The page referrer is sent to a segment's own origin, not to a
+cross-origin redirect target.
 
 **Ordered assembly.** Per stream, `init` (if any) followed by segments in index order is copied into
 `<job>/joined/<stream>.bin`. The job moves `Downloading -> Muxing`; M3.4 invokes FFmpeg on these files and owns the final

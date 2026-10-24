@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Kasi.Media.Tests" />
     <ProjectReference Include="../Kasi.Core/Kasi.Core.csproj" />
     <ProjectReference Include="../Kasi.Engine/Kasi.Engine.csproj" />
   </ItemGroup>

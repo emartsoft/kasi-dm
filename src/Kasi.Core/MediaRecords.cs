@@ -10,7 +10,9 @@ public sealed record MediaStreamRecord(
     string? VariantId = null,
     long? EstimatedBytes = null,
     string? InitUrl = null,
-    long? InitSize = null);
+    long? InitSize = null,
+    long? InitRangeStart = null,
+    long? InitRangeEnd = null);
 
 /// <summary>One segment row; <see cref="Completed"/> is set only after the segment file is flushed and renamed.</summary>
 public sealed record MediaSegmentRecord(
