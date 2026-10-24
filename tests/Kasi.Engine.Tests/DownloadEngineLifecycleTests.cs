@@ -474,6 +474,21 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Recovery_leaves_a_media_job_to_the_media_executor()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root, startEngine: false);
+        var job = harness.NewJob("/files/media-recover/1024", "media-recover.mp4") with { Kind = JobKind.Media, State = JobState.Downloading, DoneBytes = 777 };
+        await harness.Jobs.AddAsync(job, ct);
+
+        await harness.Engine.StartAsync(ct);
+
+        var stored = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        stored.State.Should().Be(JobState.Downloading, "the engine's recovery is for HTTP and FTP jobs only");
+        stored.DoneBytes.Should().Be(777, "the saved media progress is not reset");
+    }
+
+    [Fact]
     [Trait("TC", "TC-RES-002")]
     public async Task Recovery_pauses_a_job_with_a_valid_part_and_reconciles_its_bytes()
     {

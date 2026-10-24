@@ -9,7 +9,9 @@ namespace Kasi.App.Engine;
 
 /// <summary>
 /// Runs the media-specific part of a job: load the manifest with the saved page context, download/decrypt/join, mux with the
-/// configured FFmpeg, verify the duration and move the job to Completed (M3.5). It starts in the background, like DownloadEngine.
+/// configured FFmpeg, verify the duration and move the job to Completed (M3.5). It starts in the background, like DownloadEngine,
+/// and publishes every state change and progress step through <c>publish</c> (the engine's dispatcher), so the grid, tray,
+/// notifications and the queue runner treat a media job like any other.
 /// </summary>
 internal sealed partial class MediaJobExecutor(
     IJobRepository jobs,
@@ -19,8 +21,15 @@ internal sealed partial class MediaJobExecutor(
     BandwidthLimiter bandwidth,
     string mediaRoot,
     FfmpegOptions? ffmpeg,
-    ILogger? logger = null)
+    Action<EngineEvent> publish,
+    TimeProvider? timeProvider = null,
+    ILogger? logger = null) : IJobControl
 {
+    public const string FfmpegMissingMessage = "FFmpeg is not available, so this stream can't be saved.";
+
+    private const int MaxLogLines = 20;
+
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
     private readonly ConcurrentDictionary<JobId, CancellationTokenSource> _running = new();
 
@@ -33,11 +42,88 @@ internal sealed partial class MediaJobExecutor(
             throw new InvalidOperationException("The job is not a media job.");
         }
 
+        if (_running.ContainsKey(id))
+        {
+            return;
+        }
+
         if (!await MoveToDownloadingAsync(job, cancellationToken).ConfigureAwait(false))
         {
             throw new InvalidOperationException("The media job cannot start from its current state.");
         }
 
+        StartRun(id);
+    }
+
+    /// <summary>
+    /// Stops the download and parks the job as Paused. A job already muxing or verifying is left to finish: that step is short
+    /// and interrupting it would only redo the join.
+    /// </summary>
+    public async Task PauseJobAsync(JobId id, CancellationToken cancellationToken = default)
+    {
+        if (!_running.TryGetValue(id, out var run))
+        {
+            return;
+        }
+
+        var job = await jobs.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        if (job is null || job.State is JobState.Muxing or JobState.Verifying)
+        {
+            return;
+        }
+
+        await run.CancelAsync().ConfigureAwait(false);
+        if (job.State is JobState.Downloading or JobState.Retrying)
+        {
+            await ChangeAsync(id, job.State, JobState.Paused, null, PauseReason.UserRequested, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Start-up recovery for media jobs (the engine only recovers HTTP and FTP jobs): a job caught downloading is parked and
+    /// requeued, a job caught muxing is muxed again from its joined files, and a job whose file was already saved is completed.
+    /// </summary>
+    public async Task RecoverAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var state in new[] { JobState.Probing, JobState.Downloading, JobState.Retrying, JobState.Verifying, JobState.Muxing })
+        {
+            var stuck = await jobs.ListAsync(state: state, cancellationToken: cancellationToken).ConfigureAwait(false);
+            foreach (var job in stuck.Where(job => job.Kind == JobKind.Media))
+            {
+                await RecoverJobAsync(job, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task RecoverJobAsync(Job job, CancellationToken cancellationToken)
+    {
+        switch (job.State)
+        {
+            case JobState.Probing:
+                await ChangeAsync(job.Id, JobState.Probing, JobState.Queued, null, null, cancellationToken).ConfigureAwait(false);
+                break;
+            case JobState.Muxing:
+                StartRun(job.Id); // the segments and joined files are on disk: RunAsync rejoins and muxes
+                break;
+            case JobState.Verifying when File.Exists(Path.Combine(job.Folder, job.FileName)):
+                if (await ChangeAsync(job.Id, JobState.Verifying, JobState.Completed, null, null, cancellationToken).ConfigureAwait(false))
+                {
+                    await secrets.DeleteAsync(job.Id, cancellationToken).ConfigureAwait(false);
+                }
+
+                break;
+            default: // Downloading, Retrying, or Verifying without its file
+                if (await ChangeAsync(job.Id, job.State, JobState.Paused, null, PauseReason.CrashRecovery, cancellationToken).ConfigureAwait(false))
+                {
+                    await ChangeAsync(job.Id, JobState.Paused, JobState.Queued, null, null, cancellationToken).ConfigureAwait(false);
+                }
+
+                break;
+        }
+    }
+
+    private void StartRun(JobId id)
+    {
         var run = new CancellationTokenSource();
         if (!_running.TryAdd(id, run))
         {
@@ -48,33 +134,37 @@ internal sealed partial class MediaJobExecutor(
         _ = Task.Run(() => RunAsync(id, run.Token), CancellationToken.None);
     }
 
-    public async Task PauseJobAsync(JobId id, CancellationToken cancellationToken = default)
-    {
-        if (_running.TryGetValue(id, out var run))
-        {
-            await run.CancelAsync().ConfigureAwait(false);
-        }
-
-    }
-
     private async Task<bool> MoveToDownloadingAsync(Job job, CancellationToken cancellationToken)
     {
-        if (job.State == JobState.Downloading || job.State == JobState.Muxing)
+        switch (job.State)
         {
-            return true;
+            case JobState.Downloading or JobState.Muxing:
+                return true;
+            case JobState.Queued:
+                return await ChangeAsync(job.Id, JobState.Queued, JobState.Probing, null, null, cancellationToken).ConfigureAwait(false)
+                    && await ChangeAsync(job.Id, JobState.Probing, JobState.Downloading, null, null, cancellationToken).ConfigureAwait(false);
+            case JobState.Paused:
+                return await ChangeAsync(job.Id, JobState.Paused, JobState.Downloading, null, null, cancellationToken).ConfigureAwait(false);
+            default:
+                return false;
         }
+    }
 
-        if (job.State != JobState.Queued)
+    private async Task<bool> ChangeAsync(
+        JobId id,
+        JobState from,
+        JobState to,
+        string? error,
+        PauseReason? pauseReason,
+        CancellationToken cancellationToken)
+    {
+        if (!await jobs.TryChangeStateAsync(id, from, to, error, pauseReason, cancellationToken).ConfigureAwait(false))
         {
             return false;
         }
 
-        if (!await jobs.TryChangeStateAsync(job.Id, JobState.Queued, JobState.Probing, cancellationToken: cancellationToken).ConfigureAwait(false))
-        {
-            return false;
-        }
-
-        return await jobs.TryChangeStateAsync(job.Id, JobState.Probing, JobState.Downloading, cancellationToken: cancellationToken).ConfigureAwait(false);
+        publish(new JobStateChanged(id, from, to, error));
+        return true;
     }
 
     private async Task RunAsync(JobId id, CancellationToken cancellationToken)
@@ -88,6 +178,13 @@ internal sealed partial class MediaJobExecutor(
                 return;
             }
 
+            if (ffmpeg is null)
+            {
+                LogFfmpegMissing(id);
+                await FailAsync(job.Id, FfmpegMissingMessage).ConfigureAwait(false);
+                return;
+            }
+
             var secret = await secrets.GetAsync(id, cancellationToken).ConfigureAwait(false);
             var context = new MediaRequestContext(
                 secret?.Cookies ?? [],
@@ -96,13 +193,12 @@ internal sealed partial class MediaJobExecutor(
                 TryUri(Header(secret, "Origin")));
             var kind = job.Url.EndsWith(".mpd", StringComparison.OrdinalIgnoreCase) ? MediaKind.Dash : MediaKind.Hls;
             var result = await loader.LoadAsync(kind, new Uri(job.Url), context, cancellationToken).ConfigureAwait(false);
-            if (result is MediaSourceLoader.ProtectedResult)
+            if (result is not MediaSourceLoader.Playable playable)
             {
-                await FailAsync(job, MediaSourceLoader.ProtectedMessage, cancellationToken).ConfigureAwait(false);
+                await FailAsync(job.Id, MediaSourceLoader.ProtectedMessage).ConfigureAwait(false);
                 return;
             }
 
-            var playable = (MediaSourceLoader.Playable)result;
             var downloaded = await runner.RunAsync(playable, new MediaJobOptions
             {
                 JobId = id,
@@ -110,14 +206,8 @@ internal sealed partial class MediaJobExecutor(
                 MediaRoot = mediaRoot,
                 RequestContext = context,
                 BandwidthLimiter = bandwidth,
-
+                Events = publish,
             }, cancellationToken).ConfigureAwait(false);
-
-            if (ffmpeg is null)
-            {
-                LogFfmpegMissing(id);
-                return;
-            }
 
             var muxed = await new MediaMuxer(new FfmpegRunner(ffmpeg)).MuxAsync(
                 downloaded,
@@ -130,20 +220,30 @@ internal sealed partial class MediaJobExecutor(
             }
 
             await jobs.UpdateAsync(current with { FileName = Path.GetFileName(muxed.OutputPath) }, cancellationToken).ConfigureAwait(false);
-            await jobs.TryChangeStateAsync(id, JobState.Muxing, JobState.Verifying, cancellationToken: cancellationToken).ConfigureAwait(false);
-            await jobs.TryChangeStateAsync(id, JobState.Verifying, JobState.Completed, cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (await ChangeAsync(id, JobState.Muxing, JobState.Verifying, null, null, cancellationToken).ConfigureAwait(false)
+                && await ChangeAsync(id, JobState.Verifying, JobState.Completed, null, null, cancellationToken).ConfigureAwait(false))
+            {
+                await secrets.DeleteAsync(id, cancellationToken).ConfigureAwait(false); // TRD 11.1: cookies go with the job's work
+            }
         }
         catch (OperationCanceledException)
         {
-            // pause/close: the Downloading state and the completion rows are already durable
+            // pause or shutdown: the state and the completion rows are already durable
+        }
+        catch (MediaMuxException exception)
+        {
+            LogJobFailed(id, exception.Kind.ToString());
+            foreach (var line in (exception.SanitizedStderr ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(MaxLogLines))
+            {
+                publish(new JobLogged(id, _time.GetUtcNow(), line));
+            }
+
+            await FailAsync(id, exception.Message).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
             LogJobFailed(id, exception.GetType().Name);
-            if (job is not null)
-            {
-                await FailAsync(job, "The media capture failed.", CancellationToken.None).ConfigureAwait(false);
-            }
+            await FailAsync(id, "The media capture failed.").ConfigureAwait(false);
         }
         finally
         {
@@ -154,17 +254,17 @@ internal sealed partial class MediaJobExecutor(
         }
     }
 
-    [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Media job {Job} downloaded but FFmpeg is not configured; leaving it in Muxing.")]
-    private partial void LogFfmpegMissing(Kasi.Core.JobId job);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Media job {Job} cannot run: FFmpeg is not configured.")]
+    private partial void LogFfmpegMissing(JobId job);
 
-    [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Media job {Job} failed ({Kind}).")]
-    private partial void LogJobFailed(Kasi.Core.JobId job, string kind);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Media job {Job} failed ({Kind}).")]
+    private partial void LogJobFailed(JobId job, string kind);
 
-    private async Task FailAsync(Job job, string message, CancellationToken cancellationToken)
+    private async Task FailAsync(JobId id, string message)
     {
-        foreach (var state in new[] { JobState.Downloading, JobState.Muxing, JobState.Verifying })
+        foreach (var state in new[] { JobState.Downloading, JobState.Muxing, JobState.Verifying, JobState.Retrying, JobState.Probing })
         {
-            if (await jobs.TryChangeStateAsync(job.Id, state, JobState.Failed, message, cancellationToken: cancellationToken).ConfigureAwait(false))
+            if (await ChangeAsync(id, state, JobState.Failed, message, null, CancellationToken.None).ConfigureAwait(false))
             {
                 return;
             }

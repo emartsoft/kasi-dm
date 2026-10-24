@@ -35,6 +35,24 @@ internal sealed class FakeIntake : IBrowserIntake
     }
 }
 
+/// <summary>A capture that finishes only when the test says so, to prove the browser is not kept waiting for a slow manifest.</summary>
+internal sealed class GatedMediaCapture : IBrowserMediaCapture
+{
+    private readonly TaskCompletionSource<MediaCaptureResult> _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public bool Called { get; private set; }
+
+    public void Finish(MediaCaptureResult result) => _gate.TrySetResult(result);
+
+    public Task<MediaCaptureResult> CaptureAsync(CaptureMedia message, CancellationToken cancellationToken)
+    {
+        Called = true;
+#pragma warning disable VSTHRD003 // the gate is this fake's own completion source
+        return _gate.Task;
+#pragma warning restore VSTHRD003
+    }
+}
+
 internal sealed class FakeMediaCapture : IBrowserMediaCapture
 {
     public MediaCaptureResult Result { get; set; } = new(MediaCaptureStatus.Accepted);
@@ -359,6 +377,43 @@ public class BrowserHandlerTests
         media.Capture = new FakeMediaCapture { Result = new MediaCaptureResult(MediaCaptureStatus.Accepted) };
         var accepted = await rig.AskAsync(capture with { Id = "p2" }, ct);
         accepted.Should().BeOfType<Ack>().Which.Ok.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_slow_capture_is_acknowledged_within_the_budget_and_finishes_in_the_background()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var slow = new GatedMediaCapture();
+        var media = new BrowserMediaServices { Capture = slow, AckBudget = TimeSpan.FromMilliseconds(50) };
+        await using var rig = await PipeRig.StartAsync(HandlerFor(null, out _, out _, media: media), ct);
+        var capture = new CaptureMedia { Id = "s1", TabId = 1, Url = "https://example.com/a.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t" };
+
+        var answer = await rig.AskAsync(capture, ct);
+        var again = await rig.AskAsync(capture, ct);
+        slow.Finish(new MediaCaptureResult(MediaCaptureStatus.Accepted));
+
+        answer.Should().BeOfType<Ack>().Which.Ok.Should().BeTrue();
+        slow.Called.Should().BeTrue();
+        again.Should().BeOfType<Ack>().Which.Ok.Should().BeTrue("a repeated request id is answered from memory, not captured twice");
+    }
+
+    [Fact]
+    public async Task A_failed_capture_is_an_error_that_carries_its_reason()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var media = new BrowserMediaServices
+        {
+            Capture = new FakeMediaCapture { Result = new MediaCaptureResult(MediaCaptureStatus.Failed, "The media link could not be read.") },
+        };
+        await using var rig = await PipeRig.StartAsync(HandlerFor(null, out _, out _, media: media), ct);
+
+        var answer = await rig.AskAsync(
+            new CaptureMedia { Id = "f1", TabId = 1, Url = "https://example.com/a.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t" },
+            ct);
+
+        var error = answer.Should().BeOfType<IpcError>().Subject;
+        error.Code.Should().Be(IpcErrorCode.Internal);
+        error.Detail.Should().Be("The media link could not be read.");
     }
 
     [Fact]

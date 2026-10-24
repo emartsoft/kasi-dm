@@ -860,7 +860,8 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
             active.AddRange(await _jobs.ListAsync(state: state, cancellationToken: cancellationToken).ConfigureAwait(false));
         }
 
-        foreach (var job in active)
+        // media jobs have no part file or byte segments; the media executor recovers them
+        foreach (var job in active.Where(job => job.Kind is JobKind.Http or JobKind.Ftp))
         {
             await RecoverJobAsync(job, cancellationToken).ConfigureAwait(false);
         }
@@ -1049,6 +1050,16 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
                 await StorePausedErrorAsync(job.Id, $"The job could not resume after reconnecting ({ex.GetType().Name}).").ConfigureAwait(false);
             }
         }
+    }
+
+    /// <summary>
+    /// Lets jobs that run outside the transfer engine (media captures) publish their events on this dispatcher, so the grid, tray,
+    /// notifications and the queue runner see them like any other job.
+    /// </summary>
+    public void PublishExternal(EngineEvent engineEvent)
+    {
+        ArgumentNullException.ThrowIfNull(engineEvent);
+        Publish(engineEvent);
     }
 
     private void Publish(EngineEvent engineEvent)

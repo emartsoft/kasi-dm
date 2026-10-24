@@ -132,19 +132,43 @@ internal sealed partial class BrowserMessageHandler(
             return new Ack { Id = capture.Id, Ok = true, Detail = previous?.Status == MediaCaptureStatus.Protected ? previous.Detail : null };
         }
 
-        var result = await captureService.CaptureAsync(capture, cancellationToken).ConfigureAwait(false);
+        // Reading a manifest can take seconds on a slow server. The browser gets its answer within the budget; a capture still
+        // running then finishes in the background (the job appears in the list, a refusal is only logged).
+        var work = Task.Run(() => captureService.CaptureAsync(capture, CancellationToken.None), CancellationToken.None);
+        var first = await Task.WhenAny(work, Task.Delay(_media.AckBudget, _time, cancellationToken)).ConfigureAwait(false);
+        if (first != work)
+        {
+            Remember(capture.Id, _time.GetUtcNow());
+            _ = work.ContinueWith(
+                task => _ = task.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            return new Ack { Id = capture.Id, Ok = true };
+        }
+
+        var result = await work.ConfigureAwait(false);
         switch (result.Status)
         {
             case MediaCaptureStatus.Accepted:
-                Remember(capture.Id, _time.GetUtcNow());
-                _captureResults[capture.Id] = result;
+                RememberResult(capture.Id, result);
                 return new Ack { Id = capture.Id, Ok = true };
             case MediaCaptureStatus.Protected:
-                Remember(capture.Id, _time.GetUtcNow());
-                _captureResults[capture.Id] = result;
+                RememberResult(capture.Id, result);
                 return new Ack { Id = capture.Id, Ok = true, Detail = result.Detail ?? "This video is protected and can't be saved" };
             default:
-                return Error(capture.Id, IpcErrorCode.Internal);
+                return Error(capture.Id, IpcErrorCode.Internal, result.Detail);
+        }
+    }
+
+    private void RememberResult(string id, MediaCaptureResult result)
+    {
+        var now = _time.GetUtcNow();
+        Remember(id, now);
+        _captureResults[id] = result;
+        if (_captureResults.Count > RememberedRequests)
+        {
+            foreach (var key in _captureResults.Keys.Where(key => !_accepted.ContainsKey(key)))
+            {
+                _captureResults.TryRemove(key, out _);
+            }
         }
     }
 
@@ -200,7 +224,7 @@ internal sealed partial class BrowserMessageHandler(
     private static BrowserDownload ToDownload(AddDownload add) =>
         new(add.Url, add.FinalUrl, add.Referrer, add.Filename, add.Mime, add.UserAgent, add.Cookies);
 
-    private static IpcError Error(string id, IpcErrorCode code) => new() { Id = id, Code = code };
+    private static IpcError Error(string id, IpcErrorCode code, string? detail = null) => new() { Id = id, Code = code, Detail = detail };
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Browser message {Type} answered with {Reply}.")]
     private partial void LogHandled(string type, string reply);

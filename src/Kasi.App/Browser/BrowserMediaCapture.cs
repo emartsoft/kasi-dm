@@ -1,11 +1,11 @@
 using Kasi.App.Engine;
 using Kasi.Core;
 using Kasi.Ipc.Messages;
-using IpcMediaKind = Kasi.Ipc.Messages.MediaKind;
-using MediaKind = Kasi.Media.MediaKind;
 using Kasi.Media;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using IpcMediaKind = Kasi.Ipc.Messages.MediaKind;
+using MediaKind = Kasi.Media.MediaKind;
 
 namespace Kasi.App.Browser;
 
@@ -19,6 +19,9 @@ internal sealed partial class BrowserMediaCapture(
     IJobSecretRepository secrets,
     IJobControl control,
     IJobService jobService,
+    ICategoryRepository categories,
+    ICategoryRuleRepository categoryRules,
+    Action<EngineEvent> publish,
     string downloadsFolder,
     TimeProvider? timeProvider = null,
     ILogger? logger = null) : IBrowserMediaCapture
@@ -57,7 +60,15 @@ internal sealed partial class BrowserMediaCapture(
                 return new MediaCaptureResult(MediaCaptureStatus.Protected, MediaSourceLoader.ProtectedMessage);
             }
 
+            if (await FindActiveAsync(message.Url, cancellationToken).ConfigureAwait(false) is { } existing)
+            {
+                LogDuplicate(existing.Id); // the same stream clicked twice is one capture
+                return new MediaCaptureResult(MediaCaptureStatus.Accepted);
+            }
+
             var id = JobId.New(_time);
+            var fileName = CaptureFileName(message.Url, id);
+            var (categoryId, folder) = await PlaceAsync(message.Url, fileName, cancellationToken).ConfigureAwait(false);
             var queue = await jobs.ListAsync(1, cancellationToken: cancellationToken).ConfigureAwait(false);
             var job = new Job
             {
@@ -65,15 +76,25 @@ internal sealed partial class BrowserMediaCapture(
                 Kind = JobKind.Media,
                 Url = message.Url,
                 Referrer = message.Referrer,
-                FileName = CaptureFileName(message.Url, id),
-                Folder = downloadsFolder,
+                FileName = fileName,
+                Folder = folder,
                 QueueId = 1,
                 QueuePos = queue.Select(item => item.QueuePos).DefaultIfEmpty(0).Max() + 1,
+                CategoryId = categoryId,
                 CreatedUtc = _time.GetUtcNow(),
             };
             await jobs.AddAsync(job, cancellationToken).ConfigureAwait(false);
+            publish(new JobAdded(job)); // the grid learns about a job from this event
             await secrets.SetAsync(id, SecretOf(message), cancellationToken).ConfigureAwait(false);
-            await control.StartJobAsync(id, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await control.StartJobAsync(id, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogStartFailed(id, exception.GetType().Name); // the job is in the list, queued: the queue or the user can start it
+            }
+
             LogAccepted(id);
             return new MediaCaptureResult(MediaCaptureStatus.Accepted);
         }
@@ -92,6 +113,19 @@ internal sealed partial class BrowserMediaCapture(
             LogCaptureFailed(exception);
             return new MediaCaptureResult(MediaCaptureStatus.Failed, "The media capture could not be started.");
         }
+    }
+
+    private async Task<Job?> FindActiveAsync(string url, CancellationToken cancellationToken) =>
+        (await jobs.ListAsync(cancellationToken: cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(job => job.Kind == JobKind.Media && job.Url == url && job.State is not (JobState.Completed or JobState.Failed));
+
+    /// <summary>The category rules choose the folder, exactly as they do for any other download (a person's rules, KASI-CAT-001).</summary>
+    private async Task<(int? CategoryId, string Folder)> PlaceAsync(string url, string fileName, CancellationToken cancellationToken)
+    {
+        var all = await categories.ListAsync(cancellationToken).ConfigureAwait(false);
+        var rules = await categoryRules.ListAsync(cancellationToken).ConfigureAwait(false);
+        var match = CategoryResolver.Resolve(new Uri(url), fileName, "video/mp4", rules, all);
+        return (match?.Category.Id, CategoryFolder.For(downloadsFolder, match?.Category));
     }
 
     private async Task<MediaCaptureResult> AddDirectAsync(CaptureMedia message, CancellationToken cancellationToken)
@@ -129,6 +163,12 @@ internal sealed partial class BrowserMediaCapture(
 
     [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Information, Message = "Media capture accepted as job {Job}.")]
     private partial void LogAccepted(Kasi.Core.JobId job);
+
+    [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Information, Message = "Media capture ignored: job {Job} already captures this stream.")]
+    private partial void LogDuplicate(Kasi.Core.JobId job);
+
+    [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Media job {Job} was added but could not start ({Kind}).")]
+    private partial void LogStartFailed(Kasi.Core.JobId job, string kind);
 
     [Microsoft.Extensions.Logging.LoggerMessage(Level = Microsoft.Extensions.Logging.LogLevel.Warning, Message = "Media capture could not load the manifest.")]
     private partial void LogLoadFailed(MediaLoadException exception);

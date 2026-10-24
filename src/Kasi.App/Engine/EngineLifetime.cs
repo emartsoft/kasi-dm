@@ -13,13 +13,19 @@ internal sealed class EngineLifetime(
     MigrationRunner migrations,
     CheckpointWriter checkpoints,
     DownloadEngine engine,
-    QueueScheduler? scheduler = null) : IHostedService
+    QueueScheduler? scheduler = null,
+    MediaJobExecutor? media = null) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await migrations.MigrateAsync(cancellationToken).ConfigureAwait(false);
         checkpoints.Start();
         await engine.StartAsync(cancellationToken).ConfigureAwait(false);
+        if (media is not null)
+        {
+            await media.RecoverAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         if (scheduler is not null)
         {
             await scheduler.StartAsync(cancellationToken).ConfigureAwait(false);

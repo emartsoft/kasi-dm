@@ -40,6 +40,9 @@ public sealed record MediaJobOptions
     /// <summary>Called once per completed segment file; the app turns it into job progress and speed.</summary>
     public Action<MediaJobProgress>? Progress { get; init; }
 
+    /// <summary>Receives the job's state changes and progress, so the app's grid, tray and queue runner see a media job like any other.</summary>
+    public Action<EngineEvent>? Events { get; init; }
+
     internal void Validate()
     {
         ArgumentNullException.ThrowIfNull(ManifestUri);

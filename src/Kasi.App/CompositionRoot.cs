@@ -83,7 +83,8 @@ internal static class CompositionRoot
             sp.GetRequiredService<BandwidthLimiter>(),
             Path.Combine(AppPaths.DataFolder(), "media"),
             AppPaths.Ffmpeg(),
-            sp.GetService<ILoggerFactory>()?.CreateLogger<MediaJobExecutor>()));
+            sp.GetRequiredService<DownloadEngine>().PublishExternal,
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<MediaJobExecutor>()));
         services.AddSingleton<IJobControl>(sp => new RoutingJobControl(
             sp.GetRequiredService<DownloadEngine>(),
             sp.GetRequiredService<IJobRepository>(),
@@ -122,6 +123,9 @@ internal static class CompositionRoot
             sp.GetRequiredService<IJobSecretRepository>(),
             sp.GetRequiredService<IJobControl>(),
             sp.GetRequiredService<IJobService>(),
+            sp.GetRequiredService<ICategoryRepository>(),
+            sp.GetRequiredService<ICategoryRuleRepository>(),
+            sp.GetRequiredService<DownloadEngine>().PublishExternal,
             AppPaths.DownloadsFolder(),
             timeProvider: TimeProvider.System,
             logger: sp.GetService<ILoggerFactory>()?.CreateLogger<BrowserMediaCapture>()));
@@ -129,6 +133,7 @@ internal static class CompositionRoot
             sp.GetRequiredService<MigrationRunner>(),
             sp.GetRequiredService<CheckpointWriter>(),
             sp.GetRequiredService<DownloadEngine>(),
-            sp.GetRequiredService<QueueScheduler>()));
+            sp.GetRequiredService<QueueScheduler>(),
+            sp.GetRequiredService<MediaJobExecutor>()));
     }
 }

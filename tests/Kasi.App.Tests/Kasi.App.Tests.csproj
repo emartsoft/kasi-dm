@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Kasi.App/Kasi.App.csproj" />
+    <ProjectReference Include="../Kasi.TestServer/Kasi.TestServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
