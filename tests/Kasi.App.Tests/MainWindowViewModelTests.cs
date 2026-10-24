@@ -181,6 +181,25 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task The_buttons_are_told_when_the_state_of_a_selected_row_changes()
+    {
+        var job = TestJobs.New("d.zip", JobState.Downloading);
+        await using var rig = await MainRig.CreateAsync(job);
+        rig.Select("d.zip");
+        var resumeChanged = 0;
+        var pauseChanged = 0;
+        rig.Model.ResumeCommand.CanExecuteChanged += (_, _) => resumeChanged++;
+        rig.Model.PauseCommand.CanExecuteChanged += (_, _) => pauseChanged++;
+
+        rig.Service.Raise(new JobStateChanged(job.Id, JobState.Downloading, JobState.Paused, null));
+
+        resumeChanged.Should().BePositive("a button only follows its command when the command says it changed (found by the UI smoke test: Resume stayed disabled)");
+        pauseChanged.Should().BePositive();
+        rig.Model.ResumeCommand.CanExecute(null).Should().BeTrue();
+        rig.Model.PauseCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task The_queue_and_scheduler_buttons_are_active_and_delegate_to_service_and_dialog()
     {
         await using var rig = await MainRig.CreateAsync(TestJobs.New("q.zip", JobState.Queued));

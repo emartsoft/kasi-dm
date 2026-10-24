@@ -22,3 +22,4 @@ The alpha gate asks for a FlaUI smoke suite (TPL section 4). `Kasi.App.Tests` dr
 - The three first flows (window opens with its toolbar, sidebar, list and status bar; Add dialog to a finished download checked by SHA-256 and shown in the list; Pause then Resume) run against the real window.
 - The tray menu, the tray icon and toasts are not covered here (13b and the manual M4 list).
 - The Pause and Resume test could not be run in the session that wrote it (that session could not inject mouse input); the first run on the CI desktop is its proof.
+- **First finding:** the first CI run of the Pause and Resume test showed that a toolbar button stayed disabled after the selected download paused (the buttons were refreshed when the selection changed, not when a selected row changed state). `MainWindowViewModel` now follows the selected rows; a headless test covers it.
