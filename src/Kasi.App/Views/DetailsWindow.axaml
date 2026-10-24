@@ -61,7 +61,7 @@
           <TextBlock Grid.Column="0" Text="{Binding PercentText}" FontSize="40" FontWeight="Bold" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding PercentText}" />
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
             <TextBlock Text="{Binding Row.Speed}" FontFamily="{DynamicResource KasiMonoFont}" Foreground="{DynamicResource KasiSuccessBrush}" FontWeight="SemiBold" AutomationProperties.Name="{Binding Row.Speed}" />
-            <TextBlock Text="{Binding PeakLabel}" Classes="kasi-secondary" />
+            <TextBlock Text="{Binding PeakLabel}" Classes="kasi-secondary" IsVisible="{Binding PeakText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <TextBlock Text="{Binding PeakText}" FontFamily="{DynamicResource KasiMonoFont}" Classes="kasi-secondary" AutomationProperties.Name="{Binding PeakText}" />
           </StackPanel>
         </Grid>
