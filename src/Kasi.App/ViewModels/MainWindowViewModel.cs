@@ -27,6 +27,9 @@ internal interface IConfirmHost
 /// </summary>
 internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownloadService, IBrowserRequestSink, IDisposable
 {
+    private const int DiskPollEvery = 5;
+
+    private static readonly CompositeFormat _diskFreeFormat = CompositeFormat.Parse(Strings.StatusDiskFree);
     private static readonly CompositeFormat _countsFormat = CompositeFormat.Parse(Strings.StatusCounts);
     private static readonly CompositeFormat _limitFormat = CompositeFormat.Parse(Strings.StatusLimit);
     private static readonly CompositeFormat _toolbarLimitFormat = CompositeFormat.Parse(Strings.ToolbarSpeedLimit);
@@ -39,6 +42,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     private readonly IShell _shell;
     private readonly SpeedLimitState _limit;
     private IReadOnlyList<JobRowViewModel> _selection = [];
+    private int _polls;
 
     /// <summary>The row the user has selected in the list (the first, when several are).</summary>
     [ObservableProperty]
@@ -105,6 +109,16 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     /// <summary>How many browser extensions are connected; the app sets it, the status bar reads it on <see cref="Poll"/>.</summary>
     public Func<int>? ConnectedBrowsers { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExtensionCardText))]
+    private bool _extensionConnected;
+
+    /// <summary>The state on the sidebar's extension card.</summary>
+    public string ExtensionCardText => ExtensionConnected ? Strings.SidebarExtensionConnected : Strings.SidebarExtensionNone;
+
+    [ObservableProperty]
+    private string _diskFreeText = string.Empty;
+
     /// <summary>A running download was opened (double-click or Enter); the details window of M2.9c answers it.</summary>
     public event Action<JobRowViewModel>? DetailsRequested;
 
@@ -153,7 +167,16 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     {
         var count = ConnectedBrowsers?.Invoke() ?? 0;
         ExtensionStatusText = count > 0 ? Strings.StatusExtensionConnected : Strings.StatusExtensionNone;
+        ExtensionConnected = count > 0;
+        Jobs.SampleSpeed();
+        if (_polls++ % DiskPollEvery == 0)
+        {
+            DiskFreeText = DiskFree?.Invoke() is { } disk ? string.Format(CultureInfo.CurrentCulture, _diskFreeFormat, disk.Drive, ByteText.Format(disk.FreeBytes)) : string.Empty;
+        }
     }
+
+    /// <summary>The drive Downloads is on and the space left on it, for the status bar; null when it cannot be read. Set by the app.</summary>
+    public Func<(string Drive, long FreeBytes)?>? DiskFree { get; set; }
 
     public void Dispose()
     {

@@ -22,6 +22,7 @@
       <Color x:Key="KasiInfoColor">#38bdf8</Color>
 
       <SolidColorBrush x:Key="KasiBaseBrush" Color="{StaticResource KasiBaseColor}" />
+      <SolidColorBrush x:Key="KasiPanelBrush" Color="{StaticResource KasiMicaColor}" Opacity="0.72" />
       <SolidColorBrush x:Key="KasiMicaBrush" Color="{StaticResource KasiMicaColor}" />
       <SolidColorBrush x:Key="KasiCardBrush" Color="{StaticResource KasiCardColor}" />
       <SolidColorBrush x:Key="KasiCardHoverBrush" Color="{StaticResource KasiCardHoverColor}" />
@@ -76,6 +77,7 @@
       <Color x:Key="KasiInfoColor">#0369a1</Color>
 
       <SolidColorBrush x:Key="KasiBaseBrush" Color="{StaticResource KasiBaseColor}" />
+      <SolidColorBrush x:Key="KasiPanelBrush" Color="{StaticResource KasiMicaColor}" Opacity="0.72" />
       <SolidColorBrush x:Key="KasiMicaBrush" Color="{StaticResource KasiMicaColor}" />
       <SolidColorBrush x:Key="KasiCardBrush" Color="{StaticResource KasiCardColor}" />
       <SolidColorBrush x:Key="KasiCardHoverBrush" Color="{StaticResource KasiCardHoverColor}" />

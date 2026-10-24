@@ -28,11 +28,16 @@ internal static class Icons
     public const string ChevronDown = "";
     public const string Lightning = "";
     public const string Clock = "";
+    public const string List = "";
+    public const string Package = "";
+    public const string Music = "";
+    public const string Apps = "";
+    public const string Dot = "●";
 
     /// <summary>Every glyph, for the tests that check none is empty or repeated.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
         Add, Cancel, Settings, Video, Stop, Search, Accept, Delete, Play, Pause, Globe, Warning, Calendar, Sync, Download, Document, Folder,
-        Picture, Copy, ChevronDown, Lightning, Clock,
+        Picture, Copy, ChevronDown, Lightning, Clock, List, Package, Music, Apps,
     ];
 }

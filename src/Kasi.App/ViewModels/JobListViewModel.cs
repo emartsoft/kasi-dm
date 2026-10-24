@@ -54,6 +54,7 @@ internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposa
     private readonly List<JobRowViewModel> _all = [];
     private readonly Dictionary<JobId, JobRowViewModel> _byId = [];
     private readonly Dictionary<JobId, long> _moving = [];
+    private readonly SpeedHistory _history = new();
     private Dictionary<int, string> _categoryNames = [];
     private JobFilter _filter = new();
 
@@ -61,7 +62,11 @@ internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposa
     private int _allCount;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasActive))]
     private int _activeCount;
+
+    /// <summary>True while at least one download is running (the status bar's dot is lit).</summary>
+    public bool HasActive => ActiveCount > 0;
 
     [ObservableProperty]
     private int _finishedCount;
@@ -241,6 +246,25 @@ internal sealed partial class JobListViewModel : ObservableObject, IAsyncDisposa
         }
 
         UpdateTotalSpeed();
+    }
+
+    /// <summary>The total of what the running downloads are receiving now, in bytes a second.</summary>
+    public long TotalBytesPerSecond => _moving.Values.Sum();
+
+    /// <summary>The last minute of <see cref="TotalBytesPerSecond"/>, one sample a second; replaced as a whole when a sample is taken.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<double> _speedSamples = [];
+
+    /// <summary>The big number of the aggregate-speed card: the total speed, or zero when nothing is running.</summary>
+    [ObservableProperty]
+    private string _speedNumberText = ByteText.Format(0) + "/s";
+
+    /// <summary>Takes one sample of the total speed for the chart; the app calls it once a second.</summary>
+    public void SampleSpeed()
+    {
+        _history.Add(TotalBytesPerSecond);
+        SpeedSamples = _history.Snapshot();
+        SpeedNumberText = ByteText.Format(TotalBytesPerSecond) + "/s";
     }
 
     private void UpdateTotalSpeed()

@@ -8,5 +8,7 @@ internal static class SidebarFonts
 {
     public static readonly IValueConverter Weight = new FuncValueConverter<bool, FontWeight>(isHeader => isHeader ? FontWeight.SemiBold : FontWeight.Normal);
 
+    public static readonly IValueConverter Size = new FuncValueConverter<bool, double>(isHeader => isHeader ? 11 : 13);
+
     public static readonly IValueConverter Opacity = new FuncValueConverter<bool, double>(isHeader => isHeader ? 0.65 : 1.0);
 }
