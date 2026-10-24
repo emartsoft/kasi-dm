@@ -11,12 +11,20 @@ public static class KasiPipeNames
         return "kasi-" + user.Value;
     }
 
-    public static string ForCurrentUser() => For(CurrentUser());
+    /// <summary>
+    /// Tests set this so a test instance of Kasi and the native host meet on pipes of their own and never reach a Kasi that is running
+    /// on the machine; it only appends to the names. Absent in production.
+    /// </summary>
+    public const string TestSuffixVariable = "KASI_ENDPOINT_SUFFIX";
+
+    public static string ForCurrentUser() => WithSuffix(For(CurrentUser()), Environment.GetEnvironmentVariable(TestSuffixVariable));
 
     /// <summary>The argument hand-off pipe for a user: <c>kasi-&lt;SID&gt;-open</c>, a second pipe so the browser protocol keeps one purpose (ADR 0023).</summary>
     public static string HandOffFor(SecurityIdentifier user) => For(user) + "-open";
 
-    public static string HandOffForCurrentUser() => HandOffFor(CurrentUser());
+    public static string HandOffForCurrentUser() => WithSuffix(HandOffFor(CurrentUser()), Environment.GetEnvironmentVariable(TestSuffixVariable));
+
+    internal static string WithSuffix(string name, string? suffix) => string.IsNullOrEmpty(suffix) ? name : name + "-" + suffix;
 
     internal static SecurityIdentifier CurrentUser()
     {

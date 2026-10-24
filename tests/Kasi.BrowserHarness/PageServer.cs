@@ -112,6 +112,8 @@ internal static class PageServer
         var excluded = $"http://{ExcludedHost}:{port}";
         var page = new StringBuilder("<!doctype html><meta charset=\"utf-8\"><title>Kasi e2e</title><body>");
         page.Append(CultureInfo.InvariantCulture, $"<a id=\"plain\" href=\"{testServer}/files/plain/{size}\">plain</a> ");
+        // a file behind the test server's cookie gate: only a browser holding the session cookie gets it (M2.12)
+        page.Append(CultureInfo.InvariantCulture, $"<a id=\"secret\" href=\"{testServer}/auth/cookie/files/secret/{size}\">secret</a> ");
         page.Append(CultureInfo.InvariantCulture, $"<a id=\"attr\" href=\"{testServer}/files/attr/{size}\" download>attr</a> ");
         page.Append(CultureInfo.InvariantCulture, $"<a id=\"slow\" href=\"/slow/3000/slow/{size}\">slow</a> ");
         page.Append(CultureInfo.InvariantCulture, $"<a id=\"excluded\" href=\"{excluded}/files/excluded/{size}\">excluded</a> ");

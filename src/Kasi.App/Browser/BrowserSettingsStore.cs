@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Kasi.App.Engine;
 using Kasi.Ipc.Messages;
 
 namespace Kasi.App.Browser;
@@ -49,7 +50,7 @@ internal sealed class BrowserSettingsStore : IBrowserSettings
     public static string DefaultPath(string? suffix)
     {
         var name = string.IsNullOrEmpty(suffix) ? "browser-settings.json" : $"browser-settings-{suffix}.json";
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Kasi", name);
+        return Path.Combine(AppPaths.DataFolder(), name); // the data folder, so KASI_DATA_DIR moves it with the rest
     }
 
     public async Task SaveAsync(BrowserSettings settings, CancellationToken cancellationToken)

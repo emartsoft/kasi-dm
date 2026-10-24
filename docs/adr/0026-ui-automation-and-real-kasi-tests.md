@@ -1,6 +1,6 @@
 # ADR 0026: UI Automation tests against the real Kasi window
 
-- **Status:** Proposed (M2.13a and 13b; 13c extends it)
+- **Status:** Proposed (M2.13a to 13c)
 - **Requirements:** KASI-UI-001, KASI-UI-003, KASI-UI-004, KASI-BRW-002 | **Test cases:** TC-UI-001
 - **Plan:** [`docs/plans/m2-13.md`](../plans/m2-13.md)
 
@@ -25,6 +25,15 @@ The alpha gate asks for a FlaUI smoke suite (TPL section 4). `Kasi.App.Tests` dr
 - **Left for 13c:** the refresh-link window, which needs the extension to answer `refreshLink`.
 - **Not driven:** the tray icon's menu (Pause all, Quit). UI Automation does not reach the shell's tray menu reliably, so the tray is covered by the closing-the-window flow above, the headless tray tests, and the manual list for the M4 installer.
 - **Nightly:** `nightly-ui.yml` runs the whole project at 03:15 UTC with the mouse tests on.
+
+## M2.13c: the real Kasi behind the browser
+
+- **Same browser, same native host, real far end.** `extension/tests/e2e/real-scenarios.ts` publishes `Kasi.App` beside the host as `Kasi.exe` (the apphost finds its dll next to itself) and lets the host start it with `--tray`, as it does for a user. The harness serves only the test pages and `Kasi.TestServer` (`stub: false`); no stub owns the pipe.
+- **Isolation by environment.** The browser starts the host and the host starts Kasi, and each inherits the test process's environment: `KASI_DATA_DIR` (data, settings), `KASI_DOWNLOADS_DIR` (what is saved) and `KASI_ENDPOINT_SUFFIX` (pipes and instance lock). Three small seams made that possible: `KasiPipeNames` appends the suffix for the host as the app already did, `AppPaths.DownloadsFolder` honours `KASI_DOWNLOADS_DIR`, and the browser settings file moved into the data folder, so `KASI_DATA_DIR` moves it with the rest. A Kasi the developer runs is never reached, and the user's Downloads is never written.
+- **No one to press Add.** The real app asks before adding what a browser hands over; the test seeds `showAddDialog: false` in its own settings file.
+- **Cases:** an intercepted download is saved by the real Kasi (SHA-256 of the file) and the browser keeps no copy (TC-BRW-001); a file behind the test server's cookie gate downloads with the browser's cookie, and no file in Kasi's data folder contains the cookie name (M2.12).
+- **Where it runs:** nightly and by hand in `extension-e2e.yml`, Chromium and Firefox, after the stub run. Pull requests keep the stub run only, so their time does not grow.
+- **Not covered:** the refresh-link window against a real extension (the extension half is tested against the stub, the Kasi half headlessly and in the picker/refresh view-model tests), and the link picker against a real browser (the picker is driven by a real `addBatch` in M2.13b). The real Kasi is ended by the path of its executable, never by image name.
 
 ## Consequences
 
