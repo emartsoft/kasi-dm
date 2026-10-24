@@ -7,6 +7,7 @@ namespace Kasi.TestServer;
 public sealed class TestServerMetrics
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _tlsConnections = new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _pathRequests = new(StringComparer.Ordinal);
     private int _totalConnections;
     private int _openConnections;
     private int _peakConcurrentConnections;
@@ -53,6 +54,15 @@ public sealed class TestServerMetrics
     /// <summary>Generated file bytes read for response bodies; range requests count only the requested slice.</summary>
     public long BytesServed => Volatile.Read(ref _bytesServed);
 
+    /// <summary>Requests served for one absolute path (query excluded), used by the media "zero segment requests" assertions.</summary>
+    public int RequestsForPath(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return _pathRequests.TryGetValue(path, out var count) ? count : 0;
+    }
+
+    public IReadOnlyDictionary<string, int> PathRequests => _pathRequests;
+
     /// <summary>
     /// Starts a new measurement. Counters are zeroed, but connections that are still open (keep-alive) stay counted as open
     /// and the peak restarts from them, and a TLS connection already counted is not counted again when it is reused. Call it
@@ -72,6 +82,7 @@ public sealed class TestServerMetrics
         Interlocked.Exchange(ref _signedLinkRejects, 0);
         Interlocked.Exchange(ref _requestsServed, 0);
         Interlocked.Exchange(ref _bytesServed, 0);
+        _pathRequests.Clear();
     }
 
     internal void ConnectionAccepted()
@@ -100,6 +111,7 @@ public sealed class TestServerMetrics
     internal void RequestServed(HttpContext context)
     {
         Interlocked.Increment(ref _requestsServed);
+        _pathRequests.AddOrUpdate(context.Request.Path.Value ?? "/", 1, static (_, count) => count + 1);
         if (!string.IsNullOrEmpty(context.Request.Headers.Authorization))
         {
             Interlocked.Increment(ref _requestsWithAuthorization);
