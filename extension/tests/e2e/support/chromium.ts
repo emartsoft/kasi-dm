@@ -152,6 +152,27 @@ export async function launchChromium(
         await popup.close();
       }
     },
+    mediaText: async () => {
+      const popup = await context.newPage();
+      try {
+        await popup.goto(`chrome-extension://${extension.id}/src/popup/index.html`);
+        await popup.waitForFunction(
+          () => !document.querySelector('#media-section')?.hasAttribute('hidden'),
+        );
+        return (await popup.locator('#media-list').textContent()) ?? '';
+      } finally {
+        await popup.close();
+      }
+    },
+    captureFirstMedia: async () => {
+      const popup = await context.newPage();
+      try {
+        await popup.goto(`chrome-extension://${extension.id}/src/popup/index.html`);
+        await popup.locator('#media-list li button').first().click();
+      } finally {
+        await popup.close();
+      }
+    },
     badge: () =>
       worker.evaluate(() =>
         (

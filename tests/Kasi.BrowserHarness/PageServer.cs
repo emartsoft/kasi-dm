@@ -32,10 +32,14 @@ internal static class PageServer
             await Task.Delay(Math.Min(ms, 30_000), cancel);
             return Results.Redirect($"{testServer}/files/{seed}/{size}");
         });
+        app.MapGet("/pages/media/hls", () => Results.Content(MediaPage("hls", testServer), "text/html; charset=utf-8"));
+        app.MapGet("/pages/media/dash", () => Results.Content(MediaPage("dash", testServer), "text/html; charset=utf-8"));
+        app.MapGet("/pages/media/direct", () => Results.Content(MediaPage("direct", testServer), "text/html; charset=utf-8"));
         app.MapGet("/_stub/sha256/{seed}/{size:long}", (string seed, long size) => Results.Text(GeneratedContent.Sha256Hex(seed, size)));
         app.MapGet("/_stub/ready", () => Results.Ok(new { stub = stub.Running }));
         app.MapGet("/_stub/received", () => Results.Json(stub.Received, _json));
         app.MapGet("/_stub/received-batches", () => Results.Json(stub.Batches, _json));
+        app.MapGet("/_stub/media", () => Results.Json(stub.Media, _json));
         // 40 links to files of the test server; the first 12 sit in #picked, so a test can select exactly those (TC-BRW-005)
         app.MapGet("/pages/links", () => Results.Content(Links(testServer), "text/html; charset=utf-8"));
         // A page that starts its download by itself, as a download page with a countdown does (refreshLink, M2.5c)
@@ -88,6 +92,25 @@ internal static class PageServer
     internal sealed record RefreshBody(string JobId, string ReferrerUrl, string? MatchHint);
 
     internal sealed record ModeBody(string Mode, int AnswerDelayMs);
+
+    private static string MediaPage(string kind, string testServer) => kind switch
+    {
+        "hls" => $"""
+            <!doctype html><meta charset="utf-8"><title>Kasi HLS</title><body>
+            <h1>HLS</h1><video id="player" width="640" height="360" poster="/poster.jpg"></video>
+            <script>fetch('{testServer}/hls/clear/master.m3u8').catch(()=>undefined);</script></body>
+            """,
+        "dash" => $"""
+            <!doctype html><meta charset="utf-8"><title>Kasi DASH</title><body>
+            <h1>DASH</h1><video id="player" width="640" height="360" poster="/poster.jpg"></video>
+            <script>fetch('{testServer}/dash/clear/manifest.mpd').catch(()=>undefined);</script></body>
+            """,
+        _ => $"""
+            <!doctype html><meta charset="utf-8"><title>Kasi direct media</title><body>
+            <h1>Direct</h1><video id="player" width="640" height="360" controls src="{testServer}/media/direct/2000000"></video>
+            </body>
+            """,
+    };
 
     private static string Links(string testServer)
     {

@@ -109,6 +109,19 @@ export async function launchFirefox(
         }
         return '';
       }),
+    mediaText: () =>
+      session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, async () => {
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const text = await session.text('#media-list');
+          if (text !== '') return text;
+          await new Promise((done) => setTimeout(done, 100));
+        }
+        return '';
+      }),
+    captureFirstMedia: () =>
+      session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, () =>
+        session.click('#media-list li button'),
+      ),
     badge: () => Promise.resolve(undefined),
     close: async () => {
       await session.quit();
