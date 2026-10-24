@@ -1,6 +1,6 @@
 # ADR 0026: UI Automation tests against the real Kasi window
 
-- **Status:** Proposed (M2.13a; 13b and 13c extend it)
+- **Status:** Proposed (M2.13a and 13b; 13c extends it)
 - **Requirements:** KASI-UI-001, KASI-UI-003, KASI-UI-004, KASI-BRW-002 | **Test cases:** TC-UI-001
 - **Plan:** [`docs/plans/m2-13.md`](../plans/m2-13.md)
 
@@ -16,6 +16,15 @@ The alpha gate asks for a FlaUI smoke suite (TPL section 4). `Kasi.App.Tests` dr
 4. **One exception:** Avalonia's `DataGrid` rows expose only the legacy accessibility and scroll-into-view patterns, not selection, so selecting a row takes a real mouse click. Tests that need it use `[UiInputFact]` and run only with `KASI_UI_INPUT=1`; a session that cannot inject input (a locked or remote desktop) skips them with that reason. Making the rows selectable through UI Automation is an accessibility improvement worth its own change (TC-UI-007).
 5. **CI:** `ui-smoke.yml` runs the suite on pull requests that touch the app, its engine or these tests, on `windows-latest`. The nightly with the full flow set comes in M2.13b.
 6. **A failure explains itself:** a wait that times out throws with a dump of the control tree it was looking at.
+
+## M2.13b: the other flows
+
+- **Windows and flows added:** the Scheduler window (tabs, Cancel), the link picker started by a real `addBatch` on the app's pipe (filter, Select shown, Add selected; only the ticked link downloads, SHA-256 checked), closing the window leaves Kasi running and a second launch brings the window back (the single-instance hand-off), Delete with its confirmation and the files option, and the details window opened by a double-click. The last two click the grid and so run only with `KASI_UI_INPUT=1`.
+- **`BrowserPlayer`** is the extension's end of the pipe in the tests: hello, then `addBatch`. It uses `Kasi.Ipc` as the host does and needs no new app code.
+- **Tests never run side by side** (`DisableTestParallelization`): they share the desktop's focus and mouse and one UI Automation client, and a run with two apps at once was flaky locally.
+- **Left for 13c:** the refresh-link window, which needs the extension to answer `refreshLink`.
+- **Not driven:** the tray icon's menu (Pause all, Quit). UI Automation does not reach the shell's tray menu reliably, so the tray is covered by the closing-the-window flow above, the headless tray tests, and the manual list for the M4 installer.
+- **Nightly:** `nightly-ui.yml` runs the whole project at 03:15 UTC with the mouse tests on.
 
 ## Consequences
 

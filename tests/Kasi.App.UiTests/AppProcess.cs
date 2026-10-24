@@ -2,6 +2,7 @@ using System.Diagnostics;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.UIA3;
+using Kasi.Ipc.Transport;
 
 namespace Kasi.App.UiTests;
 
@@ -15,17 +16,22 @@ public sealed class AppProcess : IAsyncDisposable
 
     private static readonly TimeSpan _windowWait = TimeSpan.FromSeconds(60);
     private readonly Process _process;
+    private readonly ProcessStartInfo _start;
     private readonly UIA3Automation _automation = new();
     private readonly System.Text.StringBuilder _output = new();
 
-    private AppProcess(Process process, string dataFolder, string workFolder)
+    private AppProcess(Process process, ProcessStartInfo start, string dataFolder, string workFolder)
     {
         _process = process;
+        _start = start;
         DataFolder = dataFolder;
         WorkFolder = workFolder;
     }
 
     public string DataFolder { get; }
+
+    /// <summary>The name of this instance's browser pipe: the per-user name with the test suffix this app was started with.</summary>
+    public string BrowserPipe { get; private set; } = string.Empty;
 
     /// <summary>A folder under the test's root for the files the test downloads; removed with the app.</summary>
     public string WorkFolder { get; }
@@ -50,8 +56,10 @@ public sealed class AppProcess : IAsyncDisposable
         }
 
         start.Environment["KASI_DATA_DIR"] = data;
-        start.Environment["KASI_ENDPOINT_SUFFIX"] = "ui" + Guid.NewGuid().ToString("N")[..8];
-        var app = new AppProcess(Process.Start(start)!, data, work);
+        var suffix = "ui" + Guid.NewGuid().ToString("N")[..8];
+        start.Environment["KASI_ENDPOINT_SUFFIX"] = suffix;
+        var app = new AppProcess(Process.Start(start)!, start, data, work);
+        app.BrowserPipe = KasiPipeNames.ForCurrentUser() + "-" + suffix;
         app._process.OutputDataReceived += (_, e) => app.Capture(e.Data);
         app._process.ErrorDataReceived += (_, e) => app.Capture(e.Data);
         app._process.BeginOutputReadLine();
@@ -60,6 +68,22 @@ public sealed class AppProcess : IAsyncDisposable
     }
 
     public bool HasExited => _process.HasExited;
+
+    /// <summary>
+    /// Starts Kasi.App.exe again with the same endpoint names, as a user does by opening Kasi a second time: the running instance
+    /// takes over (shows its window) and the new process ends.
+    /// </summary>
+    public async Task LaunchAgainAsync(CancellationToken cancellationToken)
+    {
+        using var second = Process.Start(new ProcessStartInfo(_start.FileName)
+        {
+            UseShellExecute = false,
+            Environment = { ["KASI_DATA_DIR"] = _start.Environment["KASI_DATA_DIR"], ["KASI_ENDPOINT_SUFFIX"] = _start.Environment["KASI_ENDPOINT_SUFFIX"] },
+        })!;
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(TimeSpan.FromSeconds(60));
+        await second.WaitForExitAsync(limit.Token).ConfigureAwait(false);
+    }
 
     /// <summary>What the app wrote to its output and error streams so far, for a failure message.</summary>
     public string Output
@@ -125,8 +149,20 @@ public sealed class AppProcess : IAsyncDisposable
             : throw new TimeoutException($"No window named '{name}' appeared. Windows: {string.Join(", ", TopLevelWindows().Select(w => $"'{w.Name}'"))}. {(_process.HasExited ? $"The app had exited with code {_process.ExitCode}." : "The app was still running.")} Output:{Environment.NewLine}{Output}{Environment.NewLine}{LogTail()}");
     }
 
-    public IReadOnlyList<Window> TopLevelWindows() =>
-        _process.HasExited ? [] : Application.Attach(_process).GetAllTopLevelWindows(_automation);
+    /// <summary>
+    /// The app's windows. A modal dialog (Delete) is a child of the window that opened it in the UI Automation tree, not a top-level
+    /// window of its own, so the owned windows of each top-level window are listed too.
+    /// </summary>
+    public IReadOnlyList<Window> TopLevelWindows()
+    {
+        if (_process.HasExited)
+        {
+            return [];
+        }
+
+        var top = Application.Attach(_process).GetAllTopLevelWindows(_automation);
+        return [.. top, .. top.SelectMany(w => w.FindAllChildren(c => c.ByControlType(FlaUI.Core.Definitions.ControlType.Window)).Select(c => c.AsWindow()))];
+    }
 
     public async ValueTask DisposeAsync()
     {

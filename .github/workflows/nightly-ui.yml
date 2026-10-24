@@ -1,0 +1,36 @@
+name: Nightly UI
+
+# M2.13b (docs/plans/m2-13.md, ADR 0026, TC-UI-001 to 003): every flow of tests/Kasi.App.UiTests through the real Kasi.App window, on a
+# desktop session, with the mouse-driven tests too. Pull requests run the same project through ui-smoke.yml.
+# The app and the test server run on loopback with their own data folders and endpoint names; nothing here reaches the public internet.
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  KASI_UI: '1'
+  KASI_UI_INPUT: '1'
+
+jobs:
+  ui:
+    name: UI flows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer derives the version from tags
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run the UI tests
+        run: dotnet test tests/Kasi.App.UiTests -c Release

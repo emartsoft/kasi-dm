@@ -84,6 +84,24 @@ internal static class UiHelpers
         return text.ToString();
     }
 
+    /// <summary>Adds a download through the Add dialog, saving it into the app's work folder under this name.</summary>
+    public static void AddDownload(this Window window, AppProcess app, string url, string fileName)
+    {
+        window.Press("Add URL");
+        var dialog = app.WaitForWindow("Add download");
+        dialog.SetText("Link", url);
+        dialog.SetText("Save as", fileName);
+        dialog.SetText("Folder (empty: the category folder)", app.WorkFolder);
+        dialog.Press("Add");
+    }
+
+    /// <summary>Waits for the finished file and returns its path.</summary>
+    public static string WaitForFile(AppProcess app, string fileName, long size, AutomationElement dumpOf)
+    {
+        var path = Path.Combine(app.WorkFolder, fileName);
+        return WaitFor(() => File.Exists(path) && new FileInfo(path).Length == size ? path : null, $"the finished file '{fileName}'", dumpOf);
+    }
+
     public static async Task<string> Sha256Async(string path, CancellationToken cancellationToken)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
