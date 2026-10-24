@@ -87,7 +87,7 @@ internal sealed class NotificationRouter(IJobService jobs, IShell shell)
 }
 
 /// <summary>Turns the engine's "completed" and "failed" into toasts that carry the file name and nothing else.</summary>
-internal sealed class CompletionNotifier(IJobService jobs, INotificationService notifications, Action<Exception>? onFault = null)
+internal sealed class CompletionNotifier(IJobService jobs, INotificationService notifications, Action<Exception>? onFault = null, IShell? shell = null)
 {
     public void Watch() => jobs.EventRaised += OnEvent;
 
@@ -111,6 +111,10 @@ internal sealed class CompletionNotifier(IJobService jobs, INotificationService 
             if (state == JobState.Completed)
             {
                 notifications.ShowCompleted(id, job.FileName);
+                if (job.OpenWhenCompleted)
+                {
+                    shell?.OpenFile(Path.Combine(job.Folder, job.FileName));
+                }
             }
             else
             {

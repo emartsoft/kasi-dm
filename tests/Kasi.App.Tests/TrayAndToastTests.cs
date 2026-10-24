@@ -46,6 +46,8 @@ internal sealed class EventingJobService : IJobService
 
     public Task StartAsync(JobId id, CancellationToken cancellationToken = default) => _inner.StartAsync(id, cancellationToken);
 
+    public Task SetJobOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default) => _inner.SetJobOptionsAsync(id, speedLimitBps, openWhenCompleted, cancellationToken);
+
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => _inner.PauseAsync(id, cancellationToken);
 
     public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => _inner.ResumeAsync(id, cancellationToken);
@@ -311,6 +313,26 @@ public class NotificationTests
         await WaitUntilAsync(() => toasts.Shown.Count == 1);
 
         toasts.Shown.Single().Should().Be(("completed", job.Id, "pack.zip"));
+    }
+
+    [Fact]
+    [Trait("Requirement", "KASI-UI-003")]
+    public async Task A_download_marked_open_when_completed_opens_its_file_and_an_unmarked_one_does_not()
+    {
+        var jobs = new EventingJobService();
+        var marked = Finished() with { OpenWhenCompleted = true };
+        var plain = Finished();
+        jobs.Stored[marked.Id] = marked;
+        jobs.Stored[plain.Id] = plain;
+        var toasts = new RecordingToasts();
+        var shell = new RecordingShell();
+        new CompletionNotifier(jobs, toasts, shell: shell).Watch();
+
+        jobs.Raise(new JobStateChanged(plain.Id, JobState.Verifying, JobState.Completed, null));
+        jobs.Raise(new JobStateChanged(marked.Id, JobState.Verifying, JobState.Completed, null));
+        await WaitUntilAsync(() => toasts.Shown.Count == 2);
+
+        shell.Opened.Should().Equal(Path.Combine(marked.Folder, marked.FileName));
     }
 
     [Fact]

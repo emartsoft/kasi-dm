@@ -94,6 +94,10 @@ internal static class Strings
 
     public static string DetailsMatrix => Get(nameof(DetailsMatrix));
 
+    public static string DetailsOpenWhenCompleted => Get(nameof(DetailsOpenWhenCompleted));
+
+    public static string DetailsSpeedLimit => Get(nameof(DetailsSpeedLimit));
+
     public static string JobColumnProgress => Get(nameof(JobColumnProgress));
 
     public static string JobColumnSize => Get(nameof(JobColumnSize));

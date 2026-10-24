@@ -254,7 +254,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         _tray.Start();
         _trayIcon = BuildTrayIcon(_tray);
         TrayIcon.SetIcons(this, [_trayIcon]);
-        new CompletionNotifier(jobs, new WindowsToastService(), ReportAddFault).Watch();
+        new CompletionNotifier(jobs, new WindowsToastService(), ReportAddFault, new WindowsShell()).Watch();
         _toastClicks = WindowsToastService.Activate(new NotificationRouter(jobs, new WindowsShell()));
     }
 
