@@ -10,11 +10,12 @@
         Height="640"
         MinWidth="560"
         MinHeight="440"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterScreen">
-  <DockPanel Margin="16">
+  <DockPanel Margin="20">
     <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
       <Grid ColumnDefinitions="*,12,*,12,*" RowDefinitions="Auto,Auto">
-        <TextBlock Grid.Column="0" Text="{Binding CategoryLabel}" />
+        <TextBlock Grid.Column="0" Text="{Binding CategoryLabel}" Classes="kasi-secondary" />
         <ComboBox Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" AutomationProperties.Name="{Binding CategoryLabel}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="core:Category">
@@ -22,7 +23,7 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBlock Grid.Column="2" Text="{Binding QueueLabel}" />
+        <TextBlock Grid.Column="2" Text="{Binding QueueLabel}" Classes="kasi-secondary" />
         <ComboBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" AutomationProperties.Name="{Binding QueueLabel}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="core:Queue">
@@ -30,20 +31,20 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBlock Grid.Column="4" Text="{Binding FolderLabel}" />
+        <TextBlock Grid.Column="4" Text="{Binding FolderLabel}" Classes="kasi-secondary" />
         <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding Folder}" AutomationProperties.Name="{Binding FolderLabel}" />
       </Grid>
       <CheckBox Content="{Binding StartNowLabel}" IsChecked="{Binding StartNow}" AutomationProperties.Name="{Binding StartNowLabel}" />
-      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.Name="{Binding Error}" />
+      <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource KasiDangerBrush}" AutomationProperties.Name="{Binding Error}" />
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-        <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsDefault="True" AutomationProperties.Name="{Binding AddLabel}" />
+        <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="{Binding AddLabel}" />
         <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
       </StackPanel>
     </StackPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,12,200" RowDefinitions="Auto,Auto" Margin="0,0,0,8">
-      <TextBlock Grid.Column="0" Text="{Binding FilterLabel}" />
+      <TextBlock Grid.Column="0" Text="{Binding FilterLabel}" Classes="kasi-secondary" />
       <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding FilterText}" AutomationProperties.Name="{Binding FilterLabel}" />
-      <TextBlock Grid.Column="2" Text="{Binding ExtensionLabel}" />
+      <TextBlock Grid.Column="2" Text="{Binding ExtensionLabel}" Classes="kasi-secondary" />
       <ComboBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Extensions}" SelectedItem="{Binding SelectedExtension}" AutomationProperties.Name="{Binding ExtensionLabel}">
         <ComboBox.ItemTemplate>
           <DataTemplate x:DataType="vm:ExtensionChoice">
@@ -58,13 +59,13 @@
       <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Summary}" />
     </StackPanel>
     <!-- a ListBox virtualises its rows, so 100,000 links are only as heavy as the rows on screen -->
-    <ListBox ItemsSource="{Binding Shown}" AutomationProperties.Name="{Binding FilterLabel}">
+    <ListBox ItemsSource="{Binding Shown}" Background="{DynamicResource KasiCardBrush}" BorderBrush="{DynamicResource KasiBorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource KasiCardCornerRadius}" AutomationProperties.Name="{Binding FilterLabel}">
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="vm:LinkRowViewModel">
           <CheckBox IsChecked="{Binding IsSelected}" AutomationProperties.Name="{Binding FileName}">
             <StackPanel>
               <TextBlock Text="{Binding FileName}" />
-              <TextBlock Text="{Binding Url}" FontSize="11" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Url}" Classes="kasi-secondary kasi-mono" FontSize="11" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </CheckBox>
         </DataTemplate>
