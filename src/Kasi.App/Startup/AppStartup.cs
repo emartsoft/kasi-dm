@@ -47,8 +47,18 @@ internal static class AppStartup
     // Kept out of Run: a second instance returns from Run long before the host exists, and the generic DI call here must not
     // be resolved (and its assemblies loaded) when Run is compiled.
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static void AttachMedia(IHost host, BrowserServices browser) =>
+    private static void AttachMedia(IHost host, BrowserServices browser)
+    {
         browser.Media.Capture = host.Services.GetService<IBrowserMediaCapture>();
+        if (browser.Media.Capture is BrowserMediaCapture capture)
+        {
+            capture.Metadata = message =>
+            {
+                var detected = browser.Media.Catalog.ForTab(message.TabId).FirstOrDefault(item => item.Url == message.Url);
+                return (detected?.Title ?? new Uri(message.Url).Host, detected?.ThumbnailUrl);
+            };
+        }
+    }
 
     // CA2000: the pipes and the session are owned by the process from here on; they are closed when it ends, or by a test that disposes the session
 #pragma warning disable CA2000

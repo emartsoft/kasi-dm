@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Engine;
 using Kasi.Media;
@@ -25,6 +26,8 @@ internal sealed partial class MediaJobExecutor(
     TimeProvider? timeProvider = null,
     ILogger? logger = null) : IJobControl
 {
+    public const string ChoiceGoneMessage = "The quality you chose is no longer offered by this stream.";
+
     public const string FfmpegMissingMessage = "FFmpeg is not available, so this stream can't be saved.";
 
     private const int MaxLogLines = 20;
@@ -199,6 +202,13 @@ internal sealed partial class MediaJobExecutor(
                 return;
             }
 
+            var (selected, selectionError) = ResolveSelection(playable.Presentation, secret);
+            if (selectionError is not null)
+            {
+                await FailAsync(job.Id, selectionError).ConfigureAwait(false);
+                return;
+            }
+
             var downloaded = await runner.RunAsync(playable, new MediaJobOptions
             {
                 JobId = id,
@@ -207,11 +217,22 @@ internal sealed partial class MediaJobExecutor(
                 RequestContext = context,
                 BandwidthLimiter = bandwidth,
                 Events = publish,
+                SelectedVariant = selected,
             }, cancellationToken).ConfigureAwait(false);
 
+            var format = secret?.Media?.Format;
             var muxed = await new MediaMuxer(new FfmpegRunner(ffmpeg)).MuxAsync(
                 downloaded,
-                new MediaMuxOptions { OutputPath = Path.Combine(job.Folder, job.FileName) },
+                new MediaMuxOptions
+                {
+                    OutputPath = Path.Combine(job.Folder, job.FileName),
+                    Container = format switch
+                    {
+                        "Matroska" => MediaMuxContainer.Matroska,
+                        "Mp4" => MediaMuxContainer.Mp4,
+                        _ => MediaMuxContainer.Auto,
+                    },
+                },
                 cancellationToken).ConfigureAwait(false);
             var current = await jobs.GetAsync(id, cancellationToken).ConfigureAwait(false);
             if (current is null)
@@ -220,10 +241,11 @@ internal sealed partial class MediaJobExecutor(
             }
 
             await jobs.UpdateAsync(current with { FileName = Path.GetFileName(muxed.OutputPath) }, cancellationToken).ConfigureAwait(false);
-            if (await ChangeAsync(id, JobState.Muxing, JobState.Verifying, null, null, cancellationToken).ConfigureAwait(false)
-                && await ChangeAsync(id, JobState.Verifying, JobState.Completed, null, null, cancellationToken).ConfigureAwait(false))
+            if (await ChangeAsync(id, JobState.Muxing, JobState.Verifying, null, null, cancellationToken).ConfigureAwait(false))
             {
-                await secrets.DeleteAsync(id, cancellationToken).ConfigureAwait(false); // TRD 11.1: cookies go with the job's work
+                // Delete before the terminal transition so a Completed job never has a secret left to clean up.
+                await secrets.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+                await ChangeAsync(id, JobState.Verifying, JobState.Completed, null, null, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -269,6 +291,30 @@ internal sealed partial class MediaJobExecutor(
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// The variant the person chose, found again in the freshly loaded manifest by height and nearest bitrate (playlist URLs can
+    /// change between loads). No saved choice means the default quality. A saved choice the stream no longer offers is an error,
+    /// never a silent change of quality.
+    /// </summary>
+    internal static (MediaVariant? Variant, string? Error) ResolveSelection(MediaPresentation presentation, JobSecret? secret)
+    {
+        if (secret?.Media is not { } choice)
+        {
+            return (null, null);
+        }
+
+        if (choice.Format == nameof(MediaPickerFormat.AudioOnly))
+        {
+            return presentation.FindAudioOnly(choice.Language, choice.Bandwidth) is { } track
+                ? (new MediaVariant(track, track, null), null)
+                : (null, ChoiceGoneMessage);
+        }
+
+        return presentation.FindVariant(choice.Height, choice.Bandwidth) is { } variant
+            ? (variant, null)
+            : (null, ChoiceGoneMessage);
     }
 
     private static string? Header(JobSecret? secret, string name) =>

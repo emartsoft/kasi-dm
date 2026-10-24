@@ -108,6 +108,14 @@ internal sealed class RecordingJobService : IJobService
 
     public List<JobId> Paused { get; } = [];
 
+    public List<(JobId Id, long? Limit, bool Open)> OptionsSaved { get; } = [];
+
+    public Task SetJobOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default)
+    {
+        OptionsSaved.Add((id, speedLimitBps, openWhenCompleted));
+        return Task.CompletedTask;
+    }
+
     public List<JobId> Resumed { get; } = [];
 
     public List<(JobId Id, bool DeleteFiles)> Cancelled { get; } = [];

@@ -152,6 +152,26 @@ public sealed class MediaParserTests
     }
 
     [Fact]
+    public void A_saved_choice_finds_its_variant_by_height_and_nearest_bitrate_and_its_audio_by_language()
+    {
+        MediaVariant Variant(int height, int bandwidth) => new(
+            new MediaTrack($"v{height}-{bandwidth}", MediaRole.Video, null, null, null, bandwidth, height * 16 / 9, height, 10, false, null, []), null, null);
+        var low = Variant(360, 800_000);
+        var high = Variant(360, 1_200_000);
+        var hd = Variant(720, 2_500_000);
+        var english = new MediaTrack("en", MediaRole.Audio, "en", null, null, 48_000, null, null, 10, false, null, []);
+        var french = new MediaTrack("fr", MediaRole.Audio, "fr", null, null, 96_000, null, null, 10, false, null, []);
+        var presentation = new MediaPresentation(null, 10, false, [hd, low, high], [english, french], []);
+
+        presentation.FindVariant(360, 1_000_000).Should().BeSameAs(low, "800 kbps is nearer to 1000 than 1200 is");
+        presentation.FindVariant(360, 1_150_000).Should().BeSameAs(high);
+        presentation.FindVariant(720, 1).Should().BeSameAs(hd);
+        presentation.FindVariant(1080, 5_000_000).Should().BeNull("an absent height is not replaced by another");
+        presentation.FindAudioOnly("FR", 1).Should().BeSameAs(french);
+        presentation.FindAudioOnly("de", 1).Should().BeNull();
+    }
+
+    [Fact]
     public void Hls_segments_carry_their_media_sequence_number()
     {
         var media = HlsParser.ParseMedia("#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:7\n#EXTINF:4,\na.ts\n#EXTINF:4,\nb.ts\n#EXT-X-ENDLIST\n", _master);

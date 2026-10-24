@@ -57,6 +57,20 @@ public sealed record MediaPresentation(
         return atOrBelow ?? Variants[0];
     }
 
+    /// <summary>The variant a saved choice means: same height, nearest bitrate. Null when the stream no longer offers that height.</summary>
+    public MediaVariant? FindVariant(int? height, int? bandwidth) =>
+        Variants
+            .Where(variant => variant.Height == height)
+            .OrderBy(variant => Math.Abs((variant.Video.Bandwidth ?? 0) - (bandwidth ?? 0)))
+            .FirstOrDefault();
+
+    /// <summary>The audio-only track a saved choice means: same language, nearest bitrate; null when there is none.</summary>
+    public MediaTrack? FindAudioOnly(string? language, int? bandwidth) =>
+        AudioOnly
+            .Where(track => string.Equals(track.Language, language, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(track => Math.Abs((track.Bandwidth ?? 0) - (bandwidth ?? 0)))
+            .FirstOrDefault();
+
     public static MediaPresentation Empty { get; } = new(null, 0, false, [], [], []);
 }
 

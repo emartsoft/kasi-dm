@@ -265,6 +265,31 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Requirement", "KASI-UI-003")]
+    public async Task A_speed_limit_and_the_open_flag_set_while_a_job_transfers_are_saved_and_the_job_still_completes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/options/4194304", "options.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
+
+        await harness.Engine.SetJobOptionsAsync(job.Id, 8_388_608, true, ct);
+        await download;
+
+        var done = (await harness.Jobs.GetAsync(job.Id, ct))!;
+        done.State.Should().Be(JobState.Completed);
+        done.SpeedLimitBps.Should().Be(8_388_608);
+        done.OpenWhenCompleted.Should().BeTrue();
+        var missing = () => harness.Engine.SetJobOptionsAsync(JobId.New(TimeProvider.System), null, false, ct);
+        await missing.Should().ThrowAsync<InvalidOperationException>();
+        var zero = () => harness.Engine.SetJobOptionsAsync(job.Id, 0, false, ct);
+        await zero.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
     [Trait("TC", "TC-ENG-015")]
     public async Task Disk_full_pauses_with_NotEnoughSpace_and_resume_restarts_after_space_is_freed()
     {

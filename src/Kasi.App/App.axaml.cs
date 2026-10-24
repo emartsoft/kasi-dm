@@ -42,6 +42,11 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _desktop = desktop;
+            if (services.GetService<IMediaPicker>() is AvaloniaMediaPicker mediaPicker)
+            {
+                mediaPicker.Owner = () => _window;
+            }
+
             if (shell)
             {
                 // closing the window hides it; only Quit ends Kasi, so a browser can always reach it
@@ -243,7 +248,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         _tray.Start();
         _trayIcon = BuildTrayIcon(_tray);
         TrayIcon.SetIcons(this, [_trayIcon]);
-        new CompletionNotifier(jobs, new WindowsToastService(), ReportAddFault).Watch();
+        new CompletionNotifier(jobs, new WindowsToastService(), ReportAddFault, new WindowsShell()).Watch();
         _toastClicks = WindowsToastService.Activate(new NotificationRouter(jobs, new WindowsShell()));
     }
 

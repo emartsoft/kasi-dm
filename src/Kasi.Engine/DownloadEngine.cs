@@ -228,6 +228,36 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     }
 
     /// <summary>Cancels a running job, waits for its final checkpoint and stores the user pause reason.</summary>
+    /// <summary>
+    /// Sets the job's own speed limit (null: only the global limit applies) and whether its file is opened when it completes. A job that is
+    /// transferring now changes speed at once; the choices are saved and apply to every later run (KASI-UI-003).
+    /// </summary>
+    public async Task SetJobOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default)
+    {
+        EnsureStarted();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(speedLimitBps ?? 1, 0);
+        if (!await _jobs.UpdateOptionsAsync(id, speedLimitBps, openWhenCompleted, cancellationToken).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException($"Job {id} does not exist.");
+        }
+
+        if (_running.TryGetValue(id, out var running))
+        {
+            running.Limit?.SetRate(speedLimitBps);
+        }
+    }
+
+    private BandwidthLimiter.JobBandwidthLimit JobLimitFor(Job job)
+    {
+        var limit = _bandwidth.CreateJobLimit(job.SpeedLimitBps);
+        if (_running.TryGetValue(job.Id, out var running))
+        {
+            running.Limit = limit;
+        }
+
+        return limit;
+    }
+
     public async Task PauseJobAsync(JobId id, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
@@ -563,7 +593,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
             SegmentRepository = _segments,
             JobRepository = _jobs,
             BandwidthLimiter = _bandwidth,
-            JobBandwidthLimit = _bandwidth.CreateJobLimit(job.SpeedLimitBps),
+            JobBandwidthLimit = JobLimitFor(job),
             Proxy = _proxy,
             TimeProvider = _time,
             SecretRepository = _secrets,
@@ -1115,6 +1145,9 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     private sealed class RunningJob(CancellationTokenSource cancellation)
     {
         public CancellationTokenSource Cancellation { get; } = cancellation;
+
+        /// <summary>The job's own speed budget of this run, so a change made while it transfers can reach it.</summary>
+        public BandwidthLimiter.JobBandwidthLimit? Limit { get; set; }
 
         public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }

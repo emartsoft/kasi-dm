@@ -1,10 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Kasi.App.Controls;
 using Kasi.Core;
 
 namespace Kasi.App.ViewModels;
 
 /// <summary>
-/// One line of the job list. Shows the file name, never the address (it can carry a token). The <c>Sort...</c> numbers are what the grid
+/// One line of the job list. Shows the file name and the host, never the whole address (it can carry a token). The <c>Sort...</c> numbers are what the grid
 /// sorts by, so "Size" sorts by bytes and "Time left" by seconds, not by their text.
 /// </summary>
 internal sealed partial class JobRowViewModel : ObservableObject
@@ -37,6 +38,7 @@ internal sealed partial class JobRowViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(job);
         Id = job.Id;
         FileName = job.FileName;
+        Host = Uri.TryCreate(job.Url, UriKind.Absolute, out var uri) ? uri.Host : string.Empty;
         QueueId = job.QueueId;
         CategoryId = job.CategoryId;
         CategoryName = categoryName;
@@ -53,6 +55,19 @@ internal sealed partial class JobRowViewModel : ObservableObject
     public JobId Id { get; }
 
     public string FileName { get; }
+
+    /// <summary>The site the file comes from (the second line under the name); empty when the address cannot be read.</summary>
+    public string Host { get; }
+
+    /// <summary>The colour of the status badge: green while it transfers, purple when done, amber when paused, red when failed.</summary>
+    public ChipKind StatusKind => StateValue switch
+    {
+        JobState.Completed => ChipKind.Accent,
+        JobState.Failed => ChipKind.Danger,
+        JobState.Paused => ChipKind.Warning,
+        JobState.Queued => ChipKind.Neutral,
+        _ => ChipKind.Success,
+    };
 
     public int QueueId { get; }
 
@@ -108,6 +123,7 @@ internal sealed partial class JobRowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(State));
         OnPropertyChanged(nameof(IsActive));
+        OnPropertyChanged(nameof(StatusKind));
     }
 
     private void Refresh()

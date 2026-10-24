@@ -214,6 +214,9 @@ internal sealed class JobService(
 
     public Task PauseAsync(JobId id, CancellationToken cancellationToken = default) => engine.PauseJobAsync(id, cancellationToken);
 
+    public Task SetJobOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default) =>
+        engine.SetJobOptionsAsync(id, speedLimitBps, openWhenCompleted, cancellationToken);
+
     public Task ResumeAsync(JobId id, CancellationToken cancellationToken = default) => engine.ResumeJobAsync(id, cancellationToken);
 
     public Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default) =>

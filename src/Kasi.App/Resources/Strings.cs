@@ -18,6 +18,28 @@ internal static class Strings
 
     public static string JobColumnState => Get(nameof(JobColumnState));
 
+    public static string SelectRow => Get(nameof(SelectRow));
+
+    public static string DetailsPeak => Get(nameof(DetailsPeak));
+
+    public static string DetailsElapsed => Get(nameof(DetailsElapsed));
+
+    public static string DetailsChart => Get(nameof(DetailsChart));
+
+    public static string DetailsCopyLink => Get(nameof(DetailsCopyLink));
+
+    public static string DetailsIdle => Get(nameof(DetailsIdle));
+
+    public static string DetailsStreamsActive => Get(nameof(DetailsStreamsActive));
+
+    public static string DetailsActiveStreams => Get(nameof(DetailsActiveStreams));
+
+    public static string DetailsMatrix => Get(nameof(DetailsMatrix));
+
+    public static string DetailsOpenWhenCompleted => Get(nameof(DetailsOpenWhenCompleted));
+
+    public static string DetailsSpeedLimit => Get(nameof(DetailsSpeedLimit));
+
     public static string JobColumnProgress => Get(nameof(JobColumnProgress));
 
     public static string JobColumnSize => Get(nameof(JobColumnSize));
@@ -35,6 +57,41 @@ internal static class Strings
     public static string AddCategoryLabel => Get(nameof(AddCategoryLabel));
 
     public static string PickerCategoryAutomatic => Get(nameof(PickerCategoryAutomatic));
+
+    public static string MediaPickerTitle => Get(nameof(MediaPickerTitle));
+
+    public static string MediaPickerAutomationName => Get(nameof(MediaPickerAutomationName));
+
+    public static string MediaPickerQualityLabel => Get(nameof(MediaPickerQualityLabel));
+
+    public static string MediaPickerFormatLabel => Get(nameof(MediaPickerFormatLabel));
+
+    public static string MediaPickerSubtitlesLabel => Get(nameof(MediaPickerSubtitlesLabel));
+
+    public static string MediaPickerSubtitlesUnavailable => Get(nameof(MediaPickerSubtitlesUnavailable));
+
+    public static string MediaPickerAdd => Get(nameof(MediaPickerAdd));
+
+    public static string MediaPickerCancel => Get(nameof(MediaPickerCancel));
+
+    public static string MediaPickerAudioLabel => Get(nameof(MediaPickerAudioLabel));
+
+    public static string MediaPickerAudioOnly => Get(nameof(MediaPickerAudioOnly));
+
+    public static string MediaPickerMp4 => Get(nameof(MediaPickerMp4));
+
+    public static string MediaPickerMkv => Get(nameof(MediaPickerMkv));
+
+
+    public static string MediaPickerSubtitle => Get(nameof(MediaPickerSubtitle));
+
+    public static string MediaPickerNoQuality => Get(nameof(MediaPickerNoQuality));
+
+    public static string MediaPickerNoAudio => Get(nameof(MediaPickerNoAudio));
+
+    public static string MediaPickerUnknownCodec => Get(nameof(MediaPickerUnknownCodec));
+
+    public static string MediaPickerUnknownBitrate => Get(nameof(MediaPickerUnknownBitrate));
 
     public static string AddQueueLabel => Get(nameof(AddQueueLabel));
 
