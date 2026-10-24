@@ -917,4 +917,7 @@
     <value>from</value>
     <comment>Before the start time of a queue that runs until it is empty: from 02:00.</comment>
   </data>
+  <data name="SelectRow" xml:space="preserve">
+    <value>Select download</value>
+  </data>
 </root>

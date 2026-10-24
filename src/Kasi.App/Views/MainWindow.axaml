@@ -198,21 +198,43 @@
         </ContextMenu>
       </DataGrid.ContextMenu>
       <DataGrid.Columns>
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnName}" Tag="name" Binding="{Binding FileName}" Width="2*" MinWidth="200" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSize}" Tag="size" Binding="{Binding Size}" SortMemberPath="SortSize" Width="90" />
-        <DataGridTemplateColumn Header="{x:Static res:Strings.JobColumnProgress}" Tag="progress" SortMemberPath="Percent" Width="130">
+        <DataGridTemplateColumn Header="{x:Static res:Strings.JobColumnName}" Tag="name" SortMemberPath="FileName" Width="2*" MinWidth="240">
           <DataGridTemplateColumn.CellTemplate>
             <DataTemplate x:DataType="vm:JobRowViewModel">
-              <Grid ColumnDefinitions="*,48" Margin="6,0">
-                <ProgressBar Grid.Column="0" MinWidth="0" Margin="0,0,6,0" Value="{Binding Percent}" Minimum="0" Maximum="100" VerticalAlignment="Center" AutomationProperties.Name="{Binding Percent, StringFormat={}{0:0}%}" />
-                <TextBlock Grid.Column="1" Text="{Binding Percent, StringFormat={}{0:0}%}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+              <Grid ColumnDefinitions="Auto,Auto,*" Margin="8,0" VerticalAlignment="Center">
+                <CheckBox Grid.Column="0" MinWidth="0" Padding="0" Margin="0,0,8,0" IsChecked="{Binding $parent[DataGridRow].IsSelected, Mode=TwoWay}" AutomationProperties.Name="{x:Static res:Strings.SelectRow}" />
+                <c:FileTypeChip Grid.Column="1" FileName="{Binding FileName}" Margin="0,0,10,0" />
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Host}" Classes="kasi-secondary" TextTrimming="CharacterEllipsis" IsVisible="{Binding Host, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
               </Grid>
+            </DataTemplate>
+          </DataGridTemplateColumn.CellTemplate>
+        </DataGridTemplateColumn>
+        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSize}" Tag="size" Binding="{Binding Size}" SortMemberPath="SortSize" Width="90" />
+        <DataGridTemplateColumn Header="{x:Static res:Strings.JobColumnProgress}" Tag="progress" SortMemberPath="Percent" Width="170">
+          <DataGridTemplateColumn.CellTemplate>
+            <DataTemplate x:DataType="vm:JobRowViewModel">
+              <StackPanel Margin="6,0" VerticalAlignment="Center" Spacing="2">
+                <Grid ColumnDefinitions="*,40">
+                  <ProgressBar Grid.Column="0" MinWidth="0" Margin="0,0,6,0" Height="6" Value="{Binding Percent}" Minimum="0" Maximum="100" VerticalAlignment="Center" AutomationProperties.Name="{Binding Percent, StringFormat={}{0:0}%}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Percent, StringFormat={}{0:0}%}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+                <TextBlock Text="{Binding Downloaded}" Classes="kasi-secondary" FontSize="11" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
             </DataTemplate>
           </DataGridTemplateColumn.CellTemplate>
         </DataGridTemplateColumn>
         <DataGridTextColumn Header="{x:Static res:Strings.JobColumnSpeed}" Tag="speed" Binding="{Binding Speed}" SortMemberPath="SortSpeed" Width="100" />
         <DataGridTextColumn Header="{x:Static res:Strings.JobColumnTimeLeft}" Tag="timeleft" Binding="{Binding TimeLeft}" SortMemberPath="SortTimeLeft" Width="90" />
-        <DataGridTextColumn Header="{x:Static res:Strings.JobColumnState}" Tag="status" Binding="{Binding State}" Width="110" />
+        <DataGridTemplateColumn Header="{x:Static res:Strings.JobColumnState}" Tag="status" SortMemberPath="State" Width="120">
+          <DataGridTemplateColumn.CellTemplate>
+            <DataTemplate x:DataType="vm:JobRowViewModel">
+              <c:StatusChip Text="{Binding State}" Kind="{Binding StatusKind}" Margin="6,0" />
+            </DataTemplate>
+          </DataGridTemplateColumn.CellTemplate>
+        </DataGridTemplateColumn>
         <DataGridTextColumn Header="{x:Static res:Strings.JobColumnDateAdded}" Tag="date" Binding="{Binding DateAdded}" SortMemberPath="Created" Width="130" />
         <DataGridTextColumn Header="{x:Static res:Strings.JobColumnCategory}" Tag="category" Binding="{Binding CategoryName}" Width="110" />
       </DataGrid.Columns>
