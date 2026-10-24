@@ -149,8 +149,20 @@ public sealed class AppProcess : IAsyncDisposable
             : throw new TimeoutException($"No window named '{name}' appeared. Windows: {string.Join(", ", TopLevelWindows().Select(w => $"'{w.Name}'"))}. {(_process.HasExited ? $"The app had exited with code {_process.ExitCode}." : "The app was still running.")} Output:{Environment.NewLine}{Output}{Environment.NewLine}{LogTail()}");
     }
 
-    public IReadOnlyList<Window> TopLevelWindows() =>
-        _process.HasExited ? [] : Application.Attach(_process).GetAllTopLevelWindows(_automation);
+    /// <summary>
+    /// The app's windows. A modal dialog (Delete) is a child of the window that opened it in the UI Automation tree, not a top-level
+    /// window of its own, so the owned windows of each top-level window are listed too.
+    /// </summary>
+    public IReadOnlyList<Window> TopLevelWindows()
+    {
+        if (_process.HasExited)
+        {
+            return [];
+        }
+
+        var top = Application.Attach(_process).GetAllTopLevelWindows(_automation);
+        return [.. top, .. top.SelectMany(w => w.FindAllChildren(c => c.ByControlType(FlaUI.Core.Definitions.ControlType.Window)).Select(c => c.AsWindow()))];
+    }
 
     public async ValueTask DisposeAsync()
     {
