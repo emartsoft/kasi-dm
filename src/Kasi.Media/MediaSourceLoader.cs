@@ -250,7 +250,7 @@ public sealed class MediaSourceLoader : IDisposable
         throw new MediaLoadException(MediaLoadError.HttpError, "The manifest had too many redirects.");
     }
 
-    private static HttpRequestMessage BuildRequest(Uri uri, Uri initialUri, MediaRequestContext context)
+    internal static HttpRequestMessage BuildRequest(Uri uri, Uri initialUri, MediaRequestContext context)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
         if (!string.IsNullOrWhiteSpace(context.UserAgent))
