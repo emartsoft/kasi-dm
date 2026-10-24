@@ -220,6 +220,9 @@ internal sealed class FaultHarness : IAsyncDisposable
 internal static class ChildEnvironment
 {
     public const string FlushFile = "KASI_FAULT_FLUSH_FILE";
+    /// <summary>Where the child writes the start of the checkpoint it is in the middle of (UTC ticks), or 0 between checkpoints.</summary>
+    public static string InFlightFile(string flushFile) => flushFile + ".inflight";
+
     public const string CommitMarker = "KASI_FAULT_COMMIT_MARKER";
     public const string CommitsBefore = "KASI_FAULT_COMMITS_BEFORE";
     public const string StallMilliseconds = "KASI_FAULT_STALL_MS";

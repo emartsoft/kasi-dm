@@ -11,6 +11,18 @@ namespace Kasi.FaultInjection;
 /// </summary>
 internal static class ChildRunner
 {
+    private static void WriteQuietly(string path, string text)
+    {
+        try
+        {
+            File.WriteAllText(path, text);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // a virus scanner or the parent may hold the file for a moment; the latency is a measurement, never a reason to stop
+        }
+    }
+
     public static async Task<int> RunAsync(string database, JobId jobId, long bytesPerSecond)
     {
         var factory = new SqliteConnectionFactory(database);
@@ -35,30 +47,50 @@ internal static class ChildRunner
             };
         }
 
-        // Slowest commit so far, for the parent's refetch bound: a slow flush delays the checkpoint, so more is lost to a kill.
+        // Slowest checkpoint so far, for the parent's refetch bound: a slow flush delays the checkpoint, so more is lost to a kill.
+        // A checkpoint is the part-file flush plus the database commit. One that is still running when the kill lands never
+        // completes, so the in-flight file says which step it is in ("flush:start" or "commit:flushStart:commitStart", UTC ticks)
+        // and the parent counts the time it has been running.
         var flushFile = Environment.GetEnvironmentVariable(ChildEnvironment.FlushFile);
+        var engineDecorator = (Func<Job, HttpTransferOptions, HttpTransferOptions>?)null;
         if (flushFile is not null)
         {
             var slowest = TimeSpan.Zero;
-            checkpoints.CommitCompleted = took =>
+            var inFlightFile = ChildEnvironment.InFlightFile(flushFile);
+            var lastStart = 0L;
+            engineDecorator = (_, options) => options with
             {
+                FlushFaultInjector = () =>
+                {
+                    lastStart = TimeProvider.System.GetUtcNow().UtcTicks;
+                    WriteQuietly(inFlightFile, $"flush:{lastStart.ToString(CultureInfo.InvariantCulture)}");
+                    return null;
+                },
+            };
+            var killHook = checkpoints.BeforeCommit;
+            checkpoints.BeforeCommit = async () =>
+            {
+                // the part file is flushed by now: the checkpoint is in its database commit
+                WriteQuietly(inFlightFile, string.Create(CultureInfo.InvariantCulture, $"commit:{lastStart}:{TimeProvider.System.GetUtcNow().UtcTicks}"));
+                if (killHook is not null)
+                {
+                    await killHook().ConfigureAwait(false);
+                }
+            };
+            checkpoints.CommitCompleted = commit =>
+            {
+                var took = lastStart == 0 ? commit : TimeSpan.FromTicks(TimeProvider.System.GetUtcNow().UtcTicks - lastStart);
+                WriteQuietly(inFlightFile, "0");
                 if (took > slowest)
                 {
                     slowest = took;
-                    try
-                    {
-                        File.WriteAllText(flushFile, slowest.TotalSeconds.ToString("R", CultureInfo.InvariantCulture));
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        // a virus scanner or the parent may hold the file for a moment; the latency is a measurement, never a reason to stop
-                    }
+                    WriteQuietly(flushFile, slowest.TotalSeconds.ToString("R", CultureInfo.InvariantCulture));
                 }
             };
         }
 
         checkpoints.Start();
-        await using var engine = new DownloadEngine(jobs, segments, checkpoints, new BandwidthLimiter(bytesPerSecond));
+        await using var engine = new DownloadEngine(jobs, segments, checkpoints, new BandwidthLimiter(bytesPerSecond)) { OptionsDecorator = engineDecorator };
 
         // Storage stall: delay a few part-file writes and arm a short read-stall timeout. The stall guard must only watch the network
         // read, so a slow write must not cost a retry.
@@ -67,9 +99,10 @@ internal static class ChildRunner
             && int.TryParse(Environment.GetEnvironmentVariable(ChildEnvironment.ReadStallMilliseconds), NumberStyles.Integer, CultureInfo.InvariantCulture, out var readStallMs))
         {
             var writes = 0;
-            engine.OptionsDecorator = (_, options) => options with
+            var flushDecorator = engineDecorator;
+            engine.OptionsDecorator = (job, baseOptions) => (flushDecorator is null ? baseOptions : flushDecorator(job, baseOptions)) with
             {
-                RetryPolicy = options.RetryPolicy with { ReadStallTimeout = TimeSpan.FromMilliseconds(readStallMs) },
+                RetryPolicy = baseOptions.RetryPolicy with { ReadStallTimeout = TimeSpan.FromMilliseconds(readStallMs) },
                 WriteFaultInjector = (_, _) =>
                 {
                     // let the transfer settle first, then stall the next few writes

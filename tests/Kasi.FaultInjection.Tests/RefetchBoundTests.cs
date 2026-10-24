@@ -73,4 +73,48 @@ public sealed class RefetchBoundTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void A_checkpoint_still_running_at_the_kill_is_counted_with_the_step_it_is_in()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"inflight-{Guid.NewGuid():N}");
+        var now = new DateTimeOffset(2026, 10, 24, 1, 0, 30, TimeSpan.Zero);
+        long Ticks(int secondsAgo) => now.AddSeconds(-secondsAgo).UtcTicks;
+        try
+        {
+            File.WriteAllText(path, $"flush:{Ticks(7)}");
+            FaultInjectionRunner.ReadInFlight(path, now).Should().Be(("flush", TimeSpan.FromSeconds(7)));
+
+            File.WriteAllText(path, $"commit:{Ticks(9)}:{Ticks(2)}");
+            FaultInjectionRunner.ReadInFlight(path, now).Should().Be(("commit", TimeSpan.FromSeconds(9)), "the time counts from the start of the checkpoint, not of the commit");
+
+            File.WriteAllText(path, "0");
+            FaultInjectionRunner.ReadInFlight(path, now).Should().Be(((string?)null, TimeSpan.Zero), "between checkpoints nothing is running");
+            FaultInjectionRunner.ReadInFlight(path + ".missing", now).Should().Be(((string?)null, TimeSpan.Zero));
+            File.WriteAllText(path, "commit:12"); // a write cut short by the kill
+            FaultInjectionRunner.ReadInFlight(path, now).Phase.Should().Be("commit");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void A_checkpoint_may_take_at_most_sixty_seconds_whatever_the_bound_allows()
+    {
+        FaultInjectionRunner.CeilingProblem(TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60), "flush", 1).Should().BeNull("exactly at the ceiling is allowed");
+        FaultInjectionRunner.CeilingProblem(TimeSpan.FromSeconds(61), TimeSpan.FromSeconds(61), "flush", 5).Should().Contain("unfinished at the kill, in the flush step").And.Contain("60 s ceiling");
+        FaultInjectionRunner.CeilingProblem(TimeSpan.FromSeconds(61), TimeSpan.FromSeconds(2), null, 5).Should().Contain("completed");
+        FaultInjectionRunner.RefetchBound(_options, TimeSpan.Zero, TimeSpan.FromSeconds(300)).Should().BeGreaterThan(300 * 2 * MiB, "the bound alone would let it pass");
+    }
+
+    [Fact]
+    public void The_summary_counts_stalls_by_step()
+    {
+        FaultIterationResult Kill(int i, double inFlight, string? phase) => new(i, true, null, 0, 0, i + 1, 0, inFlight, 0, inFlight, 10, phase);
+        var report = new FaultInjectionReport("kill", 1, 4, 4, 4, 0, 0, 0, true, null, TimeSpan.Zero, null, [Kill(0, 0, null), Kill(1, 6, "flush"), Kill(2, 23.3, "flush"), Kill(3, 5, "commit")]);
+
+        report.ToMarkdown().Should().Contain("3 of 4").And.Contain("longest 23.3 s, in the flush step (2 in the part-file flush, 1 in the database commit)");
+    }
 }

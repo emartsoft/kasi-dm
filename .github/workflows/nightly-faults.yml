@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '0 1 * * *'
   workflow_dispatch:
+    inputs:
+      suites:
+        description: 'Suites to run, as a JSON array (default: all but power-cut)'
+        required: false
+        default: '["kill","commit-kill","server-mutation","storage-stall","disk-pressure","network-soak"]'
 
 permissions:
   contents: read
@@ -27,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [kill, commit-kill, server-mutation, storage-stall, disk-pressure, network-soak]
+        suite: ${{ fromJSON(inputs.suites || '["kill","commit-kill","server-mutation","storage-stall","disk-pressure","network-soak"]') }}
     steps:
       - uses: actions/checkout@v4
         with:
