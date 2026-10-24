@@ -127,6 +127,50 @@ public sealed class DownloadEngineLifecycleTests : IAsyncLifetime
 
     [Fact]
     [Trait("TC", "TC-ENG-015")]
+    public async Task Resume_asked_the_moment_a_job_shows_Paused_waits_for_the_pause_to_finish_instead_of_failing()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var harness = await Harness.CreateAsync(_host, _root);
+        var job = harness.NewJob("/files/pause-then-resume/8388608", "pause-then-resume.bin");
+        await harness.Engine.AddJobAsync(job, cancellationToken: ct);
+        harness.Engine.OptionsDecorator = (_, options) => options with { RequestHeaders = harness.AddSlowChaos() };
+        var download = harness.Engine.StartAndWaitAsync(job.Id, ct);
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Downloading, DoneBytes: > 0 }, ct);
+        // hold the pause at its last step: the row already says Paused, the runner is not yet gone (what the toolbar sees a moment after Pause)
+        var atLastStep = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Engine.BeforeRunnerReleased = async _ =>
+        {
+            atLastStep.TrySetResult();
+#pragma warning disable VSTHRD003 // the test completes this source itself
+            await release.Task;
+#pragma warning restore VSTHRD003
+        };
+        var pause = harness.Engine.PauseJobAsync(job.Id, ct);
+        await atLastStep.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
+        (await harness.Jobs.GetAsync(job.Id, ct))!.State.Should().Be(JobState.Paused);
+        harness.Engine.OptionsDecorator = null;
+
+        var resume = harness.Engine.ResumeJobAsync(job.Id, ct);
+        try
+        {
+            await Task.WhenAny(resume, Task.Delay(TimeSpan.FromSeconds(2), ct)); // a failing resume ends at once; a waiting one is still waiting
+            resume.IsFaulted.Should().BeFalse("the pause is nearly over, so resume waits for it (it failed with 'already running')");
+        }
+        finally
+        {
+            release.TrySetResult(); // whatever happened above, the held pause must be let go or the engine cannot be disposed
+        }
+
+        await pause;
+        await resume;
+
+        await EventuallyAsync(async () => (await harness.Jobs.GetAsync(job.Id, ct)) is { State: JobState.Completed }, ct);
+        await download;
+    }
+
+    [Fact]
+    [Trait("TC", "TC-ENG-015")]
     public async Task Pause_waits_for_the_checkpoint_and_resume_continues_from_it()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -96,6 +96,9 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     /// <summary>Test-only hook for request headers, a fake disk-space provider or fault injection.</summary>
     internal Func<Job, HttpTransferOptions, HttpTransferOptions>? OptionsDecorator { get; set; }
 
+    /// <summary>Test-only hook: runs when a job's runner is done, after its last state change and before the runner is removed.</summary>
+    internal Func<JobId, Task>? BeforeRunnerReleased { get; set; }
+
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (Interlocked.Exchange(ref _started, 1) == 1)
@@ -253,6 +256,16 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     public async Task ResumeJobAsync(JobId id, CancellationToken cancellationToken = default)
     {
         EnsureStarted();
+        // The row says Paused one step before the runner that paused it is gone; a resume asked in between waits for it
+        // instead of failing with "already running" (the toolbar's Resume swallows that and nothing would happen).
+        if (_running.TryGetValue(id, out var pausing)
+            && await _jobs.GetAsync(id, cancellationToken).ConfigureAwait(false) is { State: JobState.Paused })
+        {
+#pragma warning disable VSTHRD003 // the running job is owned by this engine
+            await pausing.Completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+#pragma warning restore VSTHRD003
+        }
+
         var gate = _jobLocks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -453,6 +466,11 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         }
         finally
         {
+            if (BeforeRunnerReleased is { } hook)
+            {
+                await hook(id).ConfigureAwait(false);
+            }
+
             _running.TryRemove(id, out _);
             running.Completion.TrySetResult();
             running.Cancellation.Dispose();
