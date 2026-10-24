@@ -34,6 +34,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     private int _stopped;
     private int _droppedEvents;
     private int _subscriberFaults;
+    private readonly IPostProbeRouter? _postProbeRouter;
 
     public DownloadEngine(
         IJobRepository jobs,
@@ -43,7 +44,8 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         ProxySettings? proxy = null,
         IJobSecretRepository? secrets = null,
         TimeProvider? timeProvider = null,
-        INetworkStatus? network = null)
+        INetworkStatus? network = null,
+        IPostProbeRouter? postProbeRouter = null)
     {
         ArgumentNullException.ThrowIfNull(jobs);
         ArgumentNullException.ThrowIfNull(segments);
@@ -57,6 +59,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         _secrets = secrets;
         _time = timeProvider ?? TimeProvider.System;
         _network = network;
+        _postProbeRouter = postProbeRouter;
     }
 
     /// <summary>Raised on the single dispatcher after the transition is committed. A throwing handler is counted, never fatal.</summary>
@@ -569,6 +572,10 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
             SchedulerTick = ProgressPublisher(job),
             Log = line => Publish(new JobLogged(job.Id, _time.GetUtcNow(), line)),
             BeforeVerifyAsync = () => EnterVerifyingAsync(job.Id),
+            // a job whose category was only the fallback and that has saved nothing yet is routed once, by the MIME type the probe reports
+            RouteAfterProbe = _postProbeRouter is { } router && job.CategoryAuto && job.DoneBytes == 0
+                ? (fileName, contentType, cancellationToken) => router.RouteAsync(job, fileName, contentType, cancellationToken)
+                : null,
         };
         return OptionsDecorator is { } decorator ? decorator(job, options) : options;
     }

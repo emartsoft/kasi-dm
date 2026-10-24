@@ -35,6 +35,12 @@ public sealed record Job
     /// <summary>How many times a changed remote file forced a restart; capped by the facade (KASI-RES-003).</summary>
     public int RestartCount { get; init; }
 
+    /// <summary>
+    /// True when the category is only the fallback (General) because nothing in the link, the name or the browser's MIME type decided it, and
+    /// no folder was named: the engine may route the job once after the probe, by the MIME type the server reports (KASI-CAT-001).
+    /// </summary>
+    public bool CategoryAuto { get; init; }
+
     public string? ETag { get; init; }
 
     /// <summary>The <c>Last-Modified</c> header exactly as the server sent it, so <c>If-Range</c> can send it back unchanged.</summary>

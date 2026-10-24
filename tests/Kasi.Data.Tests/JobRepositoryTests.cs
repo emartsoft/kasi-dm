@@ -51,9 +51,23 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
         ChecksumAlgo = "sha256",
         Checksum = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         CategoryId = 5,
+        CategoryAuto = true,
         CompletedUtc = _created.AddHours(2),
         QueuePos = 1.0000000000000002,
     };
+
+    [Fact]
+    [Trait("TC", "TC-CAT-001")]
+    public async Task Routing_a_job_after_the_probe_sets_its_category_and_folder_and_clears_the_automatic_mark()
+    {
+        var job = NewJob() with { CategoryId = 1, Folder = "Downloads", CategoryAuto = true };
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+
+        (await _jobs.UpdateRoutingAsync(job.Id, 5, "C:/Downloads/Video", TempDatabase.Ct)).Should().BeTrue();
+
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct)).Should().Be(job with { CategoryId = 5, Folder = "C:/Downloads/Video", CategoryAuto = false });
+        (await _jobs.UpdateRoutingAsync(JobId.New(TimeProvider.System), 5, "x", TempDatabase.Ct)).Should().BeFalse();
+    }
 
     [Fact]
     public async Task A_job_with_every_field_set_comes_back_identical()

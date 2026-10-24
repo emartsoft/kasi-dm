@@ -94,6 +94,25 @@ public sealed class JobServiceTests : IAsyncLifetime
 
     [Fact]
     [Trait("TC", "TC-CAT-001")]
+    public async Task Only_a_job_that_the_fallback_categorised_without_a_named_folder_may_be_routed_after_the_probe()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var fallback = await _service.AddAsync(Request("get", category: null, url: "https://files.example.org/get"), cancellationToken: ct);
+        var byExtension = await _service.AddAsync(Request("a.mp4", category: null, url: "https://files.example.org/a.mp4"), cancellationToken: ct);
+        var named = await _service.AddAsync(Request("b", category: 1, url: "https://files.example.org/b"), cancellationToken: ct);
+        var folder = await _service.AddAsync(Request("c", category: null, url: "https://files.example.org/c") with { Folder = Path.Combine(_root, "mine") }, cancellationToken: ct);
+        var byMime = await _service.AddAsync(Request("d", category: null, url: "https://files.example.org/d") with { Mime = "video/mp4" }, cancellationToken: ct);
+
+        fallback.Job!.CategoryAuto.Should().BeTrue();
+        byExtension.Job!.CategoryAuto.Should().BeFalse("the extension decided");
+        named.Job!.CategoryAuto.Should().BeFalse("a person chose General");
+        folder.Job!.CategoryAuto.Should().BeFalse("a person named the folder");
+        byMime.Job!.CategoryAuto.Should().BeFalse("the browser's MIME type decided");
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-001")]
     public async Task The_MIME_type_the_browser_reported_decides_when_the_name_has_no_extension()
     {
         var ct = TestContext.Current.CancellationToken;

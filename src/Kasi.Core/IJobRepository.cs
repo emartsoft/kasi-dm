@@ -33,6 +33,12 @@ public interface IJobRepository
     /// <summary>Sets the saved byte count back to zero, for a job that restarts from the beginning (TRD 6.5). Returns false if there is no such job.</summary>
     Task<bool> ResetProgressAsync(JobId id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sets the category and folder of a job routed after the probe, and clears <see cref="Job.CategoryAuto"/> so it is routed only once.
+    /// Returns false if there is no such job. A repository that cannot do this (a test fake) changes nothing.
+    /// </summary>
+    Task<bool> UpdateRoutingAsync(JobId id, int categoryId, string folder, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
     /// <summary>Deletes the job and, by cascade, its segments and secrets. Returns false if there is no such job.</summary>
     Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default);
 

@@ -178,6 +178,16 @@ public class CategoryResolverTests
     }
 
     [Fact]
+    [Trait("TC", "TC-CAT-001")]
+    public void Only_the_fallback_is_marked_as_one()
+    {
+        Resolve("https://example.org/a.xyz", _defaults)!.IsFallback.Should().BeTrue();
+        Resolve("https://example.org/a", _defaults, mime: "application/octet-stream")!.IsFallback.Should().BeTrue("a MIME type that says nothing decides nothing");
+        Resolve("https://example.org/a.mp4", _defaults)!.IsFallback.Should().BeFalse();
+        Resolve("https://example.org/a", _defaults, mime: "video/mp4")!.IsFallback.Should().BeFalse("the MIME type decided");
+    }
+
+    [Fact]
     public void The_match_names_the_rule_that_decided()
     {
         var rule = Extension(5, "mp4");

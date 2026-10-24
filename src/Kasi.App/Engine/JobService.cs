@@ -59,7 +59,9 @@ internal sealed class JobService(
         }
 
         // no category named: the rules choose it from the link, the file name and the MIME type (a person's choice is never overridden)
-        var categoryId = request.CategoryId ?? await ResolveCategoryAsync(uri, request, cancellationToken).ConfigureAwait(false);
+        var (categoryId, onlyFallback) = request.CategoryId is { } named
+            ? (named, false)
+            : await ResolveCategoryAsync(uri, request, cancellationToken).ConfigureAwait(false);
         var folder = request.Folder ?? await FolderForAsync(categoryId, cancellationToken).ConfigureAwait(false);
         var last = (await jobs.ListAsync(request.QueueId, cancellationToken: cancellationToken).ConfigureAwait(false)).Select(j => j.QueuePos).DefaultIfEmpty(0).Max();
         var job = new Job
@@ -73,6 +75,7 @@ internal sealed class JobService(
             QueueId = request.QueueId,
             QueuePos = last + 1,
             CategoryId = categoryId,
+            CategoryAuto = onlyFallback && request.Folder is null, // nothing decided it: the probe's MIME type may (CategoryRouter)
             Connections = request.Connections,
             ChecksumAlgo = checksumAlgo,
             Checksum = checksum,
@@ -227,22 +230,23 @@ internal sealed class JobService(
         SensitiveOrigin = new Uri(uri.GetLeftPart(UriPartial.Authority)),
     };
 
-    private async Task<int?> ResolveCategoryAsync(Uri uri, NewDownload request, CancellationToken cancellationToken)
+    private async Task<(int? CategoryId, bool OnlyFallback)> ResolveCategoryAsync(Uri uri, NewDownload request, CancellationToken cancellationToken)
     {
         if (categoryRules is null)
         {
-            return null;
+            return (null, false);
         }
 
         var all = await categories.ListAsync(cancellationToken).ConfigureAwait(false);
         var rules = await categoryRules.ListAsync(cancellationToken).ConfigureAwait(false);
-        return CategoryResolver.Resolve(uri, request.FileName, request.Mime, rules, all)?.Category.Id;
+        var match = CategoryResolver.Resolve(uri, request.FileName, request.Mime, rules, all);
+        return (match?.Category.Id, match?.IsFallback ?? false);
     }
 
     private async Task<string> FolderForAsync(int? categoryId, CancellationToken cancellationToken)
     {
         var category = categoryId is { } id ? await categories.GetAsync(id, cancellationToken).ConfigureAwait(false) : null;
-        return string.IsNullOrEmpty(category?.Folder) ? downloadsFolder : Path.Combine(downloadsFolder, category.Folder);
+        return CategoryFolder.For(downloadsFolder, category);
     }
 
     public Task StartQueueAsync(int queueId, CancellationToken cancellationToken = default) =>
