@@ -9,50 +9,55 @@
         Width="560"
         SizeToContent="Height"
         CanResize="False"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterOwner">
-  <StackPanel Margin="16" Spacing="8">
-    <TextBlock Text="{Binding UrlLabel}" />
-    <TextBox Text="{Binding Url}" AutomationProperties.Name="{Binding UrlLabel}" />
-    <TextBlock Text="{Binding FileNameLabel}" />
-    <TextBox Text="{Binding FileName}" AutomationProperties.Name="{Binding FileNameLabel}" />
-    <TextBlock Text="{Binding FolderLabel}" />
-    <TextBox Text="{Binding Folder}" AutomationProperties.Name="{Binding FolderLabel}" />
-    <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto">
-      <TextBlock Grid.Column="0" Text="{Binding CategoryLabel}" />
-      <ComboBox Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" AutomationProperties.Name="{Binding CategoryLabel}">
-        <ComboBox.ItemTemplate>
-          <DataTemplate x:DataType="core:Category">
-            <TextBlock Text="{Binding Name}" />
-          </DataTemplate>
-        </ComboBox.ItemTemplate>
-      </ComboBox>
-      <TextBlock Grid.Column="2" Text="{Binding QueueLabel}" />
-      <ComboBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" AutomationProperties.Name="{Binding QueueLabel}">
-        <ComboBox.ItemTemplate>
-          <DataTemplate x:DataType="core:Queue">
-            <TextBlock Text="{Binding Name}" />
-          </DataTemplate>
-        </ComboBox.ItemTemplate>
-      </ComboBox>
-    </Grid>
-    <TextBlock Text="{Binding ConnectionsLabel}" />
-    <NumericUpDown Value="{Binding Connections}" Minimum="1" Maximum="32" Increment="1" FormatString="0" AutomationProperties.Name="{Binding ConnectionsLabel}" />
-    <CheckBox Content="{Binding StartNowLabel}" IsChecked="{Binding StartNow}" AutomationProperties.Name="{Binding StartNowLabel}" />
-    <TextBlock Text="{Binding ChecksumLabel}" />
-    <Grid ColumnDefinitions="140,12,*">
-      <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ChecksumChoices}" SelectedItem="{Binding SelectedChecksum}" AutomationProperties.Name="{Binding ChecksumLabel}">
-        <ComboBox.ItemTemplate>
-          <DataTemplate x:DataType="vm:ChecksumChoice">
-            <TextBlock Text="{Binding Label}" />
-          </DataTemplate>
-        </ComboBox.ItemTemplate>
-      </ComboBox>
-      <TextBox Grid.Column="2" Text="{Binding ChecksumHex}" PlaceholderText="{Binding ChecksumHexLabel}" AutomationProperties.Name="{Binding ChecksumHexLabel}" />
-    </Grid>
-    <CheckBox Content="{Binding RememberLabel}" IsChecked="{Binding RememberForSite}" AutomationProperties.Name="{Binding RememberLabel}" />
-    <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.Name="{Binding Error}" />
+  <StackPanel Margin="20" Spacing="14">
+    <Border Classes="kasi-card">
+      <StackPanel Spacing="8">
+        <TextBlock Text="{Binding UrlLabel}" Classes="kasi-secondary" />
+        <TextBox Text="{Binding Url}" AutomationProperties.Name="{Binding UrlLabel}" />
+        <TextBlock Text="{Binding FileNameLabel}" Classes="kasi-secondary" />
+        <TextBox Text="{Binding FileName}" AutomationProperties.Name="{Binding FileNameLabel}" />
+        <TextBlock Text="{Binding FolderLabel}" Classes="kasi-secondary" />
+        <TextBox Text="{Binding Folder}" AutomationProperties.Name="{Binding FolderLabel}" />
+        <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,Auto">
+          <TextBlock Grid.Column="0" Text="{Binding CategoryLabel}" Classes="kasi-secondary" />
+          <ComboBox Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" AutomationProperties.Name="{Binding CategoryLabel}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="core:Category">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Grid.Column="2" Text="{Binding QueueLabel}" Classes="kasi-secondary" />
+          <ComboBox Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" AutomationProperties.Name="{Binding QueueLabel}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="core:Queue">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+        <TextBlock Text="{Binding ConnectionsLabel}" Classes="kasi-secondary" />
+        <NumericUpDown Value="{Binding Connections}" Minimum="1" Maximum="32" Increment="1" FormatString="0" AutomationProperties.Name="{Binding ConnectionsLabel}" />
+        <CheckBox Content="{Binding StartNowLabel}" IsChecked="{Binding StartNow}" AutomationProperties.Name="{Binding StartNowLabel}" />
+        <TextBlock Text="{Binding ChecksumLabel}" Classes="kasi-secondary" />
+        <Grid ColumnDefinitions="140,12,*">
+          <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ChecksumChoices}" SelectedItem="{Binding SelectedChecksum}" AutomationProperties.Name="{Binding ChecksumLabel}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ChecksumChoice">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBox Grid.Column="2" Text="{Binding ChecksumHex}" PlaceholderText="{Binding ChecksumHexLabel}" AutomationProperties.Name="{Binding ChecksumHexLabel}" />
+        </Grid>
+        <CheckBox Content="{Binding RememberLabel}" IsChecked="{Binding RememberForSite}" AutomationProperties.Name="{Binding RememberLabel}" />
+      </StackPanel>
+    </Border>
+    <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource KasiDangerBrush}" AutomationProperties.Name="{Binding Error}" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsDefault="True" AutomationProperties.Name="{Binding AddLabel}" />
+      <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="{Binding AddLabel}" />
       <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
     </StackPanel>
   </StackPanel>

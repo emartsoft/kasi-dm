@@ -8,12 +8,13 @@
         Width="480"
         SizeToContent="Height"
         CanResize="False"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterScreen">
-  <StackPanel Margin="16" Spacing="12">
+  <StackPanel Margin="20" Spacing="14">
     <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" AutomationProperties.Name="{Binding StatusText}" />
     <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsWaiting}" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Content="{Binding StartLabel}" Command="{Binding StartCommand}" IsDefault="True" AutomationProperties.Name="{Binding StartLabel}" />
+      <Button Content="{Binding StartLabel}" Command="{Binding StartCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="{Binding StartLabel}" />
       <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" IsVisible="{Binding !IsFinished}" AutomationProperties.Name="{Binding CancelLabel}" />
       <Button Content="{Binding CloseLabel}" Command="{Binding CancelCommand}" IsVisible="{Binding IsFinished}" AutomationProperties.Name="{Binding CloseLabel}" />
     </StackPanel>
