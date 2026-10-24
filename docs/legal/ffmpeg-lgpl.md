@@ -3,15 +3,17 @@
 Kasi ships an **LGPL-2.1-or-later** FFmpeg/ffprobe build, invoked as an external process. No GPL or non-free components are
 enabled and no FFmpeg code is linked into a Kasi assembly (KASI-NFR-020, ADR 0030).
 
-## Build configuration (planned recipe)
+## Build configuration
 
-The recipe below is the plan for Kasi's own minimal build. It is **not yet built or verified**: the manual workflow
-`.github/workflows/ffmpeg-minimal-build.yml` compiles it from the pinned source tarball, checks that the result is LGPL and runs
-the media tests against it. Until that workflow is green and its artifact is the release asset, builds use the pinned stock
-LGPL build described in ADR 0030. If a run fails with "Could not find codec parameters", the recipe gains the native decoders
-the streams need and this section is updated.
+The recipe below is Kasi's own minimal build. The manual workflow `.github/workflows/ffmpeg-minimal-build.yml` compiles it from
+the pinned FFmpeg 8.1.3 source tarball (SHA-256 in the workflow), checks that the result is LGPL and runs the media tests
+against it. It was verified on 2026-10-24: run 40114108663, `ffmpeg.exe` 3.7 MB and `ffprobe.exe` 3.5 MB, all 56 media tests
+passing. Stream copy of ADTS AAC from MPEG-TS needs the native audio decoders (the first run failed with "Could not find codec
+parameters ... unspecified sample rate" without them); a video codec that fails the same way gets its native decoder added here.
+The workflow artifact (binaries, source tarball, configuration, SHA-256) is what a release uses; the release checklist requires
+the workflow to be green on the release commit. CI for pull requests keeps using the pinned stock LGPL build (ADR 0030).
 
-Planned options:
+Options:
 
 ```
 --disable-gpl --disable-nonfree --disable-autodetect --disable-everything
