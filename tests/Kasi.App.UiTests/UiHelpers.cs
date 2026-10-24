@@ -42,7 +42,12 @@ internal static class UiHelpers
         return null;
     }
 
-    public static void Press(this AutomationElement root, string name) => root.Named(ControlType.Button, name, "a button").AsButton().Invoke();
+    /// <summary>Presses the button once it is enabled: a command that cannot run yet (no row selected, a state not reached) disables its button.</summary>
+    public static void Press(this AutomationElement root, string name)
+    {
+        var button = root.Named(ControlType.Button, name, "a button").AsButton();
+        WaitFor(() => button.IsEnabled ? button : null, $"the '{name}' button to be enabled", root, TimeSpan.FromSeconds(10)).Invoke();
+    }
 
     public static void SetText(this AutomationElement root, string name, string text) =>
         root.Named(ControlType.Edit, name, "a text box").Patterns.Value.Pattern.SetValue(text);
@@ -65,7 +70,7 @@ internal static class UiHelpers
         var text = new StringBuilder();
         void Walk(AutomationElement e, int depth)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"{new string(' ', depth * 2)}{e.Properties.ControlType.ValueOrDefault} id='{e.Properties.AutomationId.ValueOrDefault}' name='{e.Properties.Name.ValueOrDefault}'");
+            text.AppendLine(CultureInfo.InvariantCulture, $"{new string(' ', depth * 2)}{e.Properties.ControlType.ValueOrDefault} id='{e.Properties.AutomationId.ValueOrDefault}' name='{e.Properties.Name.ValueOrDefault}' enabled={e.Properties.IsEnabled.ValueOrDefault}");
             if (depth < 8)
             {
                 foreach (var child in e.FindAllChildren())
