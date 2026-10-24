@@ -944,4 +944,10 @@
   <data name="DetailsMatrix" xml:space="preserve">
     <value>Segment matrix ({0} connections)</value>
   </data>
+  <data name="DetailsOpenWhenCompleted" xml:space="preserve">
+    <value>Open file when completed</value>
+  </data>
+  <data name="DetailsSpeedLimit" xml:space="preserve">
+    <value>Speed limit</value>
+  </data>
 </root>

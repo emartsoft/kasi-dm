@@ -52,6 +52,9 @@ public sealed record Job
 
     public long? SpeedLimitBps { get; init; }
 
+    /// <summary>Open the file with its program when the job completes (the Active Transfer window's check box); off by default.</summary>
+    public bool OpenWhenCompleted { get; init; }
+
     public string? ChecksumAlgo { get; init; }
 
     public string? Checksum { get; init; }

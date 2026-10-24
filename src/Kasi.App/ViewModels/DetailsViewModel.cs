@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Resources;
+using Kasi.App.Tray;
 using Kasi.Core;
 
 namespace Kasi.App.ViewModels;
@@ -39,6 +40,7 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
     private readonly SpeedHistory _history = new();
     private readonly Dictionary<int, MatrixTile> _tiles = [];
     private Job? _job;
+    private bool _loading;
     private DateTimeOffset _lastSample;
     private DateTimeOffset? _startedAt;
     private TimeSpan _elapsed;
@@ -58,6 +60,12 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _resumeSupportText = string.Empty;
+
+    [ObservableProperty]
+    private bool _openWhenCompleted;
+
+    [ObservableProperty]
+    private SpeedPreset _selectedLimit;
 
     [ObservableProperty]
     private IReadOnlyList<double> _speedSamples = [];
@@ -88,6 +96,8 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
         _shell = shell;
         _post = post ?? (action => Dispatcher.UIThread.Post(action));
         _time = timeProvider ?? TimeProvider.System;
+        SpeedLimits = TrayIconViewModel.BuildPresets();
+        _selectedLimit = SpeedLimits[0];
     }
 
     /// <summary>The list's row for this job, so the numbers here are the numbers there.</summary>
@@ -102,6 +112,13 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
     public string PercentText => Row.Percent.ToString("0.0", CultureInfo.CurrentCulture) + "%";
 
     public string StatusLine => string.IsNullOrEmpty(StreamsText) ? Row.State : Row.State + " (" + StreamsText + ")";
+
+    /// <summary>The choices of this job's own speed limit: the same list as the tray's, first entry "Unlimited".</summary>
+    public IReadOnlyList<SpeedPreset> SpeedLimits { get; }
+
+    public string OpenWhenCompletedLabel => Strings.DetailsOpenWhenCompleted;
+
+    public string SpeedLimitLabel => Strings.DetailsSpeedLimit;
 
     public string PeakLabel => Strings.DetailsPeak;
 
@@ -177,6 +194,10 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
         _job = await _service.GetAsync(Row.Id, cancellationToken).ConfigureAwait(true);
         if (_job is { } job)
         {
+            _loading = true;
+            OpenWhenCompleted = job.OpenWhenCompleted;
+            SelectedLimit = SpeedLimits.FirstOrDefault(p => p.BytesPerSecond == job.SpeedLimitBps) ?? SpeedLimits[0];
+            _loading = false;
             Address = WithoutQuery(job.FinalUrl ?? job.Url);
             SavingToText = string.Format(CultureInfo.CurrentCulture, _savingTo, job.Folder);
             ProtocolText = (Uri.TryCreate(job.Url, UriKind.Absolute, out var uri) ? uri.Scheme : string.Empty).ToUpperInvariant();
@@ -184,6 +205,31 @@ internal sealed partial class DetailsViewModel : ObservableObject, IDisposable
         }
 
         OpenFolderCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnOpenWhenCompletedChanged(bool value) => SaveOptions();
+
+    partial void OnSelectedLimitChanged(SpeedPreset value) => SaveOptions();
+
+    // the choice is saved at once, and a transferring job changes speed at once
+    private void SaveOptions()
+    {
+        if (!_loading)
+        {
+            _ = SaveOptionsAsync();
+        }
+    }
+
+    private async Task SaveOptionsAsync()
+    {
+        try
+        {
+            await _service.SetJobOptionsAsync(Row.Id, SelectedLimit.BytesPerSecond, OpenWhenCompleted).ConfigureAwait(true);
+        }
+        catch (InvalidOperationException)
+        {
+            // the job was deleted meanwhile
+        }
     }
 
     public void Dispose() => _service.EventRaised -= OnEvent;

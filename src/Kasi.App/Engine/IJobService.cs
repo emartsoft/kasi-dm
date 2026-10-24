@@ -85,6 +85,9 @@ internal interface IJobService
 
     Task PauseAsync(JobId id, CancellationToken cancellationToken = default);
 
+    /// <summary>The per-job speed limit and the open-when-completed flag of the Active Transfer window; a running job changes speed at once.</summary>
+    Task SetJobOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     Task ResumeAsync(JobId id, CancellationToken cancellationToken = default);
 
     Task CancelAsync(JobId id, bool deleteFiles = false, CancellationToken cancellationToken = default);

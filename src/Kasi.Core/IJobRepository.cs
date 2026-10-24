@@ -39,6 +39,12 @@ public interface IJobRepository
     /// </summary>
     Task<bool> UpdateRoutingAsync(JobId id, int categoryId, string folder, CancellationToken cancellationToken = default) => Task.FromResult(false);
 
+    /// <summary>
+    /// Sets the per-job speed limit (null: only the global limit applies) and the open-when-completed flag. Returns false if there is no such job.
+    /// A repository that cannot do this (a test fake) changes nothing.
+    /// </summary>
+    Task<bool> UpdateOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
     /// <summary>Deletes the job and, by cascade, its segments and secrets. Returns false if there is no such job.</summary>
     Task<bool> DeleteAsync(JobId id, CancellationToken cancellationToken = default);
 

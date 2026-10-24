@@ -11,16 +11,16 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         "SELECT id AS Id, kind AS Kind, url AS Url, final_url AS FinalUrl, referrer AS Referrer, file_name AS FileName, folder AS Folder, " +
         "total_bytes AS TotalBytes, done_bytes AS DoneBytes, state AS State, error AS Error, pause_reason AS PauseReason, restart_count AS RestartCount, etag AS ETag, last_modified AS LastModified, " +
         "resumable AS Resumable, connections AS Connections, speed_limit_bps AS SpeedLimitBps, checksum_algo AS ChecksumAlgo, checksum AS Checksum, " +
-        "queue_id AS QueueId, queue_pos AS QueuePos, category_id AS CategoryId, category_auto AS CategoryAuto, created_utc AS CreatedUtc, completed_utc AS CompletedUtc FROM job";
+        "queue_id AS QueueId, queue_pos AS QueuePos, category_id AS CategoryId, category_auto AS CategoryAuto, open_when_completed AS OpenWhenCompleted, created_utc AS CreatedUtc, completed_utc AS CompletedUtc FROM job";
 
     public async Task AddAsync(Job job, CancellationToken cancellationToken = default)
     {
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition(
             "INSERT INTO job (id, kind, url, final_url, referrer, file_name, folder, total_bytes, done_bytes, state, error, pause_reason, restart_count, etag, last_modified, " +
-            "resumable, connections, speed_limit_bps, checksum_algo, checksum, queue_id, queue_pos, category_id, category_auto, created_utc, completed_utc) " +
+            "resumable, connections, speed_limit_bps, checksum_algo, checksum, queue_id, queue_pos, category_id, category_auto, open_when_completed, created_utc, completed_utc) " +
             "VALUES (@Id, @Kind, @Url, @FinalUrl, @Referrer, @FileName, @Folder, @TotalBytes, @DoneBytes, @State, @Error, @PauseReason, @RestartCount, @ETag, @LastModified, " +
-            "@Resumable, @Connections, @SpeedLimitBps, @ChecksumAlgo, @Checksum, @QueueId, @QueuePos, @CategoryId, @CategoryAuto, @CreatedUtc, @CompletedUtc);",
+            "@Resumable, @Connections, @SpeedLimitBps, @ChecksumAlgo, @Checksum, @QueueId, @QueuePos, @CategoryId, @CategoryAuto, @OpenWhenCompleted, @CreatedUtc, @CompletedUtc);",
             Parameters(job),
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -52,6 +52,16 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
             "connections = @Connections, speed_limit_bps = @SpeedLimitBps, checksum_algo = @ChecksumAlgo, checksum = @Checksum, queue_id = @QueueId, " +
             "queue_pos = @QueuePos, category_id = @CategoryId, completed_utc = @CompletedUtc WHERE id = @Id;",
             Parameters(job),
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return changed > 0;
+    }
+
+    public async Task<bool> UpdateOptionsAsync(JobId id, long? speedLimitBps, bool openWhenCompleted, CancellationToken cancellationToken = default)
+    {
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE job SET speed_limit_bps = @speedLimitBps, open_when_completed = @open WHERE id = @id;",
+            new { id = id.ToString(), speedLimitBps, open = openWhenCompleted ? 1 : 0 },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return changed > 0;
     }
@@ -220,6 +230,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
         job.QueuePos,
         job.CategoryId,
         CategoryAuto = job.CategoryAuto ? 1 : 0,
+        OpenWhenCompleted = job.OpenWhenCompleted ? 1 : 0,
         CreatedUtc = DbText.FromDate(job.CreatedUtc),
         CompletedUtc = DbText.FromDate(job.CompletedUtc),
     };
@@ -276,6 +287,8 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
 
         public long CategoryAuto { get; set; }
 
+        public long OpenWhenCompleted { get; set; }
+
         public string CreatedUtc { get; set; } = string.Empty;
 
         public string? CompletedUtc { get; set; }
@@ -310,6 +323,7 @@ public sealed class JobRepository(SqliteConnectionFactory factory, TimeProvider?
             QueuePos = QueuePos,
             CategoryId = CategoryId is { } cat ? checked((int)cat) : null,
             CategoryAuto = CategoryAuto != 0,
+            OpenWhenCompleted = OpenWhenCompleted != 0,
             CreatedUtc = DbText.ToDate(CreatedUtc),
             CompletedUtc = DbText.ToDateOrNull(CompletedUtc),
         };

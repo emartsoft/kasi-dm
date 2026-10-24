@@ -52,6 +52,7 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
         Checksum = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         CategoryId = 5,
         CategoryAuto = true,
+        OpenWhenCompleted = true,
         CompletedUtc = _created.AddHours(2),
         QueuePos = 1.0000000000000002,
     };
@@ -67,6 +68,22 @@ public sealed class JobRepositoryTests : IAsyncLifetime, IDisposable
 
         (await _jobs.GetAsync(job.Id, TempDatabase.Ct)).Should().Be(job with { CategoryId = 5, Folder = "C:/Downloads/Video", CategoryAuto = false });
         (await _jobs.UpdateRoutingAsync(JobId.New(TimeProvider.System), 5, "x", TempDatabase.Ct)).Should().BeFalse();
+    }
+
+    [Fact]
+    [Trait("Requirement", "KASI-UI-003")]
+    public async Task The_per_job_speed_limit_and_open_when_completed_flag_are_saved_without_touching_the_rest()
+    {
+        var job = NewJob();
+        await _jobs.AddAsync(job, TempDatabase.Ct);
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct))!.OpenWhenCompleted.Should().BeFalse("off by default");
+
+        (await _jobs.UpdateOptionsAsync(job.Id, 524_288, true, TempDatabase.Ct)).Should().BeTrue();
+
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct)).Should().Be(job with { SpeedLimitBps = 524_288, OpenWhenCompleted = true });
+        await _jobs.UpdateOptionsAsync(job.Id, null, false, TempDatabase.Ct);
+        (await _jobs.GetAsync(job.Id, TempDatabase.Ct)).Should().Be(job);
+        (await _jobs.UpdateOptionsAsync(JobId.New(TimeProvider.System), 1, true, TempDatabase.Ct)).Should().BeFalse();
     }
 
     [Fact]
