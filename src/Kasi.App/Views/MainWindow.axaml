@@ -36,7 +36,6 @@
   <DockPanel>
     <!-- title strip: the app mark and name at the left, the tagline in the middle; the system's own caption buttons sit over the right end -->
     <Grid DockPanel.Dock="Top" Height="40" ColumnDefinitions="Auto,*,148" Background="{DynamicResource KasiPanelBrush}">
-      <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="SemiBold" Margin="44,0,0,0" VerticalAlignment="Center" />
       <TextBlock Grid.Column="1" Text="{x:Static res:Strings.AppTagline}" Classes="kasi-secondary" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
     </Grid>
 
