@@ -19,6 +19,9 @@ internal interface IShell
 
     /// <summary>Opens the folder in Explorer with the file selected; just the folder if the file is gone.</summary>
     void ShowInFolder(string path);
+
+    /// <summary>Opens the folder itself in Explorer. Does nothing if it is gone.</summary>
+    void OpenFolder(string path);
 }
 
 /// <summary>The words a toast puts in its activation arguments; the router reads the same.</summary>

@@ -53,8 +53,7 @@ public sealed class CategoriesWindowTests : IDisposable
         model.SelectedTab = 2;
         window.UpdateLayout();
 
-        var tabs = window.GetVisualDescendants().OfType<TabItem>().ToList();
-        tabs.Select(t => AutomationProperties.GetName(t)).Should().Contain("Categories");
+        model.Pages.Select(p => p.Label).Should().Contain("File Types & Paths");
         var page = window.GetVisualDescendants().OfType<CategoriesView>().Single();
         var buttons = page.GetVisualDescendants().OfType<Button>().Select(b => AutomationProperties.GetName(b)).ToList();
         buttons.Should().Contain(["Save category", "Delete category", "Add category", "Move up", "Move down", "Delete rule", "Add rule", "Check"]);
@@ -74,8 +73,7 @@ public sealed class CategoriesWindowTests : IDisposable
         window.UpdateLayout();
 
         model.HasCategories.Should().BeFalse();
-        window.GetVisualDescendants().OfType<TabItem>().Where(t => t.IsVisible).Select(t => AutomationProperties.GetName(t))
-            .Should().NotContain("Categories");
+        model.Pages.Select(p => p.Label).Should().NotContain("File Types & Paths");
         window.Close();
     }
 }

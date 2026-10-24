@@ -16,6 +16,14 @@ internal sealed class WindowsShell : IShell
         Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
 
+    public void OpenFolder(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Start(new ProcessStartInfo("explorer.exe", "\"" + path + "\"") { UseShellExecute = false });
+        }
+    }
+
     public void ShowInFolder(string path)
     {
         var folder = Path.GetDirectoryName(path);

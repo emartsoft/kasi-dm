@@ -199,6 +199,11 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
         }
     }
 
+    /// <summary>"1.2.3" from the assembly, without the commit the build adds after a plus sign.</summary>
+    private static string AppVersion() =>
+        (typeof(App).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "0").Split('+')[0];
+
     private void ShowSettings(IBrowserSettings settings, SettingsSection section)
     {
         if (_settings is not { IsVisible: true })
@@ -207,7 +212,13 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                 services.GetRequiredService<ICategoryRepository>(),
                 services.GetRequiredService<ICategoryRuleRepository>(),
                 AppPaths.DownloadsFolder());
-            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>(), categories);
+            var environment = new SettingsEnvironment(
+                AppPaths.DataFolder(),
+                AppVersion(),
+                browser?.ConnectedHosts ?? (() => 0),
+                () => ShowScheduler(services.GetRequiredService<IJobService>(), null),
+                new WindowsShell());
+            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>(), categories, environment);
             _settings = new SettingsWindow { DataContext = model };
             _ = categories.LoadAsync();
             model.Saved += _settings.Close;
