@@ -16,6 +16,7 @@ public sealed class AppProcess : IAsyncDisposable
     private static readonly TimeSpan _windowWait = TimeSpan.FromSeconds(60);
     private readonly Process _process;
     private readonly UIA3Automation _automation = new();
+    private readonly System.Text.StringBuilder _output = new();
 
     private AppProcess(Process process, string dataFolder, string workFolder)
     {
@@ -37,7 +38,12 @@ public sealed class AppProcess : IAsyncDisposable
         Directory.CreateDirectory(data);
         Directory.CreateDirectory(work);
 
-        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "Kasi.App.exe")) { UseShellExecute = false };
+        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "Kasi.App.exe"))
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
         foreach (var argument in arguments)
         {
             start.ArgumentList.Add(argument);
@@ -45,10 +51,62 @@ public sealed class AppProcess : IAsyncDisposable
 
         start.Environment["KASI_DATA_DIR"] = data;
         start.Environment["KASI_ENDPOINT_SUFFIX"] = "ui" + Guid.NewGuid().ToString("N")[..8];
-        return new AppProcess(Process.Start(start)!, data, work);
+        var app = new AppProcess(Process.Start(start)!, data, work);
+        app._process.OutputDataReceived += (_, e) => app.Capture(e.Data);
+        app._process.ErrorDataReceived += (_, e) => app.Capture(e.Data);
+        app._process.BeginOutputReadLine();
+        app._process.BeginErrorReadLine();
+        return app;
     }
 
     public bool HasExited => _process.HasExited;
+
+    /// <summary>What the app wrote to its output and error streams so far, for a failure message.</summary>
+    public string Output
+    {
+        get
+        {
+            lock (_output)
+            {
+                return _output.ToString();
+            }
+        }
+    }
+
+    /// <summary>The tail of the app's own log files in its data folder (they are redacted by design).</summary>
+    private string LogTail()
+    {
+        var text = new System.Text.StringBuilder();
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(DataFolder, "*.log", SearchOption.AllDirectories))
+            {
+                using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                var length = (int)Math.Min(stream.Length, 4000);
+                stream.Seek(-length, SeekOrigin.End);
+                var buffer = new byte[length];
+                stream.ReadExactly(buffer);
+                text.AppendLine(System.Globalization.CultureInfo.InvariantCulture, $"--- {Path.GetFileName(file)}").AppendLine(System.Text.Encoding.UTF8.GetString(buffer));
+            }
+        }
+        catch (IOException)
+        {
+            // a log still being written is a diagnostic, never a reason to hide the real failure
+        }
+
+        return text.ToString();
+    }
+
+    private void Capture(string? line)
+    {
+        if (line is not null)
+        {
+            lock (_output)
+            {
+                _output.AppendLine(line);
+            }
+        }
+    }
 
     /// <summary>The window with this name, waiting for it to appear; the wait is on the window, not on a fixed time.</summary>
     public Window WaitForWindow(string name, TimeSpan? timeout = null)
@@ -62,7 +120,9 @@ public sealed class AppProcess : IAsyncDisposable
             },
             timeout ?? _windowWait,
             TimeSpan.FromMilliseconds(200)).Success;
-        return ok ? found! : throw new TimeoutException($"No window named '{name}' appeared. Windows: {string.Join(", ", TopLevelWindows().Select(w => $"'{w.Name}'"))}");
+        return ok
+            ? found!
+            : throw new TimeoutException($"No window named '{name}' appeared. Windows: {string.Join(", ", TopLevelWindows().Select(w => $"'{w.Name}'"))}. {(_process.HasExited ? $"The app had exited with code {_process.ExitCode}." : "The app was still running.")} Output:{Environment.NewLine}{Output}{Environment.NewLine}{LogTail()}");
     }
 
     public IReadOnlyList<Window> TopLevelWindows() =>
