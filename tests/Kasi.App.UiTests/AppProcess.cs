@@ -175,8 +175,18 @@ public sealed class AppProcess : IAsyncDisposable
             if (!_process.HasExited)
             {
                 _process.Kill(entireProcessTree: true);
-                using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                await _process.WaitForExitAsync(limit.Token).ConfigureAwait(false); // a Kasi left running would hold the next test's files
+                // A Kasi left running would hold the next test's files, so wait until it is gone. WaitForExitAsync would also wait for the
+                // end of the redirected output, which a process the app started can keep open after the app itself has ended.
+                var deadline = TimeProvider.System.GetTimestamp();
+                while (!_process.HasExited)
+                {
+                    if (TimeProvider.System.GetElapsedTime(deadline) > TimeSpan.FromSeconds(30))
+                    {
+                        throw new TimeoutException("Kasi.App did not end within 30 s of being killed.");
+                    }
+
+                    await Task.Delay(50).ConfigureAwait(false);
+                }
             }
         }
         catch (InvalidOperationException)
