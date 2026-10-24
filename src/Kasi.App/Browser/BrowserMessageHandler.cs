@@ -32,7 +32,8 @@ internal sealed partial class BrowserMessageHandler(
     ISettingsLauncher settingsLauncher,
     TimeProvider? time = null,
     ILogger? logger = null,
-    IRefreshBroker? refreshes = null)
+    IRefreshBroker? refreshes = null,
+    BrowserMediaServices? media = null)
 {
     public const int RememberedRequests = 1024;
     public static readonly TimeSpan RememberFor = TimeSpan.FromMinutes(10);
@@ -43,6 +44,8 @@ internal sealed partial class BrowserMessageHandler(
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
     private readonly ConditionalWeakTable<IpcConnection, ExtensionInfo> _extensions = new();
     private readonly ConcurrentDictionary<string, DateTimeOffset> _accepted = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, MediaCaptureResult> _captureResults = new(StringComparer.Ordinal);
+    private readonly BrowserMediaServices? _media = media;
 
     public IpcMessageHandler Handler => HandleAsync;
 
@@ -84,21 +87,89 @@ internal sealed partial class BrowserMessageHandler(
         }
     }
 
-    private ValueTask<IpcMessage?> HandleAsync(IpcConnection connection, IpcMessage message, CancellationToken cancellationToken)
+    private async ValueTask<IpcMessage?> HandleAsync(IpcConnection connection, IpcMessage message, CancellationToken cancellationToken)
     {
-        IpcMessage? reply = message switch
+        IpcMessage? reply;
+        if (message is CaptureMedia capture)
         {
-            Hello hello => OnHello(connection, hello),
-            AddDownload add => OnceFor(add.Id, () => intake.TryAdd(ToDownload(add))),
-            AddBatch batch => OnceFor(batch.Id, () => intake.TryAddBatch(new BrowserBatch(batch.Referrer, batch.Links, batch.Cookies, batch.UserAgent))),
-            OpenSettings open => OnOpenSettings(open),
-            LinkRefreshed refreshed => refreshes is not null && refreshes.TryComplete(refreshed) ? new Ack { Id = refreshed.Id, Ok = true } : Error(refreshed.Id, IpcErrorCode.InvalidMessage), // nobody asked: refused
-            MediaDetected or CaptureMedia => Error(message.Id, IpcErrorCode.Internal), // M3
-            Ack or IpcError => null, // not a reply to anything we are waiting for
-            _ => Error(message.Id, IpcErrorCode.InvalidMessage), // Rules and RefreshLink only ever travel from Kasi to the browser
-        };
+            reply = await OnCaptureAsync(capture, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            reply = message switch
+            {
+                Hello hello => OnHello(connection, hello),
+                AddDownload add => OnceFor(add.Id, () => intake.TryAdd(ToDownload(add))),
+                AddBatch batch => OnceFor(batch.Id, () => intake.TryAddBatch(new BrowserBatch(batch.Referrer, batch.Links, batch.Cookies, batch.UserAgent))),
+                OpenSettings open => OnOpenSettings(open),
+                LinkRefreshed refreshed => refreshes is not null && refreshes.TryComplete(refreshed) ? new Ack { Id = refreshed.Id, Ok = true } : Error(refreshed.Id, IpcErrorCode.InvalidMessage), // nobody asked: refused
+                MediaDetected detected => OnMediaDetected(detected),
+                Ack or IpcError => null, // not a reply to anything we are waiting for
+                _ => Error(message.Id, IpcErrorCode.InvalidMessage), // Rules and RefreshLink only ever travel from Kasi to the browser
+            };
+        }
+
         LogHandled(message.GetType().Name, reply?.GetType().Name ?? "none");
-        return ValueTask.FromResult(reply);
+        return reply;
+    }
+
+    private Ack OnMediaDetected(MediaDetected detected)
+    {
+        _media?.Catalog.Add(detected);
+        return new Ack { Id = detected.Id, Ok = true };
+    }
+
+    private async ValueTask<IpcMessage?> OnCaptureAsync(CaptureMedia capture, CancellationToken cancellationToken)
+    {
+        if (_media?.Capture is not { } captureService)
+        {
+            return Error(capture.Id, IpcErrorCode.Internal);
+        }
+
+        if (_accepted.TryGetValue(capture.Id, out var seen) && _time.GetUtcNow() - seen < RememberFor)
+        {
+            _captureResults.TryGetValue(capture.Id, out var previous);
+            return new Ack { Id = capture.Id, Ok = true, Detail = previous?.Status == MediaCaptureStatus.Protected ? previous.Detail : null };
+        }
+
+        // Reading a manifest can take seconds on a slow server. The browser gets its answer within the budget; a capture still
+        // running then finishes in the background (the job appears in the list, a refusal is only logged).
+        var work = Task.Run(() => captureService.CaptureAsync(capture, CancellationToken.None), CancellationToken.None);
+        var first = await Task.WhenAny(work, Task.Delay(_media.AckBudget, _time, cancellationToken)).ConfigureAwait(false);
+        if (first != work)
+        {
+            Remember(capture.Id, _time.GetUtcNow());
+            _ = work.ContinueWith(
+                task => _ = task.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            return new Ack { Id = capture.Id, Ok = true };
+        }
+
+        var result = await work.ConfigureAwait(false);
+        switch (result.Status)
+        {
+            case MediaCaptureStatus.Accepted:
+                RememberResult(capture.Id, result);
+                return new Ack { Id = capture.Id, Ok = true };
+            case MediaCaptureStatus.Protected:
+                RememberResult(capture.Id, result);
+                return new Ack { Id = capture.Id, Ok = true, Detail = result.Detail ?? "This video is protected and can't be saved" };
+            default:
+                return Error(capture.Id, IpcErrorCode.Internal, result.Detail);
+        }
+    }
+
+    private void RememberResult(string id, MediaCaptureResult result)
+    {
+        var now = _time.GetUtcNow();
+        Remember(id, now);
+        _captureResults[id] = result;
+        if (_captureResults.Count > RememberedRequests)
+        {
+            foreach (var key in _captureResults.Keys.Where(key => !_accepted.ContainsKey(key)))
+            {
+                _captureResults.TryRemove(key, out _);
+            }
+        }
     }
 
     private Rules OnHello(IpcConnection connection, Hello hello)
@@ -153,7 +224,7 @@ internal sealed partial class BrowserMessageHandler(
     private static BrowserDownload ToDownload(AddDownload add) =>
         new(add.Url, add.FinalUrl, add.Referrer, add.Filename, add.Mime, add.UserAgent, add.Cookies);
 
-    private static IpcError Error(string id, IpcErrorCode code) => new() { Id = id, Code = code };
+    private static IpcError Error(string id, IpcErrorCode code, string? detail = null) => new() { Id = id, Code = code, Detail = detail };
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Browser message {Type} answered with {Reply}.")]
     private partial void LogHandled(string type, string reply);

@@ -1,3 +1,4 @@
+using Kasi.App.Browser;
 using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Startup;
@@ -5,6 +6,7 @@ using Kasi.App.ViewModels;
 using Kasi.Core;
 using Kasi.Data;
 using Kasi.Engine;
+using Kasi.Media;
 using Kasi.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -48,6 +50,7 @@ internal static class CompositionRoot
         services.AddSingleton<ISiteDefaults>(_ => new SiteDefaultsStore(Path.Combine(Path.GetDirectoryName(database)!, "site-defaults.json")));
         services.AddSingleton<MigrationRunner>(sp => new MigrationRunner(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobRepository>(sp => new JobRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<IMediaRepository>(sp => new MediaRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ISegmentRepository>(sp => new SegmentRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICategoryRepository>(sp => new CategoryRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICategoryRuleRepository>(sp => new CategoryRuleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
@@ -68,7 +71,24 @@ internal static class CompositionRoot
                 sp.GetRequiredService<ICategoryRuleRepository>(),
                 sp.GetRequiredService<IJobRepository>(),
                 AppPaths.DownloadsFolder())));
-        services.AddSingleton<IJobControl>(sp => sp.GetRequiredService<DownloadEngine>());
+        services.AddSingleton<MediaSourceLoader>();
+        services.AddSingleton(sp => new MediaJobRunner(
+            sp.GetRequiredService<IMediaRepository>(),
+            sp.GetRequiredService<IJobRepository>()));
+        services.AddSingleton(sp => new MediaJobExecutor(
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IJobSecretRepository>(),
+            sp.GetRequiredService<MediaJobRunner>(),
+            sp.GetRequiredService<MediaSourceLoader>(),
+            sp.GetRequiredService<BandwidthLimiter>(),
+            Path.Combine(AppPaths.DataFolder(), "media"),
+            AppPaths.Ffmpeg(),
+            sp.GetRequiredService<DownloadEngine>().PublishExternal,
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<MediaJobExecutor>()));
+        services.AddSingleton<IJobControl>(sp => new RoutingJobControl(
+            sp.GetRequiredService<DownloadEngine>(),
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<MediaJobExecutor>()));
         services.AddSingleton<IQueueRunner>(sp => new QueueRunner(
             sp.GetRequiredService<IQueueRepository>(),
             sp.GetRequiredService<IJobRepository>(),
@@ -97,10 +117,23 @@ internal static class CompositionRoot
             sp.GetRequiredService<IQueueRunner>(),
             sp.GetRequiredService<IQueueScheduleRepository>(),
             categoryRules: sp.GetRequiredService<ICategoryRuleRepository>()));
+        services.AddSingleton<IBrowserMediaCapture>(sp => new BrowserMediaCapture(
+            sp.GetRequiredService<MediaSourceLoader>(),
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IJobSecretRepository>(),
+            sp.GetRequiredService<IJobControl>(),
+            sp.GetRequiredService<IJobService>(),
+            sp.GetRequiredService<ICategoryRepository>(),
+            sp.GetRequiredService<ICategoryRuleRepository>(),
+            sp.GetRequiredService<DownloadEngine>().PublishExternal,
+            AppPaths.DownloadsFolder(),
+            timeProvider: TimeProvider.System,
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<BrowserMediaCapture>()));
         services.AddSingleton<IHostedService>(sp => new EngineLifetime(
             sp.GetRequiredService<MigrationRunner>(),
             sp.GetRequiredService<CheckpointWriter>(),
             sp.GetRequiredService<DownloadEngine>(),
-            sp.GetRequiredService<QueueScheduler>()));
+            sp.GetRequiredService<QueueScheduler>(),
+            sp.GetRequiredService<MediaJobExecutor>()));
     }
 }

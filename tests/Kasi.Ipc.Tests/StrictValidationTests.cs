@@ -35,8 +35,8 @@ public class StrictValidationTests
             new Rules { Id = "2", Enabled = true, Extensions = ["zip"], MimeTypes = [], ExcludedSites = ["a.example"], BypassKey = BypassKey.None, AckTimeoutMs = 2000 },
             Download(),
             new AddBatch { Id = "4", Referrer = "https://example.com/", Links = [new IpcLink { Url = "https://example.com/a" }], Cookies = [], UserAgent = "t" },
-            new MediaDetected { Id = "5", TabId = 3, PageUrl = "https://example.com/", Kind = MediaKind.Direct, Url = "https://example.com/v.mp4" },
-            new CaptureMedia { Id = "6", TabId = 3, Url = "https://example.com/v.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t" },
+            new MediaDetected { Id = "5", TabId = 3, PageUrl = "https://example.com/", Kind = MediaKind.Direct, Url = "https://example.com/v.mp4", ThumbnailUrl = "https://example.com/p.jpg", ContentType = "video/mp4" },
+            new CaptureMedia { Id = "6", TabId = 3, Url = "https://example.com/v.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t", Origin = "https://example.com" },
             new RefreshLink { Id = "7", JobId = "job", ReferrerUrl = "https://example.com/" },
             new LinkRefreshed { Id = "8", JobId = "job", Url = "ftp://example.com/f", Cookies = [] },
             new OpenSettings { Id = "9", Section = SettingsSection.General },
@@ -53,6 +53,14 @@ public class StrictValidationTests
         }
 
         messages.Select(m => m.GetType()).Should().OnlyHaveUniqueItems().And.HaveCount(11);
+    }
+
+    [Fact]
+    public void Media_optional_fields_are_still_bounded()
+    {
+        Rejected(new MediaDetected { Id = "m1", TabId = 1, PageUrl = "https://example.com/", Kind = MediaKind.Hls, Url = "https://example.com/a.m3u8", ThumbnailUrl = "ftp://example.com/p.jpg" });
+        Rejected(new MediaDetected { Id = "m2", TabId = 1, PageUrl = "https://example.com/", Kind = MediaKind.Hls, Url = "https://example.com/a.m3u8", ContentType = new string('x', 256) });
+        Rejected(new CaptureMedia { Id = "c1", TabId = 1, Url = "https://example.com/a.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t", Origin = "ftp://example.com/" });
     }
 
     [Fact]

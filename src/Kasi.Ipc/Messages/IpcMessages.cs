@@ -127,6 +127,12 @@ public sealed record MediaDetected : IpcMessage
     public required string Url { get; init; }
 
     public string? Title { get; init; }
+
+    /// <summary>Optional poster or <c>og:image</c>; the picker shows it when present (M3.6).</summary>
+    public string? ThumbnailUrl { get; init; }
+
+    /// <summary>Optional response MIME type, for the picker and diagnostics.</summary>
+    public string? ContentType { get; init; }
 }
 
 /// <summary>Extension to Kasi: the user chose a stream from the popup or overlay.</summary>
@@ -143,6 +149,9 @@ public sealed record CaptureMedia : IpcMessage
     public required string Referrer { get; init; }
 
     public required string UserAgent { get; init; }
+
+    /// <summary>The page origin when the browser supplied one; optional for older extensions.</summary>
+    public string? Origin { get; init; }
 }
 
 /// <summary>Kasi to extension: open the referrer page and watch for a matching download (TRD 6.6).</summary>

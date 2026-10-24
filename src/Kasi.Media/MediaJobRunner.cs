@@ -104,7 +104,7 @@ public sealed class MediaJobRunner(
         using var run = new RunState(options.Parallelism, cancellationToken);
         using var pool = new HttpHostPool(options.PoolOptions, proxy: options.Proxy);
         var client = new SegmentClient(pool, options, _time);
-        var progress = new ProgressTracker(options.Progress, existingSegments.Count);
+        var progress = new ProgressTracker(options.Progress, existingSegments.Count, options.Events, options.JobId, plan.EstimatedTotal, _time);
         var completionWriter = new CompletionWriter(media, options.JobId, plan.EstimatedTotal, options.CompletionInterval, _time, run);
         try
         {
@@ -127,7 +127,10 @@ public sealed class MediaJobRunner(
             var joined = await JoinAsync(existingStreams, existingSegments, jobDirectory, cancellationToken).ConfigureAwait(false);
             if (job.State == JobState.Downloading)
             {
-                await jobs.TryChangeStateAsync(options.JobId, JobState.Downloading, JobState.Muxing, cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (await jobs.TryChangeStateAsync(options.JobId, JobState.Downloading, JobState.Muxing, cancellationToken: cancellationToken).ConfigureAwait(false))
+                {
+                    options.Events?.Invoke(new JobStateChanged(options.JobId, JobState.Downloading, JobState.Muxing, null));
+                }
             }
 
             return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes), variant, jobDirectory);
@@ -140,14 +143,14 @@ public sealed class MediaJobRunner(
         catch (MediaJobException)
         {
             await completionWriter.TryFlushAsync().ConfigureAwait(false);
-            await FailAsync(job, cancellationToken).ConfigureAwait(false);
+            await FailAsync(job, options, cancellationToken).ConfigureAwait(false);
             throw;
         }
         catch (Exception exception)
         {
             await completionWriter.TryFlushAsync().ConfigureAwait(false);
             var error = Classify(exception);
-            await FailAsync(job, cancellationToken).ConfigureAwait(false);
+            await FailAsync(job, options, cancellationToken).ConfigureAwait(false);
             throw new MediaJobException(error, "The media download failed.", exception);
         }
         finally
@@ -156,11 +159,13 @@ public sealed class MediaJobRunner(
         }
     }
 
-    private async Task FailAsync(Job job, CancellationToken cancellationToken)
+    private async Task FailAsync(Job job, MediaJobOptions options, CancellationToken cancellationToken)
     {
-        if (job.State == JobState.Downloading)
+        const string Message = "Media segment download failed.";
+        if (job.State == JobState.Downloading
+            && await jobs.TryChangeStateAsync(job.Id, JobState.Downloading, JobState.Failed, Message, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
-            await jobs.TryChangeStateAsync(job.Id, JobState.Downloading, JobState.Failed, "Media segment download failed.", cancellationToken: cancellationToken).ConfigureAwait(false);
+            options.Events?.Invoke(new JobStateChanged(job.Id, JobState.Downloading, JobState.Failed, Message));
         }
     }
 
@@ -461,8 +466,15 @@ public sealed class MediaJobRunner(
         }
     }
 
-    private sealed class ProgressTracker(Action<MediaJobProgress>? report, int total)
+    private sealed class ProgressTracker(
+        Action<MediaJobProgress>? report,
+        int total,
+        Action<EngineEvent>? events,
+        JobId jobId,
+        long estimatedTotal,
+        TimeProvider time)
     {
+        private readonly long _started = time.GetTimestamp();
         private int _completed;
         private long _bytes;
 
@@ -471,6 +483,11 @@ public sealed class MediaJobRunner(
             var completed = Interlocked.Increment(ref _completed);
             var done = Interlocked.Add(ref _bytes, bytes);
             report?.Invoke(new MediaJobProgress(completed, total, done));
+            if (events is not null)
+            {
+                var seconds = Math.Max(time.GetElapsedTime(_started).TotalSeconds, 0.001);
+                events(new JobProgressed(jobId, done, estimatedTotal > 0 ? estimatedTotal : null, (long)(done / seconds)));
+            }
         }
     }
 

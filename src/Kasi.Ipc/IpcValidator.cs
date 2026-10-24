@@ -29,9 +29,12 @@ internal static class IpcValidator
             && Text(m.UserAgent, IpcLimits.UserAgentLength) && Cookies(m.Cookies),
         AddBatch m => Url(m.Referrer, _webSchemes) && Text(m.UserAgent, IpcLimits.UserAgentLength) && Cookies(m.Cookies) && Links(m.Links),
         MediaDetected m => m.TabId >= 0 && Url(m.PageUrl, _webSchemes) && Url(m.Url, _webSchemes)
-            && Optional(m.Title, v => Text(v, IpcLimits.TitleLength)),
+            && Optional(m.Title, v => Text(v, IpcLimits.TitleLength))
+            && Optional(m.ThumbnailUrl, v => Url(v, _webSchemes))
+            && Optional(m.ContentType, v => Text(v, IpcLimits.MimeLength)),
         CaptureMedia m => m.TabId >= 0 && Url(m.Url, _webSchemes) && Url(m.Referrer, _webSchemes)
-            && Text(m.UserAgent, IpcLimits.UserAgentLength) && Cookies(m.Cookies),
+            && Text(m.UserAgent, IpcLimits.UserAgentLength) && Cookies(m.Cookies)
+            && Optional(m.Origin, v => Url(v, _webSchemes)),
         RefreshLink m => Text(m.JobId, IpcLimits.IdLength, min: 1) && Url(m.ReferrerUrl, _webSchemes)
             && Optional(m.MatchHint, v => Text(v, IpcLimits.ListEntryLength, min: 1)),
         LinkRefreshed m => Text(m.JobId, IpcLimits.IdLength, min: 1) && Url(m.Url, _downloadSchemes) && Cookies(m.Cookies),

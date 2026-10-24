@@ -88,6 +88,7 @@ public class FixtureTests
         add.GetProperty("userAgent").GetProperty("maxLength").GetInt32().Should().Be(IpcLimits.UserAgentLength);
         d.GetProperty("addBatch").GetProperty("properties").GetProperty("links").GetProperty("maxItems").GetInt32().Should().Be(IpcLimits.BatchLinks);
         d.GetProperty("mediaDetected").GetProperty("properties").GetProperty("title").GetProperty("maxLength").GetInt32().Should().Be(IpcLimits.TitleLength);
+        d.GetProperty("mediaDetected").GetProperty("properties").GetProperty("contentType").GetProperty("maxLength").GetInt32().Should().Be(IpcLimits.MimeLength);
         d.GetProperty("ack").GetProperty("properties").GetProperty("detail").GetProperty("maxLength").GetInt32().Should().Be(IpcLimits.DetailLength);
         var timeout = d.GetProperty("rules").GetProperty("properties").GetProperty("ackTimeoutMs");
         timeout.GetProperty("minimum").GetInt32().Should().Be(IpcLimits.AckTimeoutMinMs);

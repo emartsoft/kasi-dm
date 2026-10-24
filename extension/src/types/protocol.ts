@@ -117,6 +117,8 @@ export interface MediaDetected {
   kind: MediaKind;
   url: WebUrl;
   title?: string;
+  thumbnailUrl?: WebUrl;
+  contentType?: string;
 }
 /**
  * Extension to Kasi: the user chose a stream from the popup or overlay.
@@ -131,6 +133,7 @@ export interface CaptureMedia {
   cookies: Cookies;
   referrer: WebUrl;
   userAgent: string;
+  origin?: WebUrl;
 }
 /**
  * Kasi to extension: open the referrer page and watch for a matching download.

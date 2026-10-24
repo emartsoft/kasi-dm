@@ -1,5 +1,6 @@
 using Kasi.App.Browser;
 using Kasi.Ipc.Transport;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -43,6 +44,12 @@ internal static class AppStartup
 {
     public static readonly TimeSpan HandOffTimeout = TimeSpan.FromSeconds(5);
 
+    // Kept out of Run: a second instance returns from Run long before the host exists, and the generic DI call here must not
+    // be resolved (and its assemblies loaded) when Run is compiled.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void AttachMedia(IHost host, BrowserServices browser) =>
+        browser.Media.Capture = host.Services.GetService<IBrowserMediaCapture>();
+
     // CA2000: the pipes and the session are owned by the process from here on; they are closed when it ends, or by a test that disposes the session
 #pragma warning disable CA2000
     public static int Run(
@@ -84,6 +91,7 @@ internal static class AppStartup
         // the engine and the UI come last; a request that arrives meanwhile waits in the relay
         using var host = buildHost(args);
         host.Start();
+        AttachMedia(host, browser);
         if (request.Urls.Count > 0)
         {
             relay.Submit(request);
