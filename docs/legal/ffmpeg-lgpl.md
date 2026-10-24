@@ -19,6 +19,7 @@ Planned options:
 --enable-demuxer=mpegts,mov,matroska,aac,mp3,ac3,eac3
 --enable-muxer=mp4,matroska,ipod,mp3
 --enable-parser=h264,hevc,av1,aac,aac_latm,ac3,mpegaudio,vp9,opus
+--enable-decoder=aac,aac_latm,ac3,eac3,mp3float
 --enable-bsf=aac_adtstoasc,extract_extradata
 ```
 

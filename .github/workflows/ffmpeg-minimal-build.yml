@@ -4,8 +4,9 @@ name: FFmpeg minimal LGPL build
 # LGPL, and runs the media integration tests (MediaMuxerTests, MediaJobRunnerTests, FfmpegRunnerTests ...) against it.
 # It is run by hand (workflow_dispatch) and must be green before a beta (docs/release-checklist.md). It is not part of every
 # pull request: the PR CI uses the pinned stock LGPL build in ci.yml, and this job validates the recipe that will replace it.
-# If the first run fails with "Could not find codec parameters", add the native decoders the stream needs to the configure
-# line below and record the change in docs/legal/ffmpeg-lgpl.md.
+# The first run showed that stream copy of ADTS AAC from MPEG-TS needs the native audio decoders ("Could not find codec
+# parameters ... unspecified sample rate"), so they are enabled below. If a video codec fails the same way, add its native
+# decoder to the configure line and record the change in docs/legal/ffmpeg-lgpl.md.
 
 on:
   workflow_dispatch:
@@ -57,7 +58,7 @@ jobs:
             --enable-demuxer=mpegts,mov,matroska,aac,mp3,ac3,eac3 \
             --enable-muxer=mp4,matroska,ipod,mp3 \
             --enable-parser=h264,hevc,av1,aac,aac_latm,ac3,mpegaudio,vp9,opus \
-            --enable-bsf=aac_adtstoasc,extract_extradata
+            --enable-decoder=aac,aac_latm,ac3,eac3,mp3float \n            --enable-bsf=aac_adtstoasc,extract_extradata
           make -j"$(nproc)"
           make install
 
