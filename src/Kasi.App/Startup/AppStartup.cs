@@ -1,5 +1,6 @@
 using Kasi.App.Browser;
 using Kasi.Ipc.Transport;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -84,6 +85,7 @@ internal static class AppStartup
         // the engine and the UI come last; a request that arrives meanwhile waits in the relay
         using var host = buildHost(args);
         host.Start();
+        browser.Media.Capture = host.Services.GetService<IBrowserMediaCapture>();
         if (request.Urls.Count > 0)
         {
             relay.Submit(request);

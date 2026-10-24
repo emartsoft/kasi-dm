@@ -377,6 +377,13 @@
         "title": {
           "type": "string",
           "maxLength": 1024
+        },
+        "thumbnailUrl": {
+          "$ref": "#/definitions/webUrl"
+        },
+        "contentType": {
+          "type": "string",
+          "maxLength": 255
         }
       }
     },
@@ -424,6 +431,9 @@
         "userAgent": {
           "type": "string",
           "maxLength": 1024
+        },
+        "origin": {
+          "$ref": "#/definitions/webUrl"
         }
       }
     },

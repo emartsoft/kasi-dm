@@ -16,7 +16,8 @@ internal sealed class BrowserServices
         Intake = new BrowserIntake();
         SettingsLauncher = new SettingsLauncher();
         Refreshes = new RefreshBroker(time);
-        Handler = new BrowserMessageHandler(settings, Intake, SettingsLauncher, time, logger, Refreshes);
+        Media = new BrowserMediaServices();
+        Handler = new BrowserMessageHandler(settings, Intake, SettingsLauncher, time, logger, Refreshes, Media);
         Logger = logger ?? NullLogger.Instance;
     }
 
@@ -25,6 +26,9 @@ internal sealed class BrowserServices
     public BrowserIntake Intake { get; }
 
     public SettingsLauncher SettingsLauncher { get; }
+
+    /// <summary>Detected streams and the capture implementation attached once the DI host is running.</summary>
+    public BrowserMediaServices Media { get; }
 
     public BrowserMessageHandler Handler { get; }
 

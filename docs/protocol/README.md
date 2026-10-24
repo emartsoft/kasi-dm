@@ -43,3 +43,7 @@ What `rules` means, so Kasi and the extension decide alike (TRD 9.2; the pure im
 | `openSettings` | extension → Kasi | Show Kasi's settings window; `section` is `general` or `browser` (default) |
 | `ack` | both | Success for a correlation id |
 | `error` | both | Failure for a correlation id (`code` and an optional short `detail`) |
+
+`mediaDetected` may carry optional `thumbnailUrl` (poster/`og:image`) and `contentType`; `captureMedia` may carry the page
+`origin`. Both are optional, so an older extension remains valid. Kasi answers both with `ack`; a protected capture uses
+`ack` with the refusal text in `detail` so the extension does not fall back to a browser download.

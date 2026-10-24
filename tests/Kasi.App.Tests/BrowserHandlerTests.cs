@@ -35,6 +35,19 @@ internal sealed class FakeIntake : IBrowserIntake
     }
 }
 
+internal sealed class FakeMediaCapture : IBrowserMediaCapture
+{
+    public MediaCaptureResult Result { get; set; } = new(MediaCaptureStatus.Accepted);
+
+    public List<CaptureMedia> Captured { get; } = [];
+
+    public Task<MediaCaptureResult> CaptureAsync(CaptureMedia message, CancellationToken cancellationToken)
+    {
+        Captured.Add(message);
+        return Task.FromResult(Result);
+    }
+}
+
 internal sealed class FixedSettings(BrowserSettings initial) : IBrowserSettings
 {
     public BrowserSettings Current { get; private set; } = initial.Normalized();
@@ -136,11 +149,12 @@ public class BrowserHandlerTests
         out FakeIntake intake,
         out FakeSettingsLauncher launcher,
         TimeProvider? time = null,
-        CapturingLogger? logger = null)
+        CapturingLogger? logger = null,
+        BrowserMediaServices? media = null)
     {
         intake = new FakeIntake();
         launcher = new FakeSettingsLauncher();
-        return new BrowserMessageHandler(new FixedSettings(settings ?? new BrowserSettings()), intake, launcher, time, logger);
+        return new BrowserMessageHandler(new FixedSettings(settings ?? new BrowserSettings()), intake, launcher, time, logger, media: media);
     }
 
     [Fact]
@@ -285,20 +299,66 @@ public class BrowserHandlerTests
     }
 
     [Fact]
-    public async Task Media_messages_get_an_error_until_they_exist_and_messages_that_only_travel_the_other_way_are_invalid()
+    public async Task Media_detections_are_catalogued_and_acknowledged_and_a_capture_without_a_service_is_an_error()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var rig = await PipeRig.StartAsync(HandlerFor(null, out _, out _), ct);
+        var media = new BrowserMediaServices();
+        await using var rig = await PipeRig.StartAsync(HandlerFor(null, out _, out _, media: media), ct);
 
-        var media = await rig.AskAsync(
-            new MediaDetected { Id = "md", TabId = 1, PageUrl = "https://example.com/", Kind = MediaKind.Hls, Url = "https://example.com/a.m3u8" },
+        var detected = await rig.AskAsync(
+            new MediaDetected
+            {
+                Id = "md",
+                TabId = 1,
+                PageUrl = "https://example.com/",
+                Kind = MediaKind.Hls,
+                Url = "https://example.com/a.m3u8",
+                ThumbnailUrl = "https://example.com/poster.jpg",
+                ContentType = "application/vnd.apple.mpegurl",
+            },
+            ct);
+        var capture = await rig.AskAsync(
+            new CaptureMedia { Id = "cm", TabId = 1, Url = "https://example.com/a.m3u8", Kind = MediaKind.Hls, Cookies = [], Referrer = "https://example.com/", UserAgent = "t" },
             ct);
         var wrongWay = await rig.AskAsync(
             new Rules { Id = "rw", Enabled = true, Extensions = [], MimeTypes = [], ExcludedSites = [], BypassKey = BypassKey.Alt, AckTimeoutMs = 2000 },
             ct);
 
-        media.Should().BeOfType<IpcError>().Which.Code.Should().Be(IpcErrorCode.Internal);
+        detected.Should().BeOfType<Ack>().Which.Id.Should().Be("md");
+        media.Catalog.ForTab(1).Should().ContainSingle().Which.ThumbnailUrl.Should().Be("https://example.com/poster.jpg");
+        capture.Should().BeOfType<IpcError>().Which.Code.Should().Be(IpcErrorCode.Internal);
         wrongWay.Should().BeOfType<IpcError>().Which.Code.Should().Be(IpcErrorCode.InvalidMessage);
+    }
+
+    [Fact]
+    public async Task A_protected_capture_is_acknowledged_with_the_exact_message_and_a_clear_one_is_accepted()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var media = new BrowserMediaServices
+        {
+            Capture = new FakeMediaCapture
+            {
+                Result = new MediaCaptureResult(MediaCaptureStatus.Protected, "This video is protected and can't be saved"),
+            },
+        };
+        await using var rig = await PipeRig.StartAsync(HandlerFor(null, out _, out _, media: media), ct);
+        var capture = new CaptureMedia
+        {
+            Id = "p1",
+            TabId = 1,
+            Url = "https://example.com/a.m3u8",
+            Kind = MediaKind.Hls,
+            Cookies = [],
+            Referrer = "https://example.com/",
+            UserAgent = "t",
+        };
+
+        var refused = await rig.AskAsync(capture, ct);
+
+        refused.Should().BeOfType<Ack>().Which.Detail.Should().Be("This video is protected and can't be saved");
+        media.Capture = new FakeMediaCapture { Result = new MediaCaptureResult(MediaCaptureStatus.Accepted) };
+        var accepted = await rig.AskAsync(capture with { Id = "p2" }, ct);
+        accepted.Should().BeOfType<Ack>().Which.Ok.Should().BeTrue();
     }
 
     [Fact]
