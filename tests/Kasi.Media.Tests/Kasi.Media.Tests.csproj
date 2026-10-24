@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Kasi.Media/Kasi.Media.csproj" />
+    <PackageReference Include="FsCheck.Xunit.v3" />
+  </ItemGroup>
+
+</Project>

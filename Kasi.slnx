@@ -22,6 +22,7 @@
     <Project Path="tests/Kasi.Data.Tests/Kasi.Data.Tests.csproj" />
     <Project Path="tests/Kasi.Engine.Tests/Kasi.Engine.Tests.csproj" />
     <Project Path="tests/Kasi.FaultInjection.Tests/Kasi.FaultInjection.Tests.csproj" />
+    <Project Path="tests/Kasi.Media.Tests/Kasi.Media.Tests.csproj" />
     <Project Path="tests/Kasi.Ipc.Tests/Kasi.Ipc.Tests.csproj" />
     <Project Path="tests/Kasi.FaultInjection/Kasi.FaultInjection.csproj" />
     <Project Path="tests/Kasi.Fuzz/Kasi.Fuzz.csproj" />

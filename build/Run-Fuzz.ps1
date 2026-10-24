@@ -18,7 +18,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $LibFuzzer,
-    [ValidateSet('filename', 'host')] [string] $Target = 'filename',
+    [ValidateSet('filename', 'host', 'hls', 'dash')] [string] $Target = 'filename',
     [int] $Seconds = 0,
     [string] $OutputDir = '',
     [int] $TimeoutSeconds = 2,
@@ -30,8 +30,8 @@ Set-StrictMode -Version Latest
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
-if ($Seconds -eq 0) { $Seconds = if ($Target -eq 'host') { 300 } else { 180 } }
-if (-not $OutputDir) { $OutputDir = if ($Target -eq 'host') { 'artifacts/fuzz-host' } else { 'artifacts/fuzz' } }
+if ($Seconds -eq 0) { $Seconds = if ($Target -eq 'host' -or $Target -eq 'hls' -or $Target -eq 'dash') { 300 } else { 180 } }
+if (-not $OutputDir) { $OutputDir = if ($Target -eq 'host') { 'artifacts/fuzz-host' } elseif ($Target -in 'hls','dash') { "artifacts/fuzz-$Target" } else { 'artifacts/fuzz' } }
 if (-not (Test-Path -LiteralPath $LibFuzzer)) { throw "libfuzzer-dotnet not found at '$LibFuzzer'." }
 $bin = Join-Path $OutputDir 'bin'
 $corpus = Join-Path $OutputDir 'corpus'
@@ -53,7 +53,7 @@ if ($Target -eq 'host') {
 
 # only the assemblies under test are instrumented; instrumenting the runtime or SharpFuzz itself would only slow the run down
 dotnet tool restore | Out-Null
-$under = if ($Target -eq 'host') { 'Kasi.Ipc.dll', 'Kasi.NativeHost.dll' } else { 'Kasi.Engine.dll' }
+$under = if ($Target -eq 'host') { 'Kasi.Ipc.dll', 'Kasi.NativeHost.dll' } elseif ($Target -in 'hls','dash') { 'Kasi.Media.dll' } else { 'Kasi.Engine.dll' }
 foreach ($assembly in $under) {
     dotnet tool run sharpfuzz (Join-Path $bin $assembly)
     if ($LASTEXITCODE -ne 0) { throw "instrumentation of $assembly failed" }
@@ -62,6 +62,12 @@ foreach ($assembly in $under) {
 if ($Target -eq 'host') {
     $env:KASI_FUZZ_TARGET = 'host'
     $crashDir = 'tests/fixtures/fuzz/host-crashes'
+}
+elseif ($Target -in 'hls','dash') {
+    $env:KASI_FUZZ_TARGET = $Target
+    $pattern = if ($Target -eq 'hls') { '*.m3u8' } else { '*.mpd' }
+    Get-ChildItem tests/fixtures/media -Recurse -File -Filter $pattern | Copy-Item -Destination $corpus
+    $crashDir = 'tests/fixtures/fuzz/media-crashes'
 }
 else {
     # the corpus: every seed as "header\nurl", plus every saved finding
@@ -73,7 +79,7 @@ else {
 }
 Get-ChildItem $crashDir -File | Where-Object { $_.Extension -ne '.md' } | Copy-Item -Destination $corpus
 
-$replayHint = $(if ($Target -eq 'host') { '$env:KASI_FUZZ_TARGET=''host''; ' } else { '' }) + "dotnet $fuzzDll --replay <file>"
+$replayHint = $(if ($Target -ne 'filename') { "`$env:KASI_FUZZ_TARGET='$Target'; " } else { '' }) + "dotnet $fuzzDll --replay <file>"
 $common = @("--target_path=dotnet", "--target_arg=$fuzzDll")
 $prefix = (Resolve-Path $findings).Path + [IO.Path]::DirectorySeparatorChar
 & $LibFuzzer @common "-timeout=$TimeoutSeconds" "-rss_limit_mb=$RssLimitMegabytes" "-max_total_time=$Seconds" "-artifact_prefix=$prefix" $corpus
