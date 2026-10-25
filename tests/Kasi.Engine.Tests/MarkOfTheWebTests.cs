@@ -61,6 +61,21 @@ public sealed class MarkOfTheWebTests : IAsyncLifetime
         (await File.ReadAllTextAsync(final + ":Zone.Identifier", TestContext.Current.CancellationToken)).Should().Contain("ZoneId=3").And.Contain("HostUrl=https://example.org/a");
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task On_a_volume_that_cannot_hold_the_mark_the_download_completes_and_the_log_says_so()
+    {
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var url = new Uri(_host.BaseAddress, "/files/motw-nostream/1048576");
+
+        var outcome = await new HttpTransferRunner().DownloadAsync(
+            url, _folder, new HttpTransferOptions { Log = log.Enqueue, MarkWriter = (_, _) => false }, TestContext.Current.CancellationToken);
+
+        outcome.Should().BeOfType<TransferCompleted>();
+        log.Should().Contain("Mark-of-the-Web not supported on this volume");
+        Directory.GetFiles(_folder).Should().ContainSingle(f => !f.EndsWith(".kasipart", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("files", 3_145_728)]
     [InlineData("norange", 1_048_576)]
