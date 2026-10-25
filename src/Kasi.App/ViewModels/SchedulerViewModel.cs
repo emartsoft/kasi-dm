@@ -3,11 +3,26 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Engine;
+using Kasi.App.Resources;
 using Kasi.Core;
 
 namespace Kasi.App.ViewModels;
 
 internal sealed record PostActionChoice(PostActionKind Kind, string Label);
+
+/// <summary>The words for what a queue does when it has finished: the Scheduler's list and the Active Transfer window's footer use the same.</summary>
+internal static class PostActionText
+{
+    public static string Label(PostActionKind kind) => kind switch
+    {
+        PostActionKind.Sleep => Strings.PostActionSleep,
+        PostActionKind.Hibernate => Strings.PostActionHibernate,
+        PostActionKind.Shutdown => Strings.PostActionShutdown,
+        PostActionKind.ExitKasi => Strings.PostActionExit,
+        PostActionKind.RunProgram => Strings.PostActionRunProgram,
+        _ => Strings.PostActionNone,
+    };
+}
 
 internal sealed partial class SchedulerViewModel : ObservableObject
 {
@@ -73,12 +88,8 @@ internal sealed partial class SchedulerViewModel : ObservableObject
 
     public IReadOnlyList<PostActionChoice> PostActions { get; } =
     [
-        new(PostActionKind.None, "None"),
-        new(PostActionKind.Sleep, "Sleep"),
-        new(PostActionKind.Hibernate, "Hibernate"),
-        new(PostActionKind.Shutdown, "Shut down"),
-        new(PostActionKind.ExitKasi, "Exit Kasi"),
-        new(PostActionKind.RunProgram, "Run program"),
+        .. new[] { PostActionKind.None, PostActionKind.Sleep, PostActionKind.Hibernate, PostActionKind.Shutdown, PostActionKind.ExitKasi, PostActionKind.RunProgram }
+            .Select(kind => new PostActionChoice(kind, PostActionText.Label(kind))),
     ];
 
     public event Action? RequestClose;
@@ -160,13 +171,13 @@ internal sealed partial class SchedulerViewModel : ObservableObject
 
         if (MaxParallel < 1 || MaxParallel > 20)
         {
-            StatusText = "Max parallel must be between 1 and 20.";
+            StatusText = Strings.SchedulerErrParallel;
             return;
         }
 
         if (!TimeOnly.TryParse(StartTimeText, CultureInfo.InvariantCulture, out var startTime))
         {
-            StatusText = "Invalid start time format (use HH:mm).";
+            StatusText = Strings.SchedulerErrStart;
             return;
         }
 
@@ -175,7 +186,7 @@ internal sealed partial class SchedulerViewModel : ObservableObject
         {
             if (!TimeOnly.TryParse(StopTimeText, CultureInfo.InvariantCulture, out var parsedStop))
             {
-                StatusText = "Invalid stop time format (use HH:mm).";
+                StatusText = Strings.SchedulerErrStop;
                 return;
             }
             stopTime = parsedStop;

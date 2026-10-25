@@ -2,25 +2,32 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Kasi.App.ViewModels"
         xmlns:core="using:Kasi.Core"
+        xmlns:res="using:Kasi.App.Resources"
         x:Class="Kasi.App.Views.SchedulerWindow"
         x:DataType="vm:SchedulerViewModel"
-        Title="Scheduler"
-        AutomationProperties.Name="Scheduler"
+        Title="{x:Static res:Strings.SchedulerTitle}"
+        AutomationProperties.Name="{x:Static res:Strings.SchedulerTitle}"
         Width="560"
         Height="540"
         MinWidth="440"
         MinHeight="400"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterScreen">
-  <DockPanel Margin="16">
+  <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+  </Window.Styles>
+  <DockPanel Margin="20">
     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
-      <TextBlock Text="{Binding StatusText}" Foreground="IndianRed" VerticalAlignment="Center" AutomationProperties.Name="{Binding StatusText}" />
-      <Button Content="Save" Command="{Binding SaveCommand}" IsDefault="True" AutomationProperties.Name="Save" />
-      <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="Cancel" />
+      <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource KasiDangerBrush}" VerticalAlignment="Center" AutomationProperties.Name="{Binding StatusText}" />
+      <Button Content="{x:Static res:Strings.SchedulerSave}" Command="{Binding SaveCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="{x:Static res:Strings.SchedulerSave}" />
+      <Button Content="{x:Static res:Strings.SchedulerCancel}" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="{x:Static res:Strings.SchedulerCancel}" />
     </StackPanel>
 
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-      <TextBlock Text="Queue:" VerticalAlignment="Center" />
-      <ComboBox ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" Width="200" AutomationProperties.Name="Select Queue">
+      <TextBlock Text="{x:Static res:Strings.SchedulerQueueLabel}" VerticalAlignment="Center" Classes="kasi-secondary" />
+      <ComboBox ItemsSource="{Binding Queues}" SelectedItem="{Binding SelectedQueue}" Width="200" AutomationProperties.Name="{x:Static res:Strings.SchedulerSelectQueue}">
         <ComboBox.ItemTemplate>
           <DataTemplate x:DataType="core:Queue">
             <TextBlock Text="{Binding Name}" />
@@ -30,47 +37,47 @@
     </StackPanel>
 
     <TabControl>
-      <TabItem Header="Queue settings" AutomationProperties.Name="Queue settings">
+      <TabItem Header="{x:Static res:Strings.SchedulerTabQueue}" AutomationProperties.Name="{x:Static res:Strings.SchedulerTabQueue}">
         <StackPanel Spacing="12" Margin="0,12,0,0">
-          <TextBlock Text="Maximum parallel downloads (1–20):" />
-          <NumericUpDown Value="{Binding MaxParallel}" Minimum="1" Maximum="20" Width="140" HorizontalAlignment="Left" AutomationProperties.Name="Maximum parallel downloads" />
+          <TextBlock Text="{x:Static res:Strings.SchedulerMaxParallel}" Classes="kasi-secondary" />
+          <NumericUpDown Value="{Binding MaxParallel}" Minimum="1" Maximum="20" Width="140" HorizontalAlignment="Left" AutomationProperties.Name="{x:Static res:Strings.SchedulerMaxParallelName}" />
         </StackPanel>
       </TabItem>
 
-      <TabItem Header="Schedule" AutomationProperties.Name="Schedule">
+      <TabItem Header="{x:Static res:Strings.SchedulerTabSchedule}" AutomationProperties.Name="{x:Static res:Strings.SchedulerTabSchedule}">
         <ScrollViewer>
           <StackPanel Spacing="12" Margin="0,12,0,0">
-            <CheckBox Content="Enable schedule" IsChecked="{Binding IsScheduleEnabled}" AutomationProperties.Name="Enable schedule" />
+            <CheckBox Content="{x:Static res:Strings.SchedulerEnable}" IsChecked="{Binding IsScheduleEnabled}" AutomationProperties.Name="{x:Static res:Strings.SchedulerEnable}" />
 
             <Grid ColumnDefinitions="140,140" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
-              <TextBlock Grid.Row="0" Grid.Column="0" Text="Start time (HH:mm):" />
-              <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding StartTimeText}" Width="110" HorizontalAlignment="Left" Margin="0,4,0,0" AutomationProperties.Name="Start time" />
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static res:Strings.SchedulerStartLabel}" Classes="kasi-secondary" />
+              <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding StartTimeText}" Width="110" HorizontalAlignment="Left" Margin="0,4,0,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerStartName}" />
 
-              <TextBlock Grid.Row="0" Grid.Column="1" Text="Stop time (HH:mm):" />
-              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding StopTimeText}" IsEnabled="{Binding !RunUntilEmpty}" Width="110" HorizontalAlignment="Left" Margin="0,4,0,0" AutomationProperties.Name="Stop time" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Static res:Strings.SchedulerStopLabel}" Classes="kasi-secondary" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding StopTimeText}" IsEnabled="{Binding !RunUntilEmpty}" Width="110" HorizontalAlignment="Left" Margin="0,4,0,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerStopName}" />
             </Grid>
 
-            <CheckBox Content="Run until queue is empty (no stop time)" IsChecked="{Binding RunUntilEmpty}" AutomationProperties.Name="Run until queue is empty" />
+            <CheckBox Content="{x:Static res:Strings.SchedulerUntilEmpty}" IsChecked="{Binding RunUntilEmpty}" AutomationProperties.Name="{x:Static res:Strings.SchedulerUntilEmptyName}" />
 
-            <TextBlock Text="Active days:" Margin="0,8,0,0" FontWeight="SemiBold" />
+            <TextBlock Text="{x:Static res:Strings.SchedulerActiveDays}" Margin="0,8,0,0" FontWeight="SemiBold" />
             <WrapPanel>
-              <CheckBox Content="Sun" IsChecked="{Binding Sunday}" Margin="0,0,12,0" AutomationProperties.Name="Sunday" />
-              <CheckBox Content="Mon" IsChecked="{Binding Monday}" Margin="0,0,12,0" AutomationProperties.Name="Monday" />
-              <CheckBox Content="Tue" IsChecked="{Binding Tuesday}" Margin="0,0,12,0" AutomationProperties.Name="Tuesday" />
-              <CheckBox Content="Wed" IsChecked="{Binding Wednesday}" Margin="0,0,12,0" AutomationProperties.Name="Wednesday" />
-              <CheckBox Content="Thu" IsChecked="{Binding Thursday}" Margin="0,0,12,0" AutomationProperties.Name="Thursday" />
-              <CheckBox Content="Fri" IsChecked="{Binding Friday}" Margin="0,0,12,0" AutomationProperties.Name="Friday" />
-              <CheckBox Content="Sat" IsChecked="{Binding Saturday}" Margin="0,0,12,0" AutomationProperties.Name="Saturday" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDaySun}" IsChecked="{Binding Sunday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDaySunday}" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDayMon}" IsChecked="{Binding Monday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDayMonday}" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDayTue}" IsChecked="{Binding Tuesday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDayTuesday}" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDayWed}" IsChecked="{Binding Wednesday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDayWednesday}" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDayThu}" IsChecked="{Binding Thursday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDayThursday}" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDayFri}" IsChecked="{Binding Friday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDayFriday}" />
+              <CheckBox Content="{x:Static res:Strings.SchedulerDaySat}" IsChecked="{Binding Saturday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDaySaturday}" />
             </WrapPanel>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="Post-completion" AutomationProperties.Name="Post-completion">
+      <TabItem Header="{x:Static res:Strings.SchedulerTabPost}" AutomationProperties.Name="{x:Static res:Strings.SchedulerTabPost}">
         <ScrollViewer>
           <StackPanel Spacing="12" Margin="0,12,0,0">
-            <TextBlock Text="When all downloads in this queue finish:" />
-            <ComboBox ItemsSource="{Binding PostActions}" SelectedItem="{Binding SelectedPostAction}" Width="200" AutomationProperties.Name="Post action">
+            <TextBlock Text="{x:Static res:Strings.SchedulerWhenDone}" Classes="kasi-secondary" />
+            <ComboBox ItemsSource="{Binding PostActions}" SelectedItem="{Binding SelectedPostAction}" Width="200" AutomationProperties.Name="{x:Static res:Strings.SchedulerPostActionName}">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:PostActionChoice">
                   <TextBlock Text="{Binding Label}" />
@@ -78,13 +85,13 @@
               </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <CheckBox Content="Execute even if other queues are downloading" IsChecked="{Binding ForcePostAction}" AutomationProperties.Name="Force even if other queues downloading" />
+            <CheckBox Content="{x:Static res:Strings.SchedulerForce}" IsChecked="{Binding ForcePostAction}" AutomationProperties.Name="{x:Static res:Strings.SchedulerForceName}" />
 
-            <TextBlock Text="Program executable path:" Margin="0,8,0,0" />
-            <TextBox Text="{Binding ProgramPath}" PlaceholderText="C:\tools\app.exe" AutomationProperties.Name="Program executable path" />
+            <TextBlock Text="{x:Static res:Strings.SchedulerProgramPath}" Margin="0,8,0,0" Classes="kasi-secondary" />
+            <TextBox Text="{Binding ProgramPath}" PlaceholderText="C:\tools\app.exe" AutomationProperties.Name="{x:Static res:Strings.SchedulerProgramPathName}" />
 
-            <TextBlock Text="Program arguments (use %1 for completed file path):" />
-            <TextBox Text="{Binding ProgramArguments}" PlaceholderText="--file %1" AutomationProperties.Name="Program arguments" />
+            <TextBlock Text="{x:Static res:Strings.SchedulerProgramArgs}" Classes="kasi-secondary" />
+            <TextBox Text="{Binding ProgramArguments}" PlaceholderText="--file %1" AutomationProperties.Name="{x:Static res:Strings.SchedulerProgramArgsName}" />
           </StackPanel>
         </ScrollViewer>
       </TabItem>

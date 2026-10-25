@@ -35,6 +35,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     private int _droppedEvents;
     private int _subscriberFaults;
     private readonly IPostProbeRouter? _postProbeRouter;
+    private readonly IFileScanner? _scanner;
 
     public DownloadEngine(
         IJobRepository jobs,
@@ -45,7 +46,8 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         IJobSecretRepository? secrets = null,
         TimeProvider? timeProvider = null,
         INetworkStatus? network = null,
-        IPostProbeRouter? postProbeRouter = null)
+        IPostProbeRouter? postProbeRouter = null,
+        IFileScanner? scanner = null)
     {
         ArgumentNullException.ThrowIfNull(jobs);
         ArgumentNullException.ThrowIfNull(segments);
@@ -59,6 +61,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         _secrets = secrets;
         _time = timeProvider ?? TimeProvider.System;
         _network = network;
+        _scanner = scanner;
         _postProbeRouter = postProbeRouter;
     }
 
@@ -594,6 +597,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
             JobRepository = _jobs,
             BandwidthLimiter = _bandwidth,
             JobBandwidthLimit = JobLimitFor(job),
+            Scanner = _scanner,
             Proxy = _proxy,
             TimeProvider = _time,
             SecretRepository = _secrets,

@@ -2,62 +2,196 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Kasi.App.ViewModels"
         xmlns:views="using:Kasi.App.Views"
+        xmlns:c="using:Kasi.App.Controls"
         x:Class="Kasi.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="{Binding Title}"
         AutomationProperties.Name="{Binding AutomationName}"
-        Width="640"
-        Height="780"
-        MinWidth="480"
-        MinHeight="480"
+        Background="{DynamicResource KasiBaseBrush}"
+        Width="1040"
+        Height="800"
+        MinWidth="760"
+        MinHeight="520"
         WindowStartupLocation="CenterScreen">
-  <DockPanel Margin="16">
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
-      <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" AutomationProperties.Name="{Binding StatusText}" />
-      <Button Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" IsDefault="True" AutomationProperties.Name="{Binding SaveLabel}" />
-      <Button x:Name="CancelButton" Content="{Binding CancelLabel}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
-    </StackPanel>
-    <TabControl SelectedIndex="{Binding SelectedTab}">
-      <TabItem Header="{Binding GeneralTab}" AutomationProperties.Name="{Binding GeneralTab}">
-        <StackPanel Spacing="8" Margin="0,12,0,0">
-          <TextBlock Text="{Binding ThemeLabel}" />
-          <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" AutomationProperties.Name="{Binding ThemeLabel}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:ThemeChoice">
-                <TextBlock Text="{Binding Label}" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-        </StackPanel>
-      </TabItem>
-      <TabItem Header="{Binding BrowserTab}" AutomationProperties.Name="{Binding BrowserTab}">
-        <ScrollViewer>
-          <StackPanel Spacing="8" Margin="0,12,0,0">
-            <CheckBox Content="{Binding EnabledLabel}" IsChecked="{Binding Enabled}" AutomationProperties.Name="{Binding EnabledLabel}" />
-            <CheckBox Content="{Binding ShowAddDialogLabel}" IsChecked="{Binding ShowAddDialog}" AutomationProperties.Name="{Binding ShowAddDialogLabel}" />
-            <CheckBox Content="{Binding ClipboardCaptureLabel}" IsChecked="{Binding ClipboardCapture}" AutomationProperties.Name="{Binding ClipboardCaptureLabel}" />
-            <TextBlock Text="{Binding ExtensionsLabel}" />
-            <TextBox Text="{Binding ExtensionsText}" AcceptsReturn="True" Height="110" TextWrapping="Wrap" AutomationProperties.Name="{Binding ExtensionsLabel}" />
-            <TextBlock Text="{Binding MimeTypesLabel}" />
-            <TextBox Text="{Binding MimeTypesText}" AcceptsReturn="True" Height="110" TextWrapping="Wrap" AutomationProperties.Name="{Binding MimeTypesLabel}" />
-            <TextBlock Text="{Binding ExcludedSitesLabel}" />
-            <TextBox Text="{Binding ExcludedSitesText}" AcceptsReturn="True" Height="80" TextWrapping="Wrap" AutomationProperties.Name="{Binding ExcludedSitesLabel}" />
-            <TextBlock Text="{Binding BypassKeyLabel}" />
-            <ComboBox ItemsSource="{Binding BypassKeys}" SelectedItem="{Binding SelectedBypassKey}" AutomationProperties.Name="{Binding BypassKeyLabel}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:BypassKeyChoice">
-                  <TextBlock Text="{Binding Label}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <TextBlock Text="{Binding MinSizeLabel}" />
-            <NumericUpDown Value="{Binding MinSizeMegabytes}" Minimum="0" Maximum="1000000" Increment="1" FormatString="0.##" AutomationProperties.Name="{Binding MinSizeLabel}" />
+  <Grid RowDefinitions="*,Auto" ColumnDefinitions="272,*">
+    <!-- navigation -->
+    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource KasiPanelBrush}" BorderBrush="{DynamicResource KasiBorderBrush}" BorderThickness="0,0,1,0">
+      <DockPanel Margin="12">
+        <Button DockPanel.Dock="Bottom" Command="{Binding OpenDataFolderCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                Background="Transparent" BorderThickness="0" AutomationProperties.Name="{Binding OpenDataFolderLabel}">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Classes="kasi-icon" Text="&#xE838;" />
+            <TextBlock Text="{Binding OpenDataFolderLabel}" />
           </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-      <TabItem Header="{Binding CategoriesTab}" IsVisible="{Binding HasCategories}" AutomationProperties.Name="{Binding CategoriesTab}">
-        <views:CategoriesView DataContext="{Binding Categories}" />
-      </TabItem>
-    </TabControl>
-  </DockPanel>
+        </Button>
+        <Border DockPanel.Dock="Top" Classes="kasi-card" Padding="12" Margin="0,0,0,12" AutomationProperties.Name="{Binding ThisPcLabel}">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{Binding ThisPcLabel}" Classes="kasi-title" />
+            <TextBlock Text="{Binding DataFolderText}" Classes="kasi-secondary kasi-mono" TextTrimming="CharacterEllipsis" AutomationProperties.Name="{Binding DataFolderText}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="{Binding VersionText}" Classes="kasi-secondary kasi-mono" AutomationProperties.Name="{Binding VersionText}" />
+              <c:StatusChip Grid.Column="1" Text="{Binding ExtensionText}" Kind="Neutral" />
+            </Grid>
+          </StackPanel>
+        </Border>
+        <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage}" Background="Transparent" AutomationProperties.Name="{Binding NavigationName}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SettingsPage">
+              <StackPanel Orientation="Horizontal" Spacing="12" Margin="2,4" AutomationProperties.Name="{Binding Label}">
+                <TextBlock Classes="kasi-icon" Text="{Binding Glyph}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- page -->
+    <DockPanel Grid.Row="0" Grid.Column="1">
+      <Grid DockPanel.Dock="Top" Margin="28,14,28,0" ZIndex="2">
+        <TextBox x:Name="FindBox" Text="{Binding SearchText}" Watermark="{Binding FindLabel}" Width="360" HorizontalAlignment="Right"
+                 AutomationProperties.Name="{Binding FindName}" />
+        <Border IsVisible="{Binding HasHits}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,40,0,0" Width="360" Classes="kasi-card" Padding="4">
+          <ListBox x:Name="HitList" ItemsSource="{Binding Hits}" Background="Transparent" AutomationProperties.Name="{Binding FindName}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SettingHit">
+                <TextBlock Text="{Binding Label}" AutomationProperties.Name="{Binding Label}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </Grid>
+      <ScrollViewer>
+        <StackPanel Spacing="14" Margin="28,8,28,24" MaxWidth="900" HorizontalAlignment="Stretch">
+          <TextBlock Text="{Binding Breadcrumb}" Classes="kasi-secondary" />
+          <TextBlock Text="{Binding PageTitle}" FontSize="28" FontWeight="Bold" AutomationProperties.Name="{Binding PageTitle}" />
+          <TextBlock Text="{Binding PageDescription}" Classes="kasi-secondary" FontSize="14" TextWrapping="Wrap" />
+
+          <!-- General -->
+          <StackPanel IsVisible="{Binding IsGeneralPage}" Spacing="10">
+            <Border Classes="kasi-card">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding ThemeLabel}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" MinWidth="180" AutomationProperties.Name="{Binding ThemeLabel}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ThemeChoice">
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+            </Border>
+            <c:ToggleRow Title="{Binding ScanDownloadsLabel}" Description="{Binding ScanDownloadsDescription}" IsChecked="{Binding ScanDownloads}" />
+          </StackPanel>
+
+          <!-- Browser integration -->
+          <StackPanel IsVisible="{Binding IsBrowserPage}" Spacing="10">
+            <c:ToggleRow Title="{Binding EnabledLabel}" IsChecked="{Binding Enabled}" />
+            <c:ToggleRow Title="{Binding ShowAddDialogLabel}" IsChecked="{Binding ShowAddDialog}" />
+            <c:ToggleRow Title="{Binding ClipboardCaptureLabel}" IsChecked="{Binding ClipboardCapture}" />
+            <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+              <TextBlock Text="{Binding RulesHeading}" Classes="kasi-secondary" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="1" Text="{Binding RulesNote}" Classes="kasi-secondary" />
+            </Grid>
+            <Grid ColumnDefinitions="*,*">
+              <Border Grid.Column="0" Classes="kasi-card" Margin="0,0,6,0">
+                <StackPanel Spacing="8">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding ExtensionsLabel}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <Button Grid.Column="1" Content="{Binding ResetLabel}" Command="{Binding ResetExtensionsCommand}" Padding="8,2" AutomationProperties.Name="{Binding ResetExtensionsName}" />
+                  </Grid>
+                  <TextBox Text="{Binding ExtensionsText}" AcceptsReturn="True" Height="180" TextWrapping="Wrap" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding ExtensionsLabel}" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Classes="kasi-card" Margin="6,0,0,0">
+                <StackPanel Spacing="8">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding MimeTypesLabel}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <Button Grid.Column="1" Content="{Binding ResetLabel}" Command="{Binding ResetMimeTypesCommand}" Padding="8,2" AutomationProperties.Name="{Binding ResetMimeTypesName}" />
+                  </Grid>
+                  <TextBox Text="{Binding MimeTypesText}" AcceptsReturn="True" Height="180" TextWrapping="Wrap" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding MimeTypesLabel}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+            <Border Classes="kasi-card">
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding ExcludedSitesLabel}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <Button Grid.Column="1" Content="{Binding ResetLabel}" Command="{Binding ResetExcludedSitesCommand}" Padding="8,2" AutomationProperties.Name="{Binding ResetExcludedSitesName}" />
+                </Grid>
+                <TextBox Text="{Binding ExcludedSitesText}" AcceptsReturn="True" Height="90" TextWrapping="Wrap" FontFamily="{DynamicResource KasiMonoFont}" AutomationProperties.Name="{Binding ExcludedSitesLabel}" />
+              </StackPanel>
+            </Border>
+            <Border Classes="kasi-card">
+              <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,12,Auto">
+                <TextBlock Grid.Row="0" Text="{Binding BypassKeyLabel}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding BypassKeys}" SelectedItem="{Binding SelectedBypassKey}" MinWidth="180" AutomationProperties.Name="{Binding BypassKeyLabel}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BypassKeyChoice">
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Grid.Row="2" Text="{Binding MinSizeLabel}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding MinSizeMegabytes}" Minimum="0" Maximum="1000000" Increment="1" FormatString="0.##" MinWidth="180" AutomationProperties.Name="{Binding MinSizeLabel}" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- File types and paths: the categories -->
+          <ContentControl IsVisible="{Binding IsFilesPage}">
+            <views:CategoriesView DataContext="{Binding Categories}" />
+          </ContentControl>
+
+          <!-- Scheduler and queues -->
+          <StackPanel IsVisible="{Binding IsSchedulerPage}" Spacing="10">
+            <Border Classes="kasi-card">
+              <Button Content="{Binding OpenSchedulerLabel}" Command="{Binding OpenSchedulerCommand}" Classes="accent" HorizontalAlignment="Left" AutomationProperties.Name="{Binding OpenSchedulerLabel}" />
+            </Border>
+          </StackPanel>
+
+          <!-- About -->
+          <StackPanel IsVisible="{Binding IsAboutPage}" Spacing="10">
+            <Border Classes="kasi-card">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Kasi" FontSize="24" FontWeight="Bold" />
+                <TextBlock Text="{Binding AboutTagline}" Classes="kasi-secondary" />
+                <TextBlock Text="{Binding VersionText}" Classes="kasi-mono" AutomationProperties.Name="{Binding VersionText}" />
+                <TextBlock Text="{Binding AboutOwner}" Classes="kasi-secondary" />
+              </StackPanel>
+            </Border>
+            <Border Classes="kasi-card">
+              <StackPanel Spacing="6">
+                <TextBlock Text="{Binding AboutNoticesLabel}" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding Notices}" AutomationProperties.Name="{Binding AboutNoticesLabel}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" Classes="kasi-secondary" TextWrapping="Wrap" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+
+    <!-- footer -->
+    <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="{DynamicResource KasiPanelBrush}" BorderBrush="{DynamicResource KasiBorderBrush}" BorderThickness="0,1,0,0" Padding="20,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Ellipse Classes="kasi-dot on" Width="8" Height="8" />
+          <TextBlock Text="{Binding FooterNote}" Classes="kasi-secondary" />
+          <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource KasiDangerBrush}" AutomationProperties.Name="{Binding StatusText}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="CancelButton" Content="{Binding CancelLabel}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
+          <Button Content="{Binding RestoreDefaultsLabel}" Command="{Binding RestoreDefaultsCommand}" AutomationProperties.Name="{Binding RestoreDefaultsLabel}" />
+          <Button Content="{Binding SaveLabel}" Command="{Binding SaveCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="{Binding SaveLabel}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
 </Window>

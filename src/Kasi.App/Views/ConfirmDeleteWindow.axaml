@@ -8,13 +8,14 @@
         Width="460"
         SizeToContent="Height"
         CanResize="False"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterOwner">
-  <StackPanel Margin="16" Spacing="12">
+  <StackPanel Margin="20" Spacing="14">
     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" AutomationProperties.Name="{Binding Message}" />
     <CheckBox Content="{Binding AlsoFilesLabel}" IsChecked="{Binding AlsoDeleteFiles}" IsVisible="{Binding OfferFiles}" AutomationProperties.Name="{Binding AlsoFilesLabel}" />
     <CheckBox Content="{Binding DontAskLabel}" IsChecked="{Binding DontAskAgain}" AutomationProperties.Name="{Binding DontAskLabel}" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Content="{Binding DeleteLabel}" Command="{Binding ConfirmCommand}" IsDefault="True" AutomationProperties.Name="{Binding DeleteLabel}" />
+      <Button Content="{Binding DeleteLabel}" Command="{Binding ConfirmCommand}" IsDefault="True" Classes="accent" AutomationProperties.Name="{Binding DeleteLabel}" />
       <Button Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" IsCancel="True" AutomationProperties.Name="{Binding CancelLabel}" />
     </StackPanel>
   </StackPanel>

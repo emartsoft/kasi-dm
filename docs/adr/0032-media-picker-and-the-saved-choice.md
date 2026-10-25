@@ -4,7 +4,7 @@
 - Date: 2026-10-24
 - Requirements: KASI-MED-002, KASI-UI-010
 - Plan: `docs/plans/m3.md` decisions 12 and 13 (PR 3f)
-- Related: ADR 0031
+- Related: ADR 0034
 
 ## Context
 
@@ -37,5 +37,5 @@ bound on the UI thread. A missing or oversized poster never blocks the picker.
 ## Consequences
 
 - A rotated playlist URL no longer changes the quality a person chose.
-- The picker holds the capture open until it is answered; the browser has already been acknowledged by then (ADR 0031).
+- The picker holds the capture open until it is answered; the browser has already been acknowledged by then (ADR 0034).
 - Subtitles are listed but disabled until 3j.

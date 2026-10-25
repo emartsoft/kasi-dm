@@ -8,8 +8,9 @@
         Width="460"
         SizeToContent="Height"
         CanResize="False"
+        Background="{DynamicResource KasiBaseBrush}"
         WindowStartupLocation="CenterOwner">
-  <StackPanel Margin="16" Spacing="12">
+  <StackPanel Margin="20" Spacing="14">
     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
     <ItemsControl ItemsSource="{Binding Choices}">
       <ItemsControl.ItemTemplate>

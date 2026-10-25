@@ -4,7 +4,7 @@
 - Date: 2026-10-24
 - Requirements: KASI-MED-003, KASI-MED-006, KASI-RES-004, KASI-NFR-012
 - Plan: `docs/plans/m3.md` sections 2.4, 2.5 and 2.7 (PR 3c)
-- Related: ADR 0026, ADR 0027
+- Related: ADR 0033, ADR 0027
 
 ## Context
 

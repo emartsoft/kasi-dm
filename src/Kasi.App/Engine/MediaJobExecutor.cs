@@ -24,7 +24,8 @@ internal sealed partial class MediaJobExecutor(
     FfmpegOptions? ffmpeg,
     Action<EngineEvent> publish,
     TimeProvider? timeProvider = null,
-    ILogger? logger = null) : IJobControl
+    ILogger? logger = null,
+    IFileScanner? scanner = null) : IJobControl
 {
     public const string ChoiceGoneMessage = "The quality you chose is no longer offered by this stream.";
 
@@ -226,6 +227,8 @@ internal sealed partial class MediaJobExecutor(
                 new MediaMuxOptions
                 {
                     OutputPath = Path.Combine(job.Folder, job.FileName),
+                    Scanner = scanner,
+                    Log = line => publish(new JobLogged(id, _time.GetUtcNow(), line)),
                     Container = format switch
                     {
                         "Matroska" => MediaMuxContainer.Matroska,

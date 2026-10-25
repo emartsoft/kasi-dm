@@ -21,6 +21,9 @@ public enum TransferErrorKind
     /// <summary>The sealed part file did not match the supplied checksum; it is kept for inspection.</summary>
     VerificationFailed,
 
+    /// <summary>The antivirus scan flagged the finished file (M2.11e); it is left where the antivirus put it, never deleted by Kasi.</summary>
+    FlaggedByAntivirus,
+
     /// <summary>The server returned an HTTP status the transfer loop cannot use.</summary>
     HttpStatusError,
 

@@ -61,12 +61,14 @@ internal static class CompositionRoot
         services.AddSingleton(sp => new CheckpointWriter(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICheckpointWriter>(sp => sp.GetRequiredService<CheckpointWriter>());
         services.AddSingleton(_ => new BandwidthLimiter());
+        services.AddSingleton<IFileScanner>(sp => new SettingGatedScanner(sp.GetRequiredService<IUiSettings>(), new AmsiScanner()));
         services.AddSingleton(sp => new DownloadEngine(
             sp.GetRequiredService<IJobRepository>(),
             sp.GetRequiredService<ISegmentRepository>(),
             sp.GetRequiredService<ICheckpointWriter>(),
             sp.GetRequiredService<BandwidthLimiter>(),
             secrets: sp.GetRequiredService<IJobSecretRepository>(),
+            scanner: sp.GetRequiredService<IFileScanner>(),
             postProbeRouter: new CategoryRouter(
                 sp.GetRequiredService<ICategoryRepository>(),
                 sp.GetRequiredService<ICategoryRuleRepository>(),
@@ -85,7 +87,8 @@ internal static class CompositionRoot
             Path.Combine(AppPaths.DataFolder(), "media"),
             AppPaths.Ffmpeg(),
             sp.GetRequiredService<DownloadEngine>().PublishExternal,
-            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<MediaJobExecutor>()));
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<MediaJobExecutor>(),
+            scanner: sp.GetRequiredService<IFileScanner>()));
         services.AddSingleton<IJobControl>(sp => new RoutingJobControl(
             sp.GetRequiredService<DownloadEngine>(),
             sp.GetRequiredService<IJobRepository>(),

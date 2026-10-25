@@ -10,6 +10,8 @@ import { isEligible, matchesRules } from './rules-match';
 
 export { READY_WAIT_MS } from './kasi-ready';
 const LATE_ACK_MS = 30_000;
+// How long a download that no POST mark explains waits for the request that started it (see startedByPost).
+export const POST_GRACE_MS = 400;
 
 export interface DownloadItemLike {
   id: number;
@@ -49,6 +51,8 @@ export interface InterceptionDeps {
   isIncognitoAllowed(): Promise<boolean>;
   hasHostPermission(): Promise<boolean>;
   isPost(...urls: string[]): Promise<boolean>;
+  // Waits; replaced in tests.
+  wait?(ms: number): Promise<void>;
   hops(url: string): Promise<string[]>;
   bypassHeld(key: Rules['bypassKey'], urlHashes: () => Promise<string[]>): Promise<boolean>;
   cookiesFor(item: DownloadItemLike): Promise<Cookie[]>;
@@ -100,6 +104,19 @@ export function createInterception(deps: InterceptionDeps) {
 
   const ready = (): Promise<boolean> => waitForKasi(deps.port);
 
+  // DownloadItem has no HTTP method; the request tracker learns it from webRequest. Firefox can report the download before it reports the
+  // request that started it, so a POST may not be marked yet when the download shows up. Called with the download already paused and the
+  // bypass key already checked (nothing is written meanwhile): look once more after a moment. A GET costs the moment; a POST is resumed and left to the browser, because
+  // intercepting it would send the browser's own copy away with it.
+  async function startedByPost(item: DownloadItemLike): Promise<boolean> {
+    const urls = [item.url, item.finalUrl ?? item.url];
+    if (await deps.isPost(...urls)) return true;
+    await (deps.wait ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms))))(
+      POST_GRACE_MS,
+    );
+    return deps.isPost(...urls);
+  }
+
   async function wanted(item: DownloadItemLike, rules: Rules): Promise<boolean> {
     const incognitoAllowed = item.incognito ? await deps.isIncognitoAllowed() : false;
     if (!isEligible(item, incognitoAllowed) || !matchesRules(rules, item)) return false;
@@ -117,6 +134,11 @@ export function createInterception(deps: InterceptionDeps) {
       ...(await deps.hops(item.finalUrl ?? item.url)),
     ];
     if (await deps.bypassHeld(rules.bypassKey, urlHashes)) {
+      await resumeIfPaused(item.id);
+      return;
+    }
+    // after the bypass check, which needs the time of the click: the wait must not push the key out of its window
+    if (await startedByPost(item)) {
       await resumeIfPaused(item.id);
       return;
     }

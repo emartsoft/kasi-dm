@@ -20,6 +20,170 @@ internal static class Strings
 
     public static string SelectRow => Get(nameof(SelectRow));
 
+    public static string SettingsScanDownloads => Get(nameof(SettingsScanDownloads));
+
+    public static string SettingsScanDownloadsDescription => Get(nameof(SettingsScanDownloadsDescription));
+
+    public static string SchedulerTitle => Get(nameof(SchedulerTitle));
+
+    public static string SchedulerQueueLabel => Get(nameof(SchedulerQueueLabel));
+
+    public static string SchedulerSelectQueue => Get(nameof(SchedulerSelectQueue));
+
+    public static string SchedulerTabQueue => Get(nameof(SchedulerTabQueue));
+
+    public static string SchedulerTabSchedule => Get(nameof(SchedulerTabSchedule));
+
+    public static string SchedulerTabPost => Get(nameof(SchedulerTabPost));
+
+    public static string SchedulerMaxParallel => Get(nameof(SchedulerMaxParallel));
+
+    public static string SchedulerMaxParallelName => Get(nameof(SchedulerMaxParallelName));
+
+    public static string SchedulerEnable => Get(nameof(SchedulerEnable));
+
+    public static string SchedulerStartLabel => Get(nameof(SchedulerStartLabel));
+
+    public static string SchedulerStartName => Get(nameof(SchedulerStartName));
+
+    public static string SchedulerStopLabel => Get(nameof(SchedulerStopLabel));
+
+    public static string SchedulerStopName => Get(nameof(SchedulerStopName));
+
+    public static string SchedulerUntilEmpty => Get(nameof(SchedulerUntilEmpty));
+
+    public static string SchedulerUntilEmptyName => Get(nameof(SchedulerUntilEmptyName));
+
+    public static string SchedulerActiveDays => Get(nameof(SchedulerActiveDays));
+
+    public static string SchedulerDaySun => Get(nameof(SchedulerDaySun));
+
+    public static string SchedulerDayMon => Get(nameof(SchedulerDayMon));
+
+    public static string SchedulerDayTue => Get(nameof(SchedulerDayTue));
+
+    public static string SchedulerDayWed => Get(nameof(SchedulerDayWed));
+
+    public static string SchedulerDayThu => Get(nameof(SchedulerDayThu));
+
+    public static string SchedulerDayFri => Get(nameof(SchedulerDayFri));
+
+    public static string SchedulerDaySat => Get(nameof(SchedulerDaySat));
+
+    public static string SchedulerDaySunday => Get(nameof(SchedulerDaySunday));
+
+    public static string SchedulerDayMonday => Get(nameof(SchedulerDayMonday));
+
+    public static string SchedulerDayTuesday => Get(nameof(SchedulerDayTuesday));
+
+    public static string SchedulerDayWednesday => Get(nameof(SchedulerDayWednesday));
+
+    public static string SchedulerDayThursday => Get(nameof(SchedulerDayThursday));
+
+    public static string SchedulerDayFriday => Get(nameof(SchedulerDayFriday));
+
+    public static string SchedulerDaySaturday => Get(nameof(SchedulerDaySaturday));
+
+    public static string SchedulerWhenDone => Get(nameof(SchedulerWhenDone));
+
+    public static string SchedulerPostActionName => Get(nameof(SchedulerPostActionName));
+
+    public static string SchedulerForce => Get(nameof(SchedulerForce));
+
+    public static string SchedulerForceName => Get(nameof(SchedulerForceName));
+
+    public static string SchedulerProgramPath => Get(nameof(SchedulerProgramPath));
+
+    public static string SchedulerProgramPathName => Get(nameof(SchedulerProgramPathName));
+
+    public static string SchedulerProgramArgs => Get(nameof(SchedulerProgramArgs));
+
+    public static string SchedulerProgramArgsName => Get(nameof(SchedulerProgramArgsName));
+
+    public static string SchedulerSave => Get(nameof(SchedulerSave));
+
+    public static string SchedulerCancel => Get(nameof(SchedulerCancel));
+
+    public static string SchedulerErrParallel => Get(nameof(SchedulerErrParallel));
+
+    public static string SchedulerErrStart => Get(nameof(SchedulerErrStart));
+
+    public static string SchedulerErrStop => Get(nameof(SchedulerErrStop));
+
+    public static string PostActionNone => Get(nameof(PostActionNone));
+
+    public static string PostActionSleep => Get(nameof(PostActionSleep));
+
+    public static string PostActionHibernate => Get(nameof(PostActionHibernate));
+
+    public static string PostActionShutdown => Get(nameof(PostActionShutdown));
+
+    public static string PostActionExit => Get(nameof(PostActionExit));
+
+    public static string PostActionRunProgram => Get(nameof(PostActionRunProgram));
+
+    public static string DetailsWhenCompleted => Get(nameof(DetailsWhenCompleted));
+
+    public static string DetailsChangeQueueAction => Get(nameof(DetailsChangeQueueAction));
+
+    public static string SettingsPageGeneral => Get(nameof(SettingsPageGeneral));
+
+    public static string SettingsPageGeneralDescription => Get(nameof(SettingsPageGeneralDescription));
+
+    public static string SettingsPageBrowser => Get(nameof(SettingsPageBrowser));
+
+    public static string SettingsPageBrowserDescription => Get(nameof(SettingsPageBrowserDescription));
+
+    public static string SettingsPageFiles => Get(nameof(SettingsPageFiles));
+
+    public static string SettingsPageFilesDescription => Get(nameof(SettingsPageFilesDescription));
+
+    public static string SettingsPageScheduler => Get(nameof(SettingsPageScheduler));
+
+    public static string SettingsPageSchedulerDescription => Get(nameof(SettingsPageSchedulerDescription));
+
+    public static string SettingsPageAbout => Get(nameof(SettingsPageAbout));
+
+    public static string SettingsPageAboutDescription => Get(nameof(SettingsPageAboutDescription));
+
+    public static string SettingsBreadcrumbRoot => Get(nameof(SettingsBreadcrumbRoot));
+
+    public static string SettingsFind => Get(nameof(SettingsFind));
+
+    public static string SettingsFindName => Get(nameof(SettingsFindName));
+
+    public static string SettingsRestoreDefaults => Get(nameof(SettingsRestoreDefaults));
+
+    public static string SettingsReset => Get(nameof(SettingsReset));
+
+    public static string SettingsNavigation => Get(nameof(SettingsNavigation));
+
+    public static string SettingsThisPc => Get(nameof(SettingsThisPc));
+
+    public static string SettingsDataFolder => Get(nameof(SettingsDataFolder));
+
+    public static string SettingsVersion => Get(nameof(SettingsVersion));
+
+    public static string SettingsOpenDataFolder => Get(nameof(SettingsOpenDataFolder));
+
+    public static string SettingsOpenScheduler => Get(nameof(SettingsOpenScheduler));
+
+    public static string SettingsRulesHeading => Get(nameof(SettingsRulesHeading));
+
+    public static string SettingsRulesNote => Get(nameof(SettingsRulesNote));
+
+    public static string SettingsAutoSaved => Get(nameof(SettingsAutoSaved));
+
+    public static string SettingsRestartNote => Get(nameof(SettingsRestartNote));
+
+    public static string AboutTagline => Get(nameof(AboutTagline));
+
+    public static string AboutOwner => Get(nameof(AboutOwner));
+
+    public static string AboutNotices => Get(nameof(AboutNotices));
+
+    public static string SettingsPageNameLabel => Get(nameof(SettingsPageNameLabel));
+
     public static string DetailsPeak => Get(nameof(DetailsPeak));
 
     public static string DetailsElapsed => Get(nameof(DetailsElapsed));
@@ -194,6 +358,14 @@ internal static class Strings
     public static string TrayLimitPreset => Get(nameof(TrayLimitPreset));
 
     public static string TrayQuit => Get(nameof(TrayQuit));
+
+    public static string TrayFlyoutName => Get(nameof(TrayFlyoutName));
+
+    public static string TrayFlyoutSpeed => Get(nameof(TrayFlyoutSpeed));
+
+    public static string TrayFlyoutLimit => Get(nameof(TrayFlyoutLimit));
+
+    public static string ToastDetailsFormat => Get(nameof(ToastDetailsFormat));
 
     public static string TrayToolTipSpeed => Get(nameof(TrayToolTipSpeed));
 

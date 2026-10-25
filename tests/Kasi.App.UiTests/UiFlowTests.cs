@@ -47,7 +47,7 @@ public sealed class UiFlowTests
 
         window.Press("Settings");
         var settings = app.WaitForWindow("Kasi settings");
-        settings.Named(ControlType.TabItem, "Categories", "the Categories tab").Patterns.SelectionItem.Pattern.Select();
+        settings.Named(ControlType.ListItem, "File Types & Paths", "the File Types & Paths page").Patterns.SelectionItem.Pattern.Select();
         settings.SetText("New category", "Mine");
         settings.SetText("Folder for the new category", "Mine");
         settings.Press("Add category");

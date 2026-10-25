@@ -988,6 +988,93 @@
   <data name="SelectRow" xml:space="preserve">
     <value>Select download</value>
   </data>
+  <data name="SettingsPageGeneral" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="SettingsPageGeneralDescription" xml:space="preserve">
+    <value>Appearance and how Kasi looks on this PC.</value>
+  </data>
+  <data name="SettingsPageBrowser" xml:space="preserve">
+    <value>Browser Integration</value>
+  </data>
+  <data name="SettingsPageBrowserDescription" xml:space="preserve">
+    <value>Choose which browser downloads Kasi takes, and the rules the extension follows.</value>
+  </data>
+  <data name="SettingsPageFiles" xml:space="preserve">
+    <value>File Types &amp; Paths</value>
+  </data>
+  <data name="SettingsPageFilesDescription" xml:space="preserve">
+    <value>Where each kind of file is saved, and the rules that decide it.</value>
+  </data>
+  <data name="SettingsPageScheduler" xml:space="preserve">
+    <value>Scheduler &amp; Queues</value>
+  </data>
+  <data name="SettingsPageSchedulerDescription" xml:space="preserve">
+    <value>Start and stop queues at set times, and choose what happens when they finish.</value>
+  </data>
+  <data name="SettingsPageAbout" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="SettingsPageAboutDescription" xml:space="preserve">
+    <value>Version, licence and the software Kasi is built with.</value>
+  </data>
+  <data name="SettingsBreadcrumbRoot" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsFind" xml:space="preserve">
+    <value>Find a setting (Ctrl+E)</value>
+  </data>
+  <data name="SettingsFindName" xml:space="preserve">
+    <value>Find a setting</value>
+  </data>
+  <data name="SettingsRestoreDefaults" xml:space="preserve">
+    <value>Restore Defaults</value>
+  </data>
+  <data name="SettingsReset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="SettingsNavigation" xml:space="preserve">
+    <value>Settings pages</value>
+  </data>
+  <data name="SettingsThisPc" xml:space="preserve">
+    <value>This PC</value>
+  </data>
+  <data name="SettingsDataFolder" xml:space="preserve">
+    <value>Data folder</value>
+  </data>
+  <data name="SettingsVersion" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="SettingsOpenDataFolder" xml:space="preserve">
+    <value>Open Config Directory</value>
+  </data>
+  <data name="SettingsOpenScheduler" xml:space="preserve">
+    <value>Open the Scheduler</value>
+  </data>
+  <data name="SettingsRulesHeading" xml:space="preserve">
+    <value>Interception rules and filters</value>
+  </data>
+  <data name="SettingsRulesNote" xml:space="preserve">
+    <value>Changes reach the browser extension when you save.</value>
+  </data>
+  <data name="SettingsAutoSaved" xml:space="preserve">
+    <value>Changes on this page are saved as you make them.</value>
+  </data>
+  <data name="SettingsRestartNote" xml:space="preserve">
+    <value>Settings are saved on this PC only.</value>
+  </data>
+  <data name="AboutTagline" xml:space="preserve">
+    <value>Download manager and accelerator</value>
+  </data>
+  <data name="AboutOwner" xml:space="preserve">
+    <value>MartSoft Solutions</value>
+  </data>
+  <data name="AboutNotices" xml:space="preserve">
+    <value>Third-party software</value>
+  </data>
+  <data name="SettingsPageNameLabel" xml:space="preserve">
+    <value>Page</value>
+  </data>
   <data name="DetailsPeak" xml:space="preserve">
     <value>Peak</value>
   </data>
@@ -1017,5 +1104,176 @@
   </data>
   <data name="DetailsSpeedLimit" xml:space="preserve">
     <value>Speed limit</value>
+  </data>
+  <data name="TrayFlyoutName" xml:space="preserve">
+    <value>Kasi tray panel</value>
+  </data>
+  <data name="TrayFlyoutSpeed" xml:space="preserve">
+    <value>Total speed</value>
+  </data>
+  <data name="TrayFlyoutLimit" xml:space="preserve">
+    <value>Speed limit</value>
+  </data>
+  <data name="ToastDetailsFormat" xml:space="preserve">
+    <value>{0} in {1}</value>
+  </data>
+  <data name="SchedulerTitle" xml:space="preserve">
+    <value>Scheduler</value>
+  </data>
+  <data name="SchedulerQueueLabel" xml:space="preserve">
+    <value>Queue:</value>
+  </data>
+  <data name="SchedulerSelectQueue" xml:space="preserve">
+    <value>Select Queue</value>
+  </data>
+  <data name="SchedulerTabQueue" xml:space="preserve">
+    <value>Queue settings</value>
+  </data>
+  <data name="SchedulerTabSchedule" xml:space="preserve">
+    <value>Schedule</value>
+  </data>
+  <data name="SchedulerTabPost" xml:space="preserve">
+    <value>Post-completion</value>
+  </data>
+  <data name="SchedulerMaxParallel" xml:space="preserve">
+    <value>Maximum parallel downloads (1–20):</value>
+  </data>
+  <data name="SchedulerMaxParallelName" xml:space="preserve">
+    <value>Maximum parallel downloads</value>
+  </data>
+  <data name="SchedulerEnable" xml:space="preserve">
+    <value>Enable schedule</value>
+  </data>
+  <data name="SchedulerStartLabel" xml:space="preserve">
+    <value>Start time (HH:mm):</value>
+  </data>
+  <data name="SchedulerStartName" xml:space="preserve">
+    <value>Start time</value>
+  </data>
+  <data name="SchedulerStopLabel" xml:space="preserve">
+    <value>Stop time (HH:mm):</value>
+  </data>
+  <data name="SchedulerStopName" xml:space="preserve">
+    <value>Stop time</value>
+  </data>
+  <data name="SchedulerUntilEmpty" xml:space="preserve">
+    <value>Run until queue is empty (no stop time)</value>
+  </data>
+  <data name="SchedulerUntilEmptyName" xml:space="preserve">
+    <value>Run until queue is empty</value>
+  </data>
+  <data name="SchedulerActiveDays" xml:space="preserve">
+    <value>Active days:</value>
+  </data>
+  <data name="SchedulerDaySun" xml:space="preserve">
+    <value>Sun</value>
+  </data>
+  <data name="SchedulerDayMon" xml:space="preserve">
+    <value>Mon</value>
+  </data>
+  <data name="SchedulerDayTue" xml:space="preserve">
+    <value>Tue</value>
+  </data>
+  <data name="SchedulerDayWed" xml:space="preserve">
+    <value>Wed</value>
+  </data>
+  <data name="SchedulerDayThu" xml:space="preserve">
+    <value>Thu</value>
+  </data>
+  <data name="SchedulerDayFri" xml:space="preserve">
+    <value>Fri</value>
+  </data>
+  <data name="SchedulerDaySat" xml:space="preserve">
+    <value>Sat</value>
+  </data>
+  <data name="SchedulerDaySunday" xml:space="preserve">
+    <value>Sunday</value>
+  </data>
+  <data name="SchedulerDayMonday" xml:space="preserve">
+    <value>Monday</value>
+  </data>
+  <data name="SchedulerDayTuesday" xml:space="preserve">
+    <value>Tuesday</value>
+  </data>
+  <data name="SchedulerDayWednesday" xml:space="preserve">
+    <value>Wednesday</value>
+  </data>
+  <data name="SchedulerDayThursday" xml:space="preserve">
+    <value>Thursday</value>
+  </data>
+  <data name="SchedulerDayFriday" xml:space="preserve">
+    <value>Friday</value>
+  </data>
+  <data name="SchedulerDaySaturday" xml:space="preserve">
+    <value>Saturday</value>
+  </data>
+  <data name="SchedulerWhenDone" xml:space="preserve">
+    <value>When all downloads in this queue finish:</value>
+  </data>
+  <data name="SchedulerPostActionName" xml:space="preserve">
+    <value>Post action</value>
+  </data>
+  <data name="SchedulerForce" xml:space="preserve">
+    <value>Execute even if other queues are downloading</value>
+  </data>
+  <data name="SchedulerForceName" xml:space="preserve">
+    <value>Force even if other queues downloading</value>
+  </data>
+  <data name="SchedulerProgramPath" xml:space="preserve">
+    <value>Program executable path:</value>
+  </data>
+  <data name="SchedulerProgramPathName" xml:space="preserve">
+    <value>Program executable path</value>
+  </data>
+  <data name="SchedulerProgramArgs" xml:space="preserve">
+    <value>Program arguments (use %1 for completed file path):</value>
+  </data>
+  <data name="SchedulerProgramArgsName" xml:space="preserve">
+    <value>Program arguments</value>
+  </data>
+  <data name="SchedulerSave" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SchedulerCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="SchedulerErrParallel" xml:space="preserve">
+    <value>Max parallel must be between 1 and 20.</value>
+  </data>
+  <data name="SchedulerErrStart" xml:space="preserve">
+    <value>Invalid start time format (use HH:mm).</value>
+  </data>
+  <data name="SchedulerErrStop" xml:space="preserve">
+    <value>Invalid stop time format (use HH:mm).</value>
+  </data>
+  <data name="PostActionNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="PostActionSleep" xml:space="preserve">
+    <value>Sleep</value>
+  </data>
+  <data name="PostActionHibernate" xml:space="preserve">
+    <value>Hibernate</value>
+  </data>
+  <data name="PostActionShutdown" xml:space="preserve">
+    <value>Shut down</value>
+  </data>
+  <data name="PostActionExit" xml:space="preserve">
+    <value>Exit Kasi</value>
+  </data>
+  <data name="PostActionRunProgram" xml:space="preserve">
+    <value>Run program</value>
+  </data>
+  <data name="DetailsWhenCompleted" xml:space="preserve">
+    <value>When completed:</value>
+  </data>
+  <data name="DetailsChangeQueueAction" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="SettingsScanDownloads" xml:space="preserve">
+    <value>Scan finished downloads with my antivirus</value>
+  </data>
+  <data name="SettingsScanDownloadsDescription" xml:space="preserve">
+    <value>Each file is checked through Windows antimalware (AMSI) before it gets its final name. A flagged file fails the download and Kasi leaves it where the antivirus put it. Files over 512 MB are left to Windows.</value>
   </data>
 </root>

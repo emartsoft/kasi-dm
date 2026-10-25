@@ -1,4 +1,4 @@
-# 0026. Neutral media stream model and manifest parsers
+# 0033. Neutral media stream model and manifest parsers
 
 - Status: Accepted (M3.1/3a)
 - Date: 2026-10-24
