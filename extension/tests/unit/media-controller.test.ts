@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createMediaDetectedMessage,
   createMediaDetector,
   parseMediaRuntimeMessage,
   type MediaDetectorDeps,
@@ -82,7 +83,16 @@ function rig() {
     newId: () => `id-${String(++id)}`,
     logger: { info: () => undefined, error: () => undefined },
   };
-  return { detector: createMediaDetector(deps), badges, cleared, sent, requested, detected, store };
+  return {
+    detector: createMediaDetector(deps),
+    badges,
+    cleared,
+    sent,
+    requested,
+    detected,
+    store,
+    deps,
+  };
 }
 
 describe('media detector', () => {
@@ -128,6 +138,67 @@ describe('media detector', () => {
     expect(await store.list(3)).toEqual([]);
     expect(cleared).toContain(3);
     expect(badges.at(-1)).toEqual({ tabId: 3, count: 1 });
+  });
+
+  it('uses the tab URL when Chromium supplies only the initiator origin', async () => {
+    const { detector, deps } = rig();
+    deps.pageUrlForTab = () => Promise.resolve('https://page.example/watch/clip');
+    const found = await detector.onResponse({
+      tabId: 3,
+      url: 'https://cdn.example/master.m3u8',
+      statusCode: 200,
+      initiator: 'https://page.example',
+    });
+    expect(found?.pageUrl).toBe('https://page.example/watch/clip');
+  });
+
+  it('uses the tab URL when the response has no document or initiator', async () => {
+    const { detector, deps } = rig();
+    deps.pageUrlForTab = () => Promise.resolve('https://page.example/watch/clip');
+    const found = await detector.onResponse({
+      tabId: 3,
+      url: 'https://cdn.example/master.m3u8',
+      statusCode: 200,
+    });
+    expect(found?.pageUrl).toBe('https://page.example/watch/clip');
+  });
+
+  it('clears media when a tab starts a new page', async () => {
+    const { detector, store, cleared } = rig();
+    await detector.onResponse(details('https://cdn.example/master.m3u8'));
+    await detector.onPageNavigation(3);
+    expect(await store.list(3)).toEqual([]);
+    expect(cleared).toContain(3);
+  });
+});
+
+describe('mediaDetected protocol message', () => {
+  it('uses the generated shape and resolves a relative poster URL', () => {
+    const message = createMediaDetectedMessage(
+      {
+        tabId: 3,
+        url: 'https://cdn.example/master.m3u8',
+        pageUrl: 'https://page.example/watch/clip',
+        kind: 'hls',
+        title: 'Clip',
+        thumbnailUrl: '/poster.jpg',
+        contentType: 'application/vnd.apple.mpegurl',
+        detectedAt: 10,
+      },
+      'message-1',
+    );
+    expect(message).toEqual({
+      v: 1,
+      id: 'message-1',
+      type: 'mediaDetected',
+      tabId: 3,
+      pageUrl: 'https://page.example/watch/clip',
+      kind: 'hls',
+      url: 'https://cdn.example/master.m3u8',
+      title: 'Clip',
+      thumbnailUrl: 'https://page.example/poster.jpg',
+      contentType: 'application/vnd.apple.mpegurl',
+    });
   });
 });
 

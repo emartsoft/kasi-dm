@@ -7,6 +7,7 @@ import { collectCookies, storeFor } from '../shared/cookies';
 import { createInterception, type DownloadItemLike } from '../shared/interception';
 import { collectPageLinks, parseRawAnchors, type LinkScope } from '../shared/link-collector';
 import {
+  createMediaDetectedMessage,
   createMediaDetector,
   parseMediaRuntimeMessage,
   type MediaRuntimeMessage,
@@ -118,6 +119,15 @@ const mediaDetector = createMediaDetector({
     return collectCookies(browser.cookies, [url], await storeFor(browser.cookies, tab.incognito));
   },
   userAgent: navigator.userAgent,
+  pageUrlForTab: async (tabId) => (await browser.tabs.get(tabId)).url,
+  onDetected: async (detection) => {
+    const message = createMediaDetectedMessage(detection, crypto.randomUUID());
+    if (!message) {
+      logger.error('Media detection has invalid protocol fields', { tabId: detection.tabId });
+      return;
+    }
+    if (await nativePort.whenConnected(5000)) await nativePort.request(message);
+  },
   now: () => Date.now(),
   newId: () => crypto.randomUUID(),
   logger,
@@ -267,6 +277,9 @@ const webRequestFilter = { urls: ['<all_urls>'], types: ['main_frame', 'sub_fram
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {
     void tracker.onRequest(details.url, details.method);
+    if (details.type === 'main_frame' && details.tabId >= 0) {
+      void mediaDetector.onPageNavigation(details.tabId);
+    }
   },
   { urls: [...webRequestFilter.urls], types: [...webRequestFilter.types] },
 );

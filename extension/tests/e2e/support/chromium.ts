@@ -156,6 +156,7 @@ export async function launchChromium(
       const popup = await context.newPage();
       try {
         await popup.goto(`chrome-extension://${extension.id}/src/popup/index.html`);
+        await page.bringToFront();
         await popup.waitForFunction(
           () => !document.querySelector('#media-section')?.hasAttribute('hidden'),
         );
@@ -168,19 +169,25 @@ export async function launchChromium(
       const popup = await context.newPage();
       try {
         await popup.goto(`chrome-extension://${extension.id}/src/popup/index.html`);
+        await page.bringToFront();
         await popup.locator('#media-list li button').first().click();
       } finally {
         await popup.close();
       }
     },
     badge: () =>
-      worker.evaluate(() =>
-        (
+      worker.evaluate(async (pageUrl) => {
+        const api = (
           globalThis as unknown as {
-            chrome: { action: { getBadgeText(d: object): Promise<string> } };
+            chrome: {
+              tabs: { query(d: object): Promise<{ id?: number; url?: string }[]> };
+              action: { getBadgeText(d: object): Promise<string> };
+            };
           }
-        ).chrome.action.getBadgeText({}),
-      ),
+        ).chrome;
+        const tab = (await api.tabs.query({})).find((candidate) => candidate.url === pageUrl);
+        return tab?.id === undefined ? undefined : api.action.getBadgeText({ tabId: tab.id });
+      }, page.url()),
     close: async () => {
       await context.close();
       if (!profile) await rm(userData, { recursive: true, force: true });

@@ -84,6 +84,12 @@ export function classifyResponse(details: ResponseDetailsLike): MediaCandidate |
 
   const contentType = mediaType(header(details, 'content-type'));
   const contentLength = Number(header(details, 'content-length'));
+  const rangeTotal =
+    details.statusCode === 206
+      ? Number(/^bytes\s+\d+-\d+\/(\d+)$/i.exec(header(details, 'content-range') ?? '')?.[1])
+      : NaN;
+  const declaredSize =
+    Number.isSafeInteger(rangeTotal) && rangeTotal > 0 ? rangeTotal : contentLength;
   const pageUrl =
     [details.documentUrl, details.initiator].find(
       (value) => value !== undefined && isHttp(value),
@@ -110,15 +116,15 @@ export function classifyResponse(details: ResponseDetailsLike): MediaCandidate |
   if (
     contentType !== undefined &&
     isDirectType(contentType) &&
-    Number.isFinite(contentLength) &&
-    contentLength > DIRECT_MEDIA_MIN_BYTES
+    Number.isSafeInteger(declaredSize) &&
+    declaredSize > DIRECT_MEDIA_MIN_BYTES
   ) {
     return {
       kind: 'direct',
       url: details.url,
       pageUrl,
       contentType,
-      contentLength,
+      contentLength: declaredSize,
     };
   }
 

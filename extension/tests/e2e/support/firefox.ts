@@ -58,6 +58,19 @@ export async function launchFirefox(
   });
   await session.installAddon(addon.dir);
 
+  async function activatePageTab(pageUrl: string): Promise<void> {
+    const error = await session.executeAsync<string | null>(
+      `const [pageUrl, done] = arguments;
+       browser.tabs.query({}).then((tabs) => {
+         const tab = tabs.find((item) => item.url === pageUrl);
+         if (!tab || tab.id === undefined) throw new Error('the media page tab was not found');
+         return browser.tabs.update(tab.id, { active: true });
+       }).then(() => done(null), (error) => done(String(error)));`,
+      [pageUrl],
+    );
+    if (error) throw new Error(error);
+  }
+
   return {
     family: 'firefox',
     open: (url) => session.navigate(url),
@@ -109,19 +122,29 @@ export async function launchFirefox(
         }
         return '';
       }),
-    mediaText: () =>
-      session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, async () => {
+    mediaText: async () => {
+      const pageUrl = await session.execute<string>('return document.URL;');
+      return session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, async () => {
+        await activatePageTab(pageUrl);
         for (let attempt = 0; attempt < 50; attempt++) {
           const text = await session.text('#media-list');
           if (text !== '') return text;
           await new Promise((done) => setTimeout(done, 100));
         }
         return '';
-      }),
-    captureFirstMedia: () =>
-      session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, () =>
-        session.click('#media-list li button'),
-      ),
+      });
+    },
+    captureFirstMedia: async () => {
+      const pageUrl = await session.execute<string>('return document.URL;');
+      return session.inExtensionTab(`moz-extension://${uuid}/src/popup/index.html`, async () => {
+        await activatePageTab(pageUrl);
+        for (let attempt = 0; attempt < 50; attempt++) {
+          if (await session.text('#media-list')) break;
+          await new Promise((done) => setTimeout(done, 100));
+        }
+        await session.click('#media-list li button');
+      });
+    },
     badge: () => Promise.resolve(undefined),
     close: async () => {
       await session.quit();

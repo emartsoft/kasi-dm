@@ -146,7 +146,12 @@ export function createMediaSession(area: SessionArea): MediaSessionStore {
     setContext: (tabId, context) =>
       serialized(async () => {
         const media = await read();
-        media.contexts[String(tabId)] = context;
+        const key = String(tabId);
+        const previous = media.contexts[key];
+        if (previous && previous.pageUrl !== context.pageUrl) {
+          Reflect.deleteProperty(media.tabs, key);
+        }
+        media.contexts[key] = context;
         await write(media);
       }),
 

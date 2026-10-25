@@ -56,6 +56,22 @@ describe('classifyResponse', () => {
     expect(classifyResponse(details('unknown'))).toBeUndefined();
   });
 
+  it('uses the total size of a range response for direct media', () => {
+    expect(
+      classifyResponse(
+        response({
+          url: 'https://cdn.example/movie.mp4',
+          statusCode: 206,
+          responseHeaders: [
+            { name: 'Content-Type', value: 'video/mp4' },
+            { name: 'Content-Length', value: '262144' },
+            { name: 'Content-Range', value: 'bytes 0-262143/2000000' },
+          ],
+        }),
+      )?.kind,
+    ).toBe('direct');
+  });
+
   it.each(['.ts', '.m4s', '.cmfv', '.cmfa'])(
     'suppresses segment %s even with a video type',
     (suffix) => {

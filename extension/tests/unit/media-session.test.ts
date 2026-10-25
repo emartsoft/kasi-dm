@@ -70,4 +70,12 @@ describe('media session store', () => {
     await store.clear();
     expect(await store.all()).toEqual([]);
   });
+
+  it('drops stale detections when the same tab changes pages', async () => {
+    const store = createMediaSession(new FakeArea());
+    await store.setContext(7, { pageUrl: 'https://page.example/one' });
+    await store.add(detection(7, 'https://cdn.example/old.m3u8'));
+    await store.setContext(7, { pageUrl: 'https://page.example/two' });
+    expect(await store.list(7)).toEqual([]);
+  });
 });
