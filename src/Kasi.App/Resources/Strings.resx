@@ -1276,4 +1276,39 @@
   <data name="SettingsScanDownloadsDescription" xml:space="preserve">
     <value>Each file is checked through Windows antimalware (AMSI) before it gets its final name. A flagged file fails the download and Kasi leaves it where the antivirus put it. Files over 512 MB are left to Windows.</value>
   </data>
-</root>
+  <data name="SchedulerQuota" xml:space="preserve">
+    <value>Data quota</value>
+  </data>
+  <data name="SchedulerQuotaEnable" xml:space="preserve">
+    <value>Limit this queue's data use</value>
+  </data>
+  <data name="SchedulerQuotaEnableName" xml:space="preserve">
+    <value>Limit this queue's data use</value>
+  </data>
+  <data name="SchedulerQuotaSizeName" xml:space="preserve">
+    <value>Data quota in gigabytes</value>
+  </data>
+  <data name="SchedulerQuotaUnit" xml:space="preserve">
+    <value>GB</value>
+  </data>
+  <data name="SchedulerQuotaResetName" xml:space="preserve">
+    <value>Quota reset period</value>
+  </data>
+  <data name="SchedulerQuotaDaily" xml:space="preserve">
+    <value>Every day</value>
+  </data>
+  <data name="SchedulerQuotaWeekly" xml:space="preserve">
+    <value>Every week</value>
+  </data>
+  <data name="SchedulerQuotaNever" xml:space="preserve">
+    <value>Never</value>
+  </data>
+  <data name="SchedulerQuotaSoft" xml:space="preserve">
+    <value>Kasi stops starting jobs at the cap; a transfer of unknown length may exceed it by a few MB.</value>
+  </data>
+  <data name="SchedulerErrQuota" xml:space="preserve">
+    <value>Enter a quota between 0.1 and 1,000,000 GB.</value>
+  </data>
+  <data name="SchedulerWakeWarning" xml:space="preserve">
+    <value>Windows wake timers are off for the active power plan, so Kasi cannot wake the PC for a scheduled start. Turn on "Allow wake timers" in Power Options.</value>
+  </data></root>

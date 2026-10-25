@@ -21,10 +21,10 @@ public sealed class MigrationRunnerTests : IDisposable
     {
         var runner = new MigrationRunner(_db.Factory);
 
-        (await runner.MigrateAsync(TempDatabase.Ct)).Should().Be(9);
+        (await runner.MigrateAsync(TempDatabase.Ct)).Should().Be(10);
         (await runner.MigrateAsync(TempDatabase.Ct)).Should().Be(0);
 
-        (await _db.ScalarAsync("SELECT MAX(version) FROM schema_version;")).Should().Be(9L);
+        (await _db.ScalarAsync("SELECT MAX(version) FROM schema_version;")).Should().Be(10L);
         File.Exists(runner.BackupPath).Should().BeFalse("a fresh database has nothing worth backing up");
     }
 

@@ -15,6 +15,9 @@ public interface IQueueRunner : IDisposable
     /// <summary>Checks whether the specified queue is currently active/running.</summary>
     bool IsQueueRunning(int queueId);
 
+    /// <summary>Restarts a queue paused by quota enforcement once its period has capacity. A runner without quota accounting returns false.</summary>
+    Task<bool> TryResumeAfterQuotaAsync(int queueId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
     /// <summary>Pumps open concurrency slots in the specified queue, starting waiting queued jobs up to <see cref="Queue.MaxParallel"/>.</summary>
     Task PumpQueueAsync(int queueId, CancellationToken cancellationToken = default);
 
