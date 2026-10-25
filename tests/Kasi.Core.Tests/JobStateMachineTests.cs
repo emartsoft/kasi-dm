@@ -23,6 +23,7 @@ public class JobStateMachineTests
         (JobState.Verifying, JobState.Completed),
         (JobState.Verifying, JobState.Failed),
         (JobState.Failed, JobState.Queued),
+        (JobState.Completed, JobState.Queued),
     ];
 
     private static readonly (JobState From, JobState To)[] _directEdges = [(JobState.Downloading, JobState.Verifying)];
@@ -69,9 +70,9 @@ public class JobStateMachineTests
 
     [Theory]
     [MemberData(nameof(AllKinds))]
-    public void Completed_is_terminal_and_Failed_can_only_be_retried(JobKind kind)
+    public void Completed_and_Failed_can_be_requeued(JobKind kind)
     {
-        JobStateMachine.NextStates(kind, JobState.Completed).Should().BeEmpty();
+        JobStateMachine.NextStates(kind, JobState.Completed).Should().Equal(JobState.Queued);
         JobStateMachine.NextStates(kind, JobState.Failed).Should().Equal(JobState.Queued);
     }
 

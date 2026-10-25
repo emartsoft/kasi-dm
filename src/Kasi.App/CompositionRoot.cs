@@ -125,6 +125,14 @@ internal static class CompositionRoot
             sp.GetRequiredService<IQueueQuota>(),
             sp.GetRequiredService<IWakeTimer>(),
             sp.GetRequiredService<IWakeTimerPolicy>()));
+        services.AddSingleton<IRemoteFileChecker>(sp => sp.GetRequiredService<DownloadEngine>());
+        services.AddSingleton(sp => new PeriodicSyncCoordinator(
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IJobControl>(),
+            sp.GetRequiredService<IRemoteFileChecker>(),
+            sp.GetRequiredService<ISegmentRepository>(),
+            sp.GetRequiredService<IQueueRunner>(),
+            TimeProvider.System));
         services.AddSingleton<IJobService>(sp => new JobService(
             sp.GetRequiredService<DownloadEngine>(),
             sp.GetRequiredService<IJobRepository>(),
@@ -156,6 +164,7 @@ internal static class CompositionRoot
             sp.GetRequiredService<CheckpointWriter>(),
             sp.GetRequiredService<DownloadEngine>(),
             sp.GetRequiredService<QueueScheduler>(),
+
             sp.GetRequiredService<MediaJobExecutor>()));
     }
 }

@@ -37,7 +37,7 @@ public static class JobStateMachine
         JobState.Muxing => kind == JobKind.Media ? [JobState.Verifying, JobState.Failed] : [], // only media jobs ever occupy Muxing
         JobState.Verifying => [JobState.Completed, JobState.Failed],
         JobState.Failed => [JobState.Queued],
-        JobState.Completed => [],
+        JobState.Completed => [JobState.Queued],
         _ => throw new ArgumentOutOfRangeException(nameof(from), from, "Not a defined job state."),
     };
 }

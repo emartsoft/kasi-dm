@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Threading.Channels;
 using Kasi.Core;
 
@@ -9,7 +10,7 @@ namespace Kasi.Engine;
 /// recovers interrupted jobs at start-up and runs one HTTP or FTP transfer at a time per job. Queues, UI and media are
 /// outside this type.
 /// </summary>
-public sealed class DownloadEngine : IAsyncDisposable, IJobControl
+public sealed class DownloadEngine : IAsyncDisposable, IJobControl, IRemoteFileChecker
 {
     private readonly IJobRepository _jobs;
     private readonly ISegmentRepository _segments;
@@ -433,6 +434,91 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         finally
         {
             gate.Release();
+        }
+    }
+
+    /// <inheritdoc/>
+    public void PrepareForRedownload(JobId jobId) => _overwrite[jobId] = 0;
+
+    /// <inheritdoc/>
+    public async Task<bool> HasRemoteChangedAsync(Job job, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        EnsureStarted();
+
+        if (!Uri.TryCreate(job.FinalUrl ?? job.Url, UriKind.Absolute, out var url)
+            || url.Scheme is not ("http" or "https"))
+        {
+            return false;
+        }
+
+        var secret = _secrets is not null
+            ? await _secrets.GetAsync(job.Id, cancellationToken).ConfigureAwait(false)
+            : null;
+        var settings = BuildOptions(job, url) with { Secret = secret };
+        var scope = new RequestScope(url, settings.RequestHeaders, secret);
+
+        var credentialOrigin = secret?.SensitiveOrigin ?? url;
+        (Uri Origin, NetworkCredential Credentials)? credentials = credentialOrigin is not null && RequestScope.IsSameOrigin(credentialOrigin, url) && secret?.Credentials is { } creds
+            ? (credentialOrigin, new NetworkCredential(creds.UserName, creds.Password))
+            : null;
+
+        var proxyCredentials = secret?.ProxyCredentials is { } proxySecret
+            ? new NetworkCredential(proxySecret.UserName, proxySecret.Password)
+            : null;
+
+        using var pool = new HttpHostPool(proxy: settings.Proxy, proxyCredentials: proxyCredentials, credentials: credentials);
+        var prober = new HttpProber(hop => pool.GetInvoker(hop, 0), scope, _time);
+
+        try
+        {
+            var outcome = await prober.ProbeAsync(url, firstRangeLength: 1, cancellationToken).ConfigureAwait(false);
+            if (outcome is not ProbeResponse probe)
+            {
+                return false;
+            }
+
+            await using (probe.ConfigureAwait(false))
+            {
+                if (job.TotalBytes is { } total && probe.TotalBytes is { } newTotal && total != newTotal)
+                {
+                    return true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(job.ETag) && !string.IsNullOrWhiteSpace(probe.ETag))
+                {
+                    if (!string.Equals(job.ETag, probe.ETag, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(job.ETag) != !string.IsNullOrWhiteSpace(probe.ETag))
+                {
+                    return true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(job.LastModified) && !string.IsNullOrWhiteSpace(probe.LastModified))
+                {
+                    if (!string.Equals(job.LastModified, probe.LastModified, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(job.LastModified) != !string.IsNullOrWhiteSpace(probe.LastModified))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
         }
     }
 
