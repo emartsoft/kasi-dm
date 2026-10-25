@@ -14,7 +14,8 @@ internal sealed class EngineLifetime(
     CheckpointWriter checkpoints,
     DownloadEngine engine,
     QueueScheduler? scheduler = null,
-    MediaJobExecutor? media = null) : IHostedService
+    MediaJobExecutor? media = null,
+    PeriodicSyncCoordinator? syncCoordinator = null) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -30,10 +31,13 @@ internal sealed class EngineLifetime(
         {
             await scheduler.StartAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        syncCoordinator?.Start(TimeSpan.FromMinutes(5));
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        syncCoordinator?.Dispose();
         scheduler?.Dispose();
         await engine.StopAsync(cancellationToken).ConfigureAwait(false);
         await checkpoints.FlushAsync(cancellationToken).ConfigureAwait(false);
