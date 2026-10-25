@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M2 — Browser integration, queues, categories, main UI (TRD section 16; plan.md section 5).** M2.1 to M2.8 are implemented and merged (protocol and pipe, native host, extension with interception, menus, link batch and link refresh, store IDs, the store packages, and the desktop app core: engine hosting, Add dialog, link picker, refresh dialog, tray, toasts, clipboard capture); M2.13 (the FlaUI suite and the real-Kasi browser tests) is implemented; open are the owner's store submissions. M2.9a to 9c (the main window, its saved layout and theme, and the details window) are implemented; M2.9d and M2.10 to M2.13 are implemented; M2.11 (categories and file safety) and the owner's store steps are what is left of M2. The M1 engine gate still awaits owner benchmark and fault-injection evidence. M0 is closed except the owner items in plan.md section 3.2. Update this line when the phase changes.
+**M3 — media capture, scheduler wake and quotas (TRD section 16; plan.md section 5).** M3.1 to M3.9 are implemented and merged: extension media detection (#134), data quota/wake timers (#135), WebVTT/live capture (#137), periodic sync (#138) and plan v0.4 (#139). The M1 engine gate still awaits owner benchmark and fault-injection evidence; the M2 store submissions remain owner steps. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 
