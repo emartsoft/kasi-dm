@@ -131,6 +131,8 @@ export interface RigOptions {
   cookies?: Record<string, Cookie[]>;
   cachedRules?: Rules;
   realGrace?: boolean;
+  /** What the interception does while it gives a late webRequest event the time to arrive. */
+  wait?: (ms: number) => Promise<void>;
   claims?: ((item: DownloadItemLike) => boolean | Promise<boolean>)[];
 }
 
@@ -206,6 +208,7 @@ export function rig(options: RigOptions = {}) {
     isIncognitoAllowed: () => Promise.resolve(options.incognitoAllowed ?? false),
     hasHostPermission: () => Promise.resolve(options.hostPermission ?? true),
     isPost: tracker.isPost,
+    wait: options.wait ?? (() => Promise.resolve()),
     hops: tracker.hops,
     bypassHeld: bypass.check,
     cookiesFor: async (item) =>

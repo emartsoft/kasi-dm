@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST_GRACE_MS } from '../../src/shared/interception';
 import { MARK_TTL_MS, createRequestTracker } from '../../src/shared/request-tracker';
 import { ack, memoryArea, rig, rules, settle } from './rig';
 
@@ -75,6 +76,21 @@ describe('[TC-BRW-004] downloads the extension never takes', () => {
     r.online();
     await r.tracker.onRequest('https://files.example.org/pack.zip', 'POST');
     await untouched(r, {});
+  });
+
+  it('leaves a POST-form download to the browser when the browser reports the request after the download (Firefox)', async () => {
+    let waited = 0;
+    const late: { arrive?: () => Promise<void> } = {};
+    const r = rig({
+      wait: async (ms) => {
+        waited = ms;
+        await late.arrive?.();
+      },
+    });
+    late.arrive = () => r.tracker.onRequest('https://files.example.org/pack.zip', 'POST');
+    r.online();
+    await untouched(r, {});
+    expect(waited).toBe(POST_GRACE_MS);
   });
 
   it('keeps the mark through POST -> 302 -> GET, matching the final URL', async () => {
