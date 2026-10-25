@@ -105,8 +105,9 @@ export function createInterception(deps: InterceptionDeps) {
   const ready = (): Promise<boolean> => waitForKasi(deps.port);
 
   // DownloadItem has no HTTP method; the request tracker learns it from webRequest. Firefox can report the download before it reports the
-  // request that started it, so a POST may not be marked yet when the download shows up: look once more after a moment (a GET costs the
-  // moment). Intercepting a POST-form download would send the browser's own copy away with it.
+  // request that started it, so a POST may not be marked yet when the download shows up. Called with the download already paused (nothing
+  // is written meanwhile): look once more after a moment. A GET costs the moment; a POST is resumed and left to the browser, because
+  // intercepting it would send the browser's own copy away with it.
   async function startedByPost(item: DownloadItemLike): Promise<boolean> {
     const urls = [item.url, item.finalUrl ?? item.url];
     if (await deps.isPost(...urls)) return true;
@@ -120,7 +121,7 @@ export function createInterception(deps: InterceptionDeps) {
     const incognitoAllowed = item.incognito ? await deps.isIncognitoAllowed() : false;
     if (!isEligible(item, incognitoAllowed) || !matchesRules(rules, item)) return false;
     if (item.state !== undefined && item.state !== 'in_progress') return false;
-    if (await startedByPost(item)) return false;
+    if (await deps.isPost(item.url, item.finalUrl ?? item.url)) return false;
     return deps.hasHostPermission();
   }
 
@@ -176,6 +177,10 @@ export function createInterception(deps: InterceptionDeps) {
           ours.paused = true;
         } catch {
           return; // already finished, or gone
+        }
+        if (await startedByPost(item)) {
+          await resumeIfPaused(item.id);
+          return;
         }
         await handOff(item, rules);
       } catch (error) {

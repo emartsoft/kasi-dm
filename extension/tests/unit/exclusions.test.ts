@@ -89,8 +89,14 @@ describe('[TC-BRW-004] downloads the extension never takes', () => {
     });
     late.arrive = () => r.tracker.onRequest('https://files.example.org/pack.zip', 'POST');
     r.online();
-    await untouched(r, {});
+    await r.start(r.add({}));
     expect(waited).toBe(POST_GRACE_MS);
+    expect(r.cookieCalls).toEqual([]);
+    expect(r.port().requests()).toHaveLength(0);
+    // paused while it waited, then given back: never cancelled or erased
+    expect(r.downloads.calls.filter((call) => call.startsWith('pause'))).toHaveLength(1);
+    expect(r.downloads.calls.filter((call) => call.startsWith('resume'))).toHaveLength(1);
+    expect(r.downloads.calls.filter((call) => /^(cancel|erase)/.test(call))).toEqual([]);
   });
 
   it('keeps the mark through POST -> 302 -> GET, matching the final URL', async () => {
