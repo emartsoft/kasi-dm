@@ -36,6 +36,7 @@ internal sealed partial class MediaJobExecutor(
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
     private readonly ConcurrentDictionary<JobId, CancellationTokenSource> _running = new();
+    private readonly ConcurrentDictionary<JobId, CancellationTokenSource> _liveStops = new();
 
     public async Task StartJobAsync(JobId id, CancellationToken cancellationToken = default)
     {
@@ -74,6 +75,12 @@ internal sealed partial class MediaJobExecutor(
         if (job is null || job.State is JobState.Muxing or JobState.Verifying)
         {
             return;
+        }
+
+        if (_liveStops.TryGetValue(id, out var liveStop))
+        {
+            await liveStop.CancelAsync().ConfigureAwait(false);
+            return; // Stop finalizes the collected live segments; the run moves through muxing to Completed.
         }
 
         await run.CancelAsync().ConfigureAwait(false);
@@ -174,6 +181,7 @@ internal sealed partial class MediaJobExecutor(
     private async Task RunAsync(JobId id, CancellationToken cancellationToken)
     {
         Job? job = null;
+        CancellationTokenSource? liveStop = null;
         try
         {
             job = await jobs.GetAsync(id, cancellationToken).ConfigureAwait(false);
@@ -210,6 +218,12 @@ internal sealed partial class MediaJobExecutor(
                 return;
             }
 
+            if (playable.Presentation.IsLive)
+            {
+                liveStop = new CancellationTokenSource();
+                _liveStops.TryAdd(id, liveStop);
+            }
+
             var downloaded = await runner.RunAsync(playable, new MediaJobOptions
             {
                 JobId = id,
@@ -219,6 +233,8 @@ internal sealed partial class MediaJobExecutor(
                 BandwidthLimiter = bandwidth,
                 Events = publish,
                 SelectedVariant = selected,
+                LiveLoader = loader,
+                LiveStopToken = liveStop?.Token ?? CancellationToken.None,
             }, cancellationToken).ConfigureAwait(false);
 
             var format = secret?.Media?.Format;
@@ -272,6 +288,8 @@ internal sealed partial class MediaJobExecutor(
         }
         finally
         {
+            _liveStops.TryRemove(id, out _);
+            liveStop?.Dispose();
             if (_running.TryRemove(id, out var run))
             {
                 run.Dispose();
@@ -310,14 +328,33 @@ internal sealed partial class MediaJobExecutor(
 
         if (choice.Format == nameof(MediaPickerFormat.AudioOnly))
         {
-            return presentation.FindAudioOnly(choice.Language, choice.Bandwidth) is { } track
-                ? (new MediaVariant(track, track, null), null)
-                : (null, ChoiceGoneMessage);
+            if (presentation.FindAudioOnly(choice.Language, choice.Bandwidth) is not { } track)
+            {
+                return (null, ChoiceGoneMessage);
+            }
+
+            var selectedSubtitle = choice.IncludeSubtitle ? presentation.Subtitles.FirstOrDefault(subtitle =>
+                string.Equals(subtitle.Language, choice.SubtitleLanguage, StringComparison.OrdinalIgnoreCase)) : null;
+            return choice.IncludeSubtitle && selectedSubtitle is null
+                ? (null, ChoiceGoneMessage)
+                : (new MediaVariant(track, track, selectedSubtitle), null);
         }
 
-        return presentation.FindVariant(choice.Height, choice.Bandwidth) is { } variant
-            ? (variant, null)
-            : (null, ChoiceGoneMessage);
+        if (presentation.FindVariant(choice.Height, choice.Bandwidth) is not { } variant)
+        {
+            return (null, ChoiceGoneMessage);
+        }
+
+        if (!choice.IncludeSubtitle)
+        {
+            return (variant with { Subtitle = null }, null);
+        }
+
+        var subtitle = presentation.Subtitles.FirstOrDefault(track =>
+            string.Equals(track.Language, choice.SubtitleLanguage, StringComparison.OrdinalIgnoreCase));
+        return subtitle is null
+            ? (null, ChoiceGoneMessage)
+            : (variant with { Subtitle = subtitle }, null);
     }
 
     private static string? Header(JobSecret? secret, string name) =>

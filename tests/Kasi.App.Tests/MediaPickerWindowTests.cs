@@ -33,7 +33,7 @@ public sealed class MediaPickerWindowTests
         buttons.Should().Contain([Strings.MediaPickerAdd, Strings.MediaPickerCancel]);
         window.GetVisualDescendants().OfType<ListBox>()
             .Single(list => AutomationProperties.GetName(list) == Strings.MediaPickerSubtitlesLabel)
-            .IsEnabled.Should().BeFalse();
+            .IsEnabled.Should().BeTrue();
         window.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text).Should().Contain("720p");
 
         window.Close();

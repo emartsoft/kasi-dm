@@ -17,6 +17,24 @@ public static class MuxableFixtures
     private static readonly Lazy<string> _media = new(() => File.ReadAllText(Path.Combine(_root.Value, "hls", "index.m3u8")));
     private static readonly Lazy<string> _dashManifest = new(() => File.ReadAllText(Path.Combine(_root.Value, "dash", "manifest.mpd")));
     private static readonly Lazy<byte[]> _key = new(() => SHA256.HashData("kasi-muxable-key"u8)[..16]);
+    private static readonly Lazy<byte[]> _liveSegments = new(() => File.ReadAllBytes(Path.Combine(_root.Value, "live", "segments.ts")));
+    private static readonly Lazy<int[]> _liveOffsets = new(() =>
+    {
+        var sizes = File.ReadAllLines(Path.Combine(_root.Value, "live", "sizes.txt"))
+            .Select(line => int.Parse(line, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        var offsets = new int[sizes.Length + 1];
+        for (var index = 0; index < sizes.Length; index++)
+        {
+            offsets[index + 1] = checked(offsets[index] + sizes[index]);
+        }
+
+        if (sizes.Length != 150 || offsets[^1] != _liveSegments.Value.Length)
+        {
+            throw new InvalidDataException("The live fixture must contain 150 complete segments.");
+        }
+
+        return offsets;
+    });
 
     public static string HlsMaster() => _master.Value;
 
@@ -39,6 +57,14 @@ public static class MuxableFixtures
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, SegmentCount);
         return File.ReadAllBytes(Path.Combine(_root.Value, "hls", $"segment-{index}.ts"));
+    }
+
+    public static byte[] LiveSegment(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, 150);
+        var offsets = _liveOffsets.Value;
+        return _liveSegments.Value[offsets[index]..offsets[index + 1]];
     }
 
     public static byte[] HlsEncryptedSegment(int index)

@@ -222,6 +222,8 @@ public sealed class MediaJobRunnerRobustnessTests : IAsyncLifetime, IDisposable
 
     private sealed class FailingCompletions(IMediaRepository inner) : IMediaRepository
     {
+        public Task AppendSegmentsAsync(JobId jobId, IReadOnlyList<MediaSegmentRecord> segments, CancellationToken cancellationToken = default) =>
+            inner.AppendSegmentsAsync(jobId, segments, cancellationToken);
         public Task ReplaceAsync(JobId jobId, IReadOnlyList<MediaStreamRecord> streams, IReadOnlyList<MediaSegmentRecord> segments, long? estimatedTotalBytes, CancellationToken cancellationToken = default) =>
             inner.ReplaceAsync(jobId, streams, segments, estimatedTotalBytes, cancellationToken);
 

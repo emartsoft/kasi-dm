@@ -198,5 +198,6 @@ public static class HlsPresentationBuilder
             media.IsLive,
             media.Initialization,
             media.Segments,
-            media.Key);
+            media.Key,
+            TargetDurationSeconds: media.TargetDurationSeconds);
 }

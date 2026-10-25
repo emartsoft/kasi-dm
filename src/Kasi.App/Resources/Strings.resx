@@ -937,9 +937,9 @@
     <value>Subtitles</value>
     <comment>Label above the subtitle track list.</comment>
   </data>
-  <data name="MediaPickerSubtitlesUnavailable" xml:space="preserve">
-    <value>Subtitle download arrives after M3.</value>
-    <comment>Explains why subtitle tracks are listed but disabled.</comment>
+  <data name="MediaPickerNoSubtitles" xml:space="preserve">
+    <value>None</value>
+    <comment>Option to save the video without a subtitle track.</comment>
   </data>
   <data name="MediaPickerAdd" xml:space="preserve">
     <value>Download</value>
