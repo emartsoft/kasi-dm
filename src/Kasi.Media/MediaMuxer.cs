@@ -76,6 +76,7 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
 
         var video = job.Streams.FirstOrDefault(stream => stream.Role == "video");
         var audio = job.Streams.FirstOrDefault(stream => stream.Role == "audio");
+        var subtitle = job.Streams.FirstOrDefault(stream => stream.Role == "subtitle");
         var variant = job.Variant
             ?? throw new MediaMuxException(MediaMuxErrorKind.NoStreams, "The capture has no selected variant.");
         if (audio is null && video is null)
@@ -92,6 +93,20 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
             _ => ".mp4",
         };
         var output = UniquePath(WithExtension(options.OutputPath, extension));
+        if (subtitle is not null)
+        {
+            var original = output;
+            for (var number = 1; File.Exists(SubtitlePathFor(output, subtitle.Language)); number++)
+            {
+                if (number >= 1000)
+                {
+                    throw new MediaMuxException(MediaMuxErrorKind.Io, "No free media and subtitle file names were found.");
+                }
+
+                output = UniquePath(Path.Combine(Path.GetDirectoryName(original)!,
+                    $"{Path.GetFileNameWithoutExtension(original)} ({number}){Path.GetExtension(original)}"));
+            }
+        }
         Directory.CreateDirectory(Path.GetDirectoryName(output)!);
         var temporary = output + ".part" + extension;
         File.Delete(temporary);
@@ -141,14 +156,62 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
             throw new MediaMuxException(MediaMuxErrorKind.FlaggedByAntivirus, FileSafety.FlaggedMessage);
         }
 
+        var subtitleOutput = subtitle is null ? null : SubtitlePathFor(output, subtitle.Language);
+        var subtitleTemporary = subtitleOutput is null ? null : subtitleOutput + ".part";
+        if (subtitle is not null && subtitleTemporary is not null)
+        {
+            try
+            {
+#pragma warning disable CA2007 // await using owns the streams; disposal has no ConfigureAwait
+                await using var source = new FileStream(subtitle.Path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                    16 * 1024, FileOptions.Asynchronous);
+                await using var destination = new FileStream(subtitleTemporary, FileMode.Create, FileAccess.Write,
+                    FileShare.None, 16 * 1024, FileOptions.Asynchronous);
+#pragma warning restore CA2007
+                await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+                await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+                RandomAccess.FlushToDisk(destination.SafeFileHandle);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                TryDelete(subtitleTemporary);
+                TryDelete(temporary);
+                throw new MediaMuxException(MediaMuxErrorKind.Io, "The subtitle file could not be staged.", null, exception);
+            }
+
+            if (await FileSafety.ApplyAsync(subtitleTemporary, null, options.Scanner, options.Log, cancellationToken).ConfigureAwait(false))
+            {
+                TryDelete(subtitleTemporary);
+                TryDelete(temporary);
+                throw new MediaMuxException(MediaMuxErrorKind.FlaggedByAntivirus, FileSafety.FlaggedMessage);
+            }
+        }
+
+        var movedSubtitle = false;
         try
         {
+            if (subtitleOutput is not null && subtitleTemporary is not null)
+            {
+                File.Move(subtitleTemporary, subtitleOutput, overwrite: false);
+                movedSubtitle = true;
+            }
+
             File.Move(temporary, output, overwrite: false);
         }
         catch (IOException exception)
         {
+            if (movedSubtitle && subtitleOutput is not null)
+            {
+                TryDelete(subtitleOutput);
+            }
+
+            if (subtitleTemporary is not null)
+            {
+                TryDelete(subtitleTemporary);
+            }
+
             TryDelete(temporary);
-            throw new MediaMuxException(MediaMuxErrorKind.Io, "The muxed file could not be moved into place.", null, exception);
+            throw new MediaMuxException(MediaMuxErrorKind.Io, "The media or subtitle file could not be moved into place.", null, exception);
         }
 
         var deleted = false;
@@ -160,6 +223,15 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
         }
 
         return new MediaMuxResult(output, container, actual, deleted);
+    }
+
+    internal static string SubtitlePathFor(string output, string? language)
+    {
+        var safeLanguage = !string.IsNullOrEmpty(language) && language.Length <= 16
+            && language.All(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+            ? language.ToLowerInvariant()
+            : "und";
+        return Path.Combine(Path.GetDirectoryName(output)!, $"{Path.GetFileNameWithoutExtension(output)}.{safeLanguage}.vtt");
     }
 
     /// <summary>Every input gets its own protocol whitelist and, when known, a forced demuxer (never content sniffing).</summary>

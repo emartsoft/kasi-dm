@@ -38,7 +38,24 @@ internal static class StreamingEndpoints
 
     public static void Map(IEndpointRouteBuilder app)
     {
+        var liveTime = app.ServiceProvider.GetRequiredService<TimeProvider>();
+        var liveStart = liveTime.GetUtcNow();
+        int LiveCount() => Math.Min(150, 1 + (int)Math.Max(0,
+            Math.Floor((liveTime.GetUtcNow() - liveStart).TotalSeconds / StreamFixtures.SegmentSeconds)));
+
+        app.MapGet("/hls/live/index.m3u8", () => Results.Text(LivePlaylist(LiveCount()), HlsContentType));
+        app.MapGet("/hls/live/seg{index:int}.ts", (int index) =>
+            index >= Math.Max(0, LiveCount() - 6) && index < LiveCount()
+                ? Results.Bytes(MuxableFixtures.LiveSegment(index), "video/mp2t")
+                : Results.NotFound());
+
         app.MapGet("/hls/muxable/master.m3u8", () => Results.Text(MuxableFixtures.HlsMaster(), HlsContentType));
+        app.MapGet("/hls/muxable-vtt/master.m3u8", () => Results.Text(SubtitledMaster(), HlsContentType));
+        app.MapGet("/hls/muxable-vtt/captions/index.m3u8", () => Results.Text(SubtitledPlaylist(), HlsContentType));
+        app.MapGet("/hls/muxable-vtt/captions/cue-{index:int}.vtt", (int index) =>
+            index is >= 0 and < MuxableFixtures.SegmentCount
+                ? Results.Text($"WEBVTT\n\n00:00:{index * 4:00}.000 --> 00:00:{(index + 1) * 4:00}.000\nCaption {index}\n", "text/vtt")
+                : Results.NotFound());
         app.MapGet("/hls/muxable/index.m3u8", () => Results.Text(MuxableFixtures.HlsMedia(encrypted: false), HlsContentType));
         app.MapGet("/hls/muxable/segment-{index:int}.ts", (int index) =>
             index is >= 0 and < MuxableFixtures.SegmentCount
@@ -109,6 +126,29 @@ internal static class StreamingEndpoints
         "#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720,CODECS=\"avc1.4d401f,mp4a.40.2\",AUDIO=\"aud\"",
         "720p/index.m3u8",
         string.Empty);
+
+    private static string SubtitledMaster() => string.Join('\n',
+        "#EXTM3U",
+        "#EXT-X-VERSION:3",
+        "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"English\",LANGUAGE=\"en\",DEFAULT=YES,AUTOSELECT=YES,URI=\"captions/index.m3u8\"",
+        "#EXT-X-STREAM-INF:BANDWIDTH=208000,RESOLUTION=160x90,CODECS=\"avc1.42c00c,mp4a.40.2\",SUBTITLES=\"subs\"",
+        "../muxable/index.m3u8",
+        string.Empty);
+
+    private static string SubtitledPlaylist() => string.Join('\n',
+        ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-TARGETDURATION:4", "#EXT-X-MEDIA-SEQUENCE:0",
+            .. Enumerable.Range(0, MuxableFixtures.SegmentCount).SelectMany(index => new[] { "#EXTINF:4.000,", $"cue-{index}.vtt" }),
+            "#EXT-X-ENDLIST", string.Empty]);
+
+    private static string LivePlaylist(int count)
+    {
+        var first = Math.Max(0, count - 6);
+        return string.Join('\n',
+            ["#EXTM3U", "#EXT-X-VERSION:3", $"#EXT-X-TARGETDURATION:{StreamFixtures.SegmentSeconds}",
+                $"#EXT-X-MEDIA-SEQUENCE:{first}",
+                .. Enumerable.Range(first, count - first).SelectMany(index => new[] { "#EXTINF:4.000,", $"seg{index}.ts" }),
+                .. (count == 150 ? new[] { "#EXT-X-ENDLIST" } : []), string.Empty]);
+    }
 
     private static string HlsMedia(string? keyLine)
     {

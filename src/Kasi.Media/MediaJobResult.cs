@@ -26,7 +26,8 @@ public sealed record MediaJobProgress(int CompletedSegments, int TotalSegments, 
 
 /// <summary>One stream joined in order (init first, then segments) and ready for the M3.4 mux step.</summary>
 /// <param name="InputFormat">The FFmpeg demuxer to force for this file (mpegts, mp4, aac, mp3), or null when unknown.</param>
-public sealed record MediaJoinedTrack(int Index, string Role, string Path, long Bytes, string? Container, string? InputFormat = null);
+public sealed record MediaJoinedTrack(int Index, string Role, string Path, long Bytes, string? Container, string? InputFormat = null,
+    string? Language = null);
 
 /// <summary>The result of a media download; the job is left in <see cref="Kasi.Core.JobState.Muxing"/> for M3.4.</summary>
 public sealed record MediaJobResult(
@@ -34,7 +35,8 @@ public sealed record MediaJobResult(
     IReadOnlyList<MediaJoinedTrack> Streams,
     long DoneBytes,
     MediaVariant? Variant = null,
-    string? WorkDirectory = null)
+    string? WorkDirectory = null,
+    double? DurationSecondsOverride = null)
 {
-    public double DurationSeconds => Variant?.Video.DurationSeconds ?? 0;
+    public double DurationSeconds => DurationSecondsOverride ?? Variant?.Video.DurationSeconds ?? 0;
 }

@@ -58,9 +58,25 @@ public sealed class MediaJobRunner(
             tracks.Add(audio); // an audio-only variant is one track in both slots: fetch it once
         }
 
-        if (tracks.Any(track => track.IsLive))
+        if (options.SelectedVariant?.Subtitle is { } subtitle)
         {
-            throw new MediaJobException(MediaJobErrorKind.InvalidJob, "Live media is not supported in M3.");
+            tracks.Add(subtitle);
+        }
+
+        var isLive = tracks.Any(track => track.IsLive);
+        if (isLive && options.LiveLoader is null)
+        {
+            throw new MediaJobException(MediaJobErrorKind.InvalidJob, "Live HLS needs a manifest loader.");
+        }
+
+        if (isLive && tracks.Any(track => track.IsLive && track.TargetDurationSeconds <= 0))
+        {
+            throw new MediaJobException(MediaJobErrorKind.InvalidJob, "Only live HLS playlists are supported.");
+        }
+
+        if (isLive)
+        {
+            tracks = NormalizeLiveTracks(tracks);
         }
 
         var root = options.MediaRoot ?? Path.Combine(
@@ -75,13 +91,29 @@ public sealed class MediaJobRunner(
             throw new MediaJobException(Classify(exception), "The media folder could not be created.", exception);
         }
 
-        var plan = BuildPlan(tracks, variant.EstimatedBytes);
+        var plan = BuildPlan(tracks, isLive ? 0 : variant.EstimatedBytes);
         var keys = tracks.SelectMany((track, streamIndex) => track.Segments.Select(segment => (Stream: streamIndex, segment.Index, segment.Key)))
             .Where(item => item.Key is not null)
             .ToDictionary(item => (item.Stream, item.Index), item => item.Key!);
         var existingStreams = await media.LoadStreamsAsync(options.JobId, cancellationToken).ConfigureAwait(false);
         var existingSegments = await media.LoadSegmentsAsync(options.JobId, cancellationToken).ConfigureAwait(false);
-        if (!Matches(existingStreams, existingSegments, plan.Streams, plan.Segments))
+        if (isLive && existingStreams.Count > 0)
+        {
+            if (existingStreams.Count != plan.Streams.Count || existingStreams.Where((stream, index) =>
+                stream.Index != plan.Streams[index].Index || stream.Role != plan.Streams[index].Role
+                || stream.VariantId != plan.Streams[index].VariantId).Any())
+            {
+                throw new MediaJobException(MediaJobErrorKind.SegmentMismatch, "The saved live tracks no longer match the selected stream.");
+            }
+
+            if (job.State == JobState.Downloading)
+            {
+                var appended = NewLiveSegments(existingSegments, plan.Segments);
+                await media.AppendSegmentsAsync(options.JobId, appended, cancellationToken).ConfigureAwait(false);
+                existingSegments = [.. existingSegments, .. appended];
+            }
+        }
+        else if (!Matches(existingStreams, existingSegments, plan.Streams, plan.Segments))
         {
             if (Directory.Exists(jobDirectory))
             {
@@ -89,7 +121,8 @@ public sealed class MediaJobRunner(
             }
 
             Directory.CreateDirectory(jobDirectory);
-            await media.ReplaceAsync(options.JobId, plan.Streams, plan.Segments, plan.EstimatedTotal, cancellationToken).ConfigureAwait(false);
+            await media.ReplaceAsync(options.JobId, plan.Streams, plan.Segments,
+                isLive ? null : plan.EstimatedTotal, cancellationToken).ConfigureAwait(false);
             existingStreams = plan.Streams;
             existingSegments = plan.Segments;
         }
@@ -105,7 +138,8 @@ public sealed class MediaJobRunner(
         using var pool = new HttpHostPool(options.PoolOptions, proxy: options.Proxy);
         var client = new SegmentClient(pool, options, _time);
         var progress = new ProgressTracker(options.Progress, existingSegments.Count, options.Events, options.JobId, plan.EstimatedTotal, _time);
-        var completionWriter = new CompletionWriter(media, options.JobId, plan.EstimatedTotal, options.CompletionInterval, _time, run);
+        var completionWriter = new CompletionWriter(media, options.JobId, isLive ? null : plan.EstimatedTotal,
+            options.CompletionInterval, _time, run);
         try
         {
             await DownloadInitsAsync(existingStreams, jobDirectory, client, run).ConfigureAwait(false);
@@ -123,6 +157,12 @@ public sealed class MediaJobRunner(
                 ExceptionDispatchInfo.Capture(failure).Throw();
             }
 
+            if (isLive && job.State == JobState.Downloading)
+            {
+                existingSegments = await PollLiveAsync(tracks, existingStreams, existingSegments, keys,
+                    options, jobDirectory, client, keyCache, completionWriter, progress, run).ConfigureAwait(false);
+            }
+
             await completionWriter.FlushAsync().ConfigureAwait(false);
             var joined = await JoinAsync(existingStreams, existingSegments, jobDirectory, cancellationToken).ConfigureAwait(false);
             if (job.State == JobState.Downloading)
@@ -133,7 +173,8 @@ public sealed class MediaJobRunner(
                 }
             }
 
-            return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes), variant, jobDirectory);
+            return new MediaJobResult(options.JobId, joined, joined.Sum(stream => stream.Bytes), variant, jobDirectory,
+                isLive ? 0 : null);
         }
         catch (OperationCanceledException)
         {
@@ -157,6 +198,134 @@ public sealed class MediaJobRunner(
         {
             await completionWriter.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    private static List<MediaTrack> NormalizeLiveTracks(IEnumerable<MediaTrack> tracks) =>
+        [.. tracks.Select(track => track with
+        {
+            Segments = [.. track.Segments.Select(segment => segment.Sequence is >= 0 and <= int.MaxValue
+                ? segment with { Index = (int)segment.Sequence.Value }
+                : throw new MediaJobException(MediaJobErrorKind.InvalidJob, "A live segment has no supported media sequence number."))],
+        })];
+
+    private static List<MediaSegmentRecord> NewLiveSegments(
+        IReadOnlyList<MediaSegmentRecord> existing,
+        IReadOnlyList<MediaSegmentRecord> observed)
+    {
+        var saved = existing.ToDictionary(segment => (segment.StreamIndex, segment.Index));
+        var last = existing.GroupBy(segment => segment.StreamIndex)
+            .ToDictionary(group => group.Key, group => group.Max(segment => segment.Index));
+        var added = new List<MediaSegmentRecord>();
+        foreach (var segment in observed.OrderBy(segment => segment.StreamIndex).ThenBy(segment => segment.Index))
+        {
+            if (saved.TryGetValue((segment.StreamIndex, segment.Index), out var old))
+            {
+                if (old.Url != segment.Url)
+                {
+                    throw new MediaJobException(MediaJobErrorKind.SegmentMismatch, "A live segment changed at a saved sequence number.");
+                }
+
+                continue;
+            }
+
+            if (last.TryGetValue(segment.StreamIndex, out var previous) && segment.Index != previous + 1)
+            {
+                throw new MediaJobException(MediaJobErrorKind.SegmentMismatch, "The live playlist advanced past an uncaptured segment.");
+            }
+
+            added.Add(segment);
+            last[segment.StreamIndex] = segment.Index;
+        }
+
+        return added;
+    }
+
+    private async Task<IReadOnlyList<MediaSegmentRecord>> PollLiveAsync(
+        List<MediaTrack> selectedTracks,
+        IReadOnlyList<MediaStreamRecord> streams,
+        IReadOnlyList<MediaSegmentRecord> savedSegments,
+        Dictionary<(int Stream, int Index), MediaKey> keys,
+        MediaJobOptions options,
+        string jobDirectory,
+        SegmentClient client,
+        KeyCache keyCache,
+        CompletionWriter completionWriter,
+        ProgressTracker progress,
+        RunState run)
+    {
+        var current = selectedTracks;
+        while (current.Any(track => track.IsLive) && !options.LiveStopToken.IsCancellationRequested)
+        {
+            var target = current.Where(track => track.IsLive).Min(track => track.TargetDurationSeconds);
+            var delay = TimeSpan.FromSeconds(double.IsFinite(target) ? Math.Clamp(target, 1, 3600) : 4);
+            using (var wait = CancellationTokenSource.CreateLinkedTokenSource(run.Token, options.LiveStopToken))
+            {
+                try
+                {
+                    await Task.Delay(delay, _time, wait.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (options.LiveStopToken.IsCancellationRequested && !run.Token.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
+
+            if (options.LiveStopToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            var loaded = await options.LiveLoader!.LoadAsync(MediaKind.Hls, options.ManifestUri,
+                options.RequestContext, run.Token).ConfigureAwait(false);
+            if (loaded is not MediaSourceLoader.Playable playable)
+            {
+                throw new MediaJobException(MediaJobErrorKind.InvalidJob, "The live playlist became protected.");
+            }
+
+            var available = playable.Presentation.Streams.ToDictionary(track => track.Id, StringComparer.Ordinal);
+            var refreshed = new List<MediaTrack>();
+            foreach (var track in current)
+            {
+                if (!available.TryGetValue(track.Id, out var matching))
+                {
+                    throw new MediaJobException(MediaJobErrorKind.SegmentMismatch, "A selected live track disappeared.");
+                }
+
+                refreshed.Add(matching);
+            }
+
+            current = NormalizeLiveTracks(refreshed);
+            var observed = BuildPlan(current, 0).Segments;
+            var appended = NewLiveSegments(savedSegments, observed);
+            if (appended.Count == 0)
+            {
+                continue;
+            }
+
+            await media.AppendSegmentsAsync(options.JobId, appended, run.Token).ConfigureAwait(false);
+            savedSegments = [.. savedSegments, .. appended];
+            progress.AddSegments(appended.Count);
+            foreach (var (track, streamIndex) in current.Select((track, index) => (track, index)))
+            {
+                foreach (var segment in track.Segments.Where(segment => segment.Key is not null))
+                {
+                    keys[(streamIndex, segment.Index)] = segment.Key!;
+                }
+            }
+
+            try
+            {
+                await Task.WhenAll(streams.Select(stream => DownloadStreamAsync(stream,
+                    [.. appended.Where(segment => segment.StreamIndex == stream.Index)], keys, jobDirectory, client,
+                    keyCache, completionWriter, progress, run))).ConfigureAwait(false);
+            }
+            catch when (run.Failure is { } failure)
+            {
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
+        }
+
+        return savedSegments;
     }
 
     private async Task FailAsync(Job job, MediaJobOptions options, CancellationToken cancellationToken)
@@ -295,6 +464,14 @@ public sealed class MediaJobRunner(
         foreach (var stream in streams)
         {
             var path = Path.Combine(joinedDirectory, $"{stream.Index}.bin");
+            if (stream.Role == "subtitle")
+            {
+                await JoinWebVttAsync(stream, segments, jobDirectory, path, cancellationToken).ConfigureAwait(false);
+                result.Add(new MediaJoinedTrack(stream.Index, stream.Role, path, new FileInfo(path).Length,
+                    stream.Container, Language: stream.Language));
+                continue;
+            }
+
             await using (var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.Asynchronous))
             {
                 var init = Path.Combine(StreamDirectory(jobDirectory, stream.Index), "init");
@@ -323,6 +500,43 @@ public sealed class MediaJobRunner(
         }
 
         return result;
+    }
+
+    private static async Task JoinWebVttAsync(MediaStreamRecord stream, IReadOnlyList<MediaSegmentRecord> segments,
+        string jobDirectory, string outputPath, CancellationToken cancellationToken)
+    {
+        var parts = segments.Where(segment => segment.StreamIndex == stream.Index).OrderBy(segment => segment.Index).ToArray();
+        await using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 16 * 1024, FileOptions.Asynchronous);
+        await using var writer = new StreamWriter(output, new System.Text.UTF8Encoding(false), leaveOpen: true);
+        await writer.WriteAsync("WEBVTT\n\n".AsMemory(), cancellationToken).ConfigureAwait(false);
+        foreach (var segment in parts)
+        {
+            var path = Path.Combine(StreamDirectory(jobDirectory, stream.Index), segment.Index.ToString(CultureInfo.InvariantCulture));
+            if (!File.Exists(path))
+            {
+                throw new MediaJobException(MediaJobErrorKind.SegmentMismatch, "A subtitle segment file is missing.");
+            }
+
+            var text = (await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false)).TrimStart('\uFEFF')
+                .Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (!text.StartsWith("WEBVTT", StringComparison.Ordinal))
+            {
+                throw new MediaJobException(MediaJobErrorKind.InvalidJob, "The subtitle track is not WebVTT.");
+            }
+
+            var body = text.IndexOf("\n\n", StringComparison.Ordinal);
+            if (body < 0)
+            {
+                throw new MediaJobException(MediaJobErrorKind.InvalidJob, "The WebVTT subtitle has no cues.");
+            }
+
+            await writer.WriteAsync(text.AsMemory(body + 2), cancellationToken).ConfigureAwait(false);
+            await writer.WriteAsync("\n\n".AsMemory(), cancellationToken).ConfigureAwait(false);
+        }
+
+        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+        await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+        RandomAccess.FlushToDisk(output.SafeFileHandle);
     }
 #pragma warning restore CA2000, CA2007
 
@@ -476,13 +690,16 @@ public sealed class MediaJobRunner(
     {
         private readonly long _started = time.GetTimestamp();
         private int _completed;
+        private int _total = total;
         private long _bytes;
+
+        public void AddSegments(int count) => Interlocked.Add(ref _total, count);
 
         public void Complete(long bytes)
         {
             var completed = Interlocked.Increment(ref _completed);
             var done = Interlocked.Add(ref _bytes, bytes);
-            report?.Invoke(new MediaJobProgress(completed, total, done));
+            report?.Invoke(new MediaJobProgress(completed, Volatile.Read(ref _total), done));
             if (events is not null)
             {
                 var seconds = Math.Max(time.GetElapsedTime(_started).TotalSeconds, 0.001);

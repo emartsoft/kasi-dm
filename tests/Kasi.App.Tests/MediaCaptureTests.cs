@@ -508,6 +508,24 @@ public sealed class MediaCaptureTests : IAsyncLifetime
         picked.Variant.Audio.Should().BeSameAs(audio);
     }
 
+    [Trait("Requirement", "KASI-MED-008")]
+    [Trait("TC", "TC-MED-008")]
+    [Fact]
+    public void A_saved_WebVtt_choice_is_found_again_by_language()
+    {
+        var video = new MediaTrack("video", MediaRole.Video, null, null, null, 208000, 160, 90, 10, false, null, []);
+        var subtitle = new MediaTrack("captions", MediaRole.Subtitle, "en", "wvtt", null, null, null, null, 10, false, null, []);
+        var presentation = new MediaPresentation(null, 10, false, [new MediaVariant(video, null, subtitle)], [], [subtitle]);
+        var choice = new MediaSelection("Mp4", 90, 208000, IncludeSubtitle: true, SubtitleLanguage: "en");
+
+        var selected = MediaJobExecutor.ResolveSelection(presentation, SecretWith(choice));
+
+        selected.Error.Should().BeNull();
+        selected.Variant!.Subtitle!.Language.Should().Be("en");
+        var missing = MediaJobExecutor.ResolveSelection(presentation, SecretWith(choice with { SubtitleLanguage = "fr" }));
+        missing.Error.Should().Be(MediaJobExecutor.ChoiceGoneMessage);
+    }
+
     [Fact]
     public async Task A_job_whose_chosen_quality_is_gone_fails_with_that_message()
     {

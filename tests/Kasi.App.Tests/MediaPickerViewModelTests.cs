@@ -34,13 +34,17 @@ public sealed class MediaPickerViewModelTests
     }
 
     [Fact]
-    public void Subtitles_are_listed_but_disabled_and_the_result_carries_the_choice()
+    [Trait("Requirement", "KASI-MED-008")]
+    [Trait("TC", "TC-MED-008")]
+    public void A_selected_subtitle_is_kept_with_the_media_choice()
     {
         var model = new MediaPickerViewModel(Presentation(), "Clip", "https://example.com/poster.jpg", preferredMaximumHeight: 720);
         MediaPickerSelection? selected = null;
         model.Closed += () => selected = model.Result;
 
-        model.Subtitles.Should().ContainSingle().Which.IsEnabled.Should().BeFalse();
+        model.Subtitles.Should().HaveCount(2);
+        model.SelectedSubtitle.Should().Be(model.Subtitles[0]);
+        model.SelectedSubtitle = model.Subtitles[1];
         model.Qualities[1].AutomationName.Should().Contain("720p");
         model.HasThumbnail.Should().BeTrue();
 
@@ -49,6 +53,8 @@ public sealed class MediaPickerViewModelTests
         selected.Should().NotBeNull();
         selected!.Variant!.Height.Should().Be(720);
         selected.Format.Should().Be(MediaPickerFormat.Mp4);
+        selected.Subtitle?.Language.Should().Be("en");
+        selected.ToJobSelection().IncludeSubtitle.Should().BeTrue();
     }
 
     [Fact]
