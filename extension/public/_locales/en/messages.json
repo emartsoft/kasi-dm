@@ -43,5 +43,23 @@
   },
   "menu_download_selected": {
     "message": "Download selected links with Kasi"
+  },
+  "media_overlay_save": {
+    "message": "Save with Kasi"
+  },
+  "media_title": {
+    "message": "Media on this page"
+  },
+  "media_save": {
+    "message": "Save"
+  },
+  "media_capturing": {
+    "message": "Sending to Kasi…"
+  },
+  "media_sent": {
+    "message": "Sent to Kasi."
+  },
+  "media_failed": {
+    "message": "Kasi could not take this stream."
   }
 }

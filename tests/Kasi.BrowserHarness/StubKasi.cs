@@ -15,6 +15,9 @@ internal sealed record ReceivedBatch(string Referrer, IReadOnlyList<string> Urls
 /// <summary>What the stub received for one <c>linkRefreshed</c> (the answer to a <c>refreshLink</c>, M2.5c).</summary>
 internal sealed record ReceivedRefresh(string JobId, string Url, IReadOnlyList<ReceivedCookie> Cookies);
 
+/// <summary>A mediaDetected or captureMedia message the stub received (KASI-MED-001).</summary>
+internal sealed record ReceivedMedia(string Type, string Kind, string Url, string? Referrer, string? Origin, IReadOnlyList<ReceivedCookie> Cookies);
+
 /// <summary>
 /// Kasi as the browser protocol sees it: the real <see cref="KasiPipeServer"/> on the real per-user pipe (so the framing, the access list
 /// and the native host are all genuine), with a handler that answers <c>hello</c> with rules and <c>addDownload</c> as the mode says.
@@ -24,6 +27,7 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
     private readonly ConcurrentQueue<ReceivedDownload> _received = new();
     private readonly ConcurrentQueue<ReceivedBatch> _batches = new();
     private readonly ConcurrentQueue<ReceivedRefresh> _refreshed = new();
+    private readonly ConcurrentQueue<ReceivedMedia> _media = new();
     private volatile string _mode = options.Mode;
     private volatile RulesOptions _rules = options.Rules;
     private int _answerDelayMs = options.AnswerDelayMs;
@@ -40,6 +44,8 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
     public IReadOnlyList<ReceivedBatch> Batches => [.. _batches];
 
     public IReadOnlyList<ReceivedRefresh> Refreshed => [.. _refreshed];
+
+    public IReadOnlyList<ReceivedMedia> Media => [.. _media];
 
     public void Clear()
     {
@@ -93,6 +99,13 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _server?.DisposeAsync() ?? ValueTask.CompletedTask;
 
+    private static string KindText(MediaKind kind) => kind switch
+    {
+        MediaKind.Hls => "hls",
+        MediaKind.Dash => "dash",
+        _ => "direct",
+    };
+
     private async ValueTask<IpcMessage?> HandleAsync(IpcConnection connection, IpcMessage message, CancellationToken cancellationToken)
     {
         switch (message)
@@ -124,6 +137,18 @@ internal sealed class StubKasi(HarnessOptions options) : IAsyncDisposable
                     batch.Referrer,
                     [.. batch.Links.Select(l => l.Url)],
                     [.. batch.Cookies.Select(c => new ReceivedCookie(c.Name, c.Value, c.Domain))]));
+                return new Ack { Id = message.Id, Ok = true };
+            case MediaDetected detected:
+                _media.Enqueue(new ReceivedMedia("mediaDetected", KindText(detected.Kind), detected.Url, detected.PageUrl, null, []));
+                return new Ack { Id = message.Id, Ok = true };
+            case CaptureMedia capture:
+                _media.Enqueue(new ReceivedMedia(
+                    "captureMedia",
+                    KindText(capture.Kind),
+                    capture.Url,
+                    capture.Referrer,
+                    capture.Origin,
+                    [.. capture.Cookies.Select(c => new ReceivedCookie(c.Name, c.Value, c.Domain))]));
                 return new Ack { Id = message.Id, Ok = true };
             case LinkRefreshed refreshed:
                 _refreshed.Enqueue(new ReceivedRefresh(

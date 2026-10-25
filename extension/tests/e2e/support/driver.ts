@@ -30,8 +30,14 @@ export interface BrowserDriver {
   menuClick(menuItemId: string, info?: { linkUrl?: string }): Promise<void>;
   /** The text of the popup's status line. */
   popupText(): Promise<string>;
+  /** The text of the popup's media list, or empty when it shows none. */
+  mediaText(): Promise<string>;
+  /** Clicks the first Save button in the popup's media list. */
+  captureFirstMedia(): Promise<void>;
   /** The toolbar badge text, or undefined when this driver cannot read it. */
   badge(): Promise<string | undefined>;
+  /** The media page tab's badge text, or undefined when this driver cannot read it. */
+  mediaBadge(): Promise<string | undefined>;
   close(): Promise<void>;
 }
 

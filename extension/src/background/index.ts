@@ -6,6 +6,13 @@ import { createBypass, parseModifierMessage } from '../shared/bypass';
 import { collectCookies, storeFor } from '../shared/cookies';
 import { createInterception, type DownloadItemLike } from '../shared/interception';
 import { collectPageLinks, parseRawAnchors, type LinkScope } from '../shared/link-collector';
+import {
+  createMediaDetectedMessage,
+  createMediaDetector,
+  parseMediaRuntimeMessage,
+  type MediaRuntimeMessage,
+} from '../shared/media-controller';
+import { createMediaSession } from '../shared/media-session';
 import { createMenus, parseMenuClick } from '../shared/menus';
 import { createRefreshLink } from '../shared/refresh-link';
 import { createRequestTracker } from '../shared/request-tracker';
@@ -88,6 +95,78 @@ const nativePort = createNativePort({
   },
 });
 
+// Media detection (KASI-MED-001): classification, the session list, the badge and the page/popup messages.
+const mediaSession = createMediaSession(browser.storage.session);
+const mediaDetector = createMediaDetector({
+  store: mediaSession,
+  badge: {
+    set: (tabId, count) => {
+      void browser.action.setBadgeText({ tabId, text: String(count) });
+      void browser.action.setBadgeBackgroundColor({ tabId, color: '#0f6cbd' });
+    },
+    clear: (tabId) => {
+      void browser.action.setBadgeText({ tabId, text: '' });
+    },
+  },
+  tabs: {
+    sendMessage: async (tabId, message) => {
+      await browser.tabs.sendMessage(tabId, message);
+    },
+  },
+  port: nativePort,
+  cookiesFor: async (url, tabId) => {
+    const tab = await browser.tabs.get(tabId);
+    return collectCookies(browser.cookies, [url], await storeFor(browser.cookies, tab.incognito));
+  },
+  userAgent: navigator.userAgent,
+  pageUrlForTab: async (tabId) => (await browser.tabs.get(tabId)).url,
+  onDetected: async (detection) => {
+    const message = createMediaDetectedMessage(detection, crypto.randomUUID());
+    if (!message) {
+      logger.error('Media detection has invalid protocol fields', { tabId: detection.tabId });
+      return;
+    }
+    if (await nativePort.whenConnected(5000)) await nativePort.request(message);
+  },
+  now: () => Date.now(),
+  newId: () => crypto.randomUUID(),
+  logger,
+});
+
+async function handleMediaMessage(
+  message: MediaRuntimeMessage,
+  sender: Runtime.MessageSender,
+): Promise<unknown> {
+  const tabId = 'tabId' in message ? (message.tabId ?? sender.tab?.id) : sender.tab?.id;
+  if (tabId === undefined || tabId < 0) return { ok: false };
+  switch (message.type) {
+    case 'mediaPage':
+      await mediaDetector.onPageContext(tabId, {
+        pageUrl: message.pageUrl,
+        ...(message.title ? { title: message.title } : {}),
+        ...(message.thumbnailUrl ? { thumbnailUrl: message.thumbnailUrl } : {}),
+      });
+      return { ok: true };
+    case 'mediaList':
+      return { ok: true, media: await mediaDetector.list(tabId) };
+    case 'mediaCapture':
+    case 'mediaOverlay': {
+      const capture = await mediaDetector.capture(
+        tabId,
+        message.type === 'mediaCapture' ? message.url : undefined,
+      );
+      if (!capture) return { ok: false, code: 'NO_MEDIA' };
+      try {
+        return await nativePort.request(capture);
+      } catch {
+        return { ok: false, code: 'APP_NOT_RUNNING' };
+      }
+    }
+    default:
+      return undefined;
+  }
+}
+
 const interception = createInterception({
   downloads: {
     pause: (id) => browser.downloads.pause(id),
@@ -165,6 +244,8 @@ function isOpenSettings(value: unknown): value is OpenSettings {
 // Listeners are registered synchronously so a stopped worker or event page wakes for them.
 browser.runtime.onMessage.addListener((message: unknown, sender: Runtime.MessageSender) => {
   if (sender.id !== browser.runtime.id) return undefined;
+  const mediaMessage = parseMediaRuntimeMessage(message);
+  if (mediaMessage) return handleMediaMessage(mediaMessage, sender);
   if (isStatusRequest(message)) {
     // The popup is a reason to try again (plan m2-5 decision 3); the answer is the state as it is now.
     nativePort.reconnectForStatus();
@@ -196,6 +277,9 @@ const webRequestFilter = { urls: ['<all_urls>'], types: ['main_frame', 'sub_fram
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {
     void tracker.onRequest(details.url, details.method);
+    if (details.type === 'main_frame' && details.tabId >= 0) {
+      void mediaDetector.onPageNavigation(details.tabId);
+    }
   },
   { urls: [...webRequestFilter.urls], types: [...webRequestFilter.types] },
 );
@@ -205,6 +289,18 @@ browser.webRequest.onBeforeRedirect.addListener(
   },
   { urls: [...webRequestFilter.urls], types: [...webRequestFilter.types] },
 );
+
+browser.webRequest.onResponseStarted.addListener(
+  (details) => {
+    void mediaDetector.onResponse(details);
+  },
+  { urls: ['<all_urls>'], types: ['media', 'xmlhttprequest', 'other', 'main_frame'] },
+  ['responseHeaders'],
+);
+
+browser.tabs.onRemoved.addListener((tabId) => {
+  void mediaDetector.onTabRemoved(tabId);
+});
 
 browser.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !(INTERCEPTION_KEY in changes)) return;

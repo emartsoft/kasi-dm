@@ -43,6 +43,15 @@ export interface ReceivedBatch {
   cookies: { name: string; value: string; domain: string }[];
 }
 
+export interface ReceivedMedia {
+  type: 'mediaDetected' | 'captureMedia';
+  kind: 'hls' | 'dash' | 'direct';
+  url: string;
+  referrer: string | null;
+  origin: string | null;
+  cookies: { name: string; value: string; domain: string }[];
+}
+
 export interface ReceivedRefresh {
   jobId: string;
   url: string;
@@ -57,6 +66,8 @@ export interface Harness {
   receivedBatches(): Promise<ReceivedBatch[]>;
   /** The `linkRefreshed` answers the stub has had. */
   refreshed(): Promise<ReceivedRefresh[]>;
+  /** The mediaDetected/captureMedia messages the stub has had. */
+  receivedMedia(): Promise<ReceivedMedia[]>;
   /** Kasi asks the extension for a fresh link (`refreshLink`). */
   refreshLink(jobId: string, referrerUrl: string, matchHint?: string): Promise<void>;
   /** How many `hello` messages the stub has had from a native host. */
@@ -139,6 +150,7 @@ function api(admin: string): Omit<Harness, 'testServer' | 'stop'> {
     received: () => json<Received[]>(`${admin}/_stub/received`),
     receivedBatches: () => json<ReceivedBatch[]>(`${admin}/_stub/received-batches`),
     refreshed: () => json<ReceivedRefresh[]>(`${admin}/_stub/refreshed`),
+    receivedMedia: () => json<ReceivedMedia[]>(`${admin}/_stub/media`),
     refreshLink: async (jobId, referrerUrl, matchHint) => {
       await send(`${admin}/_stub/refresh-link`, 'POST', { jobId, referrerUrl, matchHint });
     },

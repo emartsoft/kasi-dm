@@ -75,6 +75,13 @@ jobs:
           $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
           npm run test:e2e -- e2e/chromium.e2e allowlist -t chromium
 
+      - name: Chromium media detection
+        working-directory: extension
+        shell: pwsh
+        run: |
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
+          npm run test:e2e -- media.e2e -t chromium
+
       - name: Firefox
         if: github.event_name != 'pull_request'
         working-directory: extension
@@ -83,6 +90,15 @@ jobs:
           geckodriver --version
           $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
           npm run test:e2e -- e2e/firefox.e2e allowlist -t firefox
+
+      - name: Firefox media detection
+        if: github.event_name != 'pull_request'
+        working-directory: extension
+        shell: pwsh
+        run: |
+          geckodriver --version
+          $env:KASI_NATIVEHOST_AOT = (Resolve-Path ../artifacts/native-host/Kasi.NativeHost.exe).Path
+          npm run test:e2e -- media.e2e -t firefox
 
       - name: Chromium with the real Kasi
         if: github.event_name != 'pull_request'

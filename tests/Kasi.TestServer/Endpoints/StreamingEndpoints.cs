@@ -60,6 +60,11 @@ internal static class StreamingEndpoints
                 ? Results.Bytes(MuxableFixtures.DashSegment(number), "video/mp4")
                 : Results.NotFound());
 
+        app.MapGet("/media/direct/{size:long}", (long size) =>
+            size is >= 1 and <= 8_000_000
+                ? Results.Bytes(GeneratedContent.Bytes("media-direct", size), "video/mp4")
+                : Results.NotFound());
+
         app.MapGet("/hls/{kind}/master.m3u8", (string kind) =>
             _hlsKeyLines.ContainsKey(kind) ? Results.Text(HlsMaster(), HlsContentType) : Results.NotFound());
 
