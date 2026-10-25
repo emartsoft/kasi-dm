@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST_GRACE_MS } from '../../src/shared/interception';
 import { MARK_TTL_MS, createRequestTracker } from '../../src/shared/request-tracker';
 import { ack, memoryArea, rig, rules, settle } from './rig';
 
@@ -75,6 +76,27 @@ describe('[TC-BRW-004] downloads the extension never takes', () => {
     r.online();
     await r.tracker.onRequest('https://files.example.org/pack.zip', 'POST');
     await untouched(r, {});
+  });
+
+  it('leaves a POST-form download to the browser when the browser reports the request after the download (Firefox)', async () => {
+    let waited = 0;
+    const late: { arrive?: () => Promise<void> } = {};
+    const r = rig({
+      wait: async (ms) => {
+        waited = ms;
+        await late.arrive?.();
+      },
+    });
+    late.arrive = () => r.tracker.onRequest('https://files.example.org/pack.zip', 'POST');
+    r.online();
+    await r.start(r.add({}));
+    expect(waited).toBe(POST_GRACE_MS);
+    expect(r.cookieCalls).toEqual([]);
+    expect(r.port().requests()).toHaveLength(0);
+    // paused while it waited, then given back: never cancelled or erased
+    expect(r.downloads.calls.filter((call) => call.startsWith('pause'))).toHaveLength(1);
+    expect(r.downloads.calls.filter((call) => call.startsWith('resume'))).toHaveLength(1);
+    expect(r.downloads.calls.filter((call) => /^(cancel|erase)/.test(call))).toEqual([]);
   });
 
   it('keeps the mark through POST -> 302 -> GET, matching the final URL', async () => {

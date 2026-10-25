@@ -46,6 +46,26 @@ async function fileSha(
   return harness.sha256(seed, SIZE);
 }
 
+// When a file the browser should keep never lands, say what did happen: handed to Kasi (the extension took it) or not saved at all.
+async function browserFinishedFile(
+  driver: BrowserDriver,
+  harness: { received(): Promise<readonly unknown[]> },
+  expected: string,
+): Promise<void> {
+  try {
+    await waitFor('the browser to finish the file', async () =>
+      (await driver.files()).some((f) => f.sha256 === expected),
+    );
+  } catch (error) {
+    const handed = (await harness.received()).length;
+    const folder = (await driver.folder()).length;
+    throw new Error(
+      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s) and the download folder holds ${String(folder)} entries`,
+      { cause: error },
+    );
+  }
+}
+
 export function defineScenarios(kit: BrowserKit): void {
   SIZE = kit.size ?? 20_000;
   const reason = unavailableReason() ?? kit.unavailable();
@@ -119,9 +139,7 @@ export function defineScenarios(kit: BrowserKit): void {
 
         await handedOff();
         const expected = await fileSha('plain', harness);
-        await waitFor('the browser to finish the file', async () =>
-          (await driver.files()).some((f) => f.sha256 === expected),
-        );
+        await browserFinishedFile(driver, harness, expected);
         if ((await driver.badge()) !== undefined) {
           await waitFor('the failure badge', async () => (await driver.badge()) === '!');
         }
@@ -142,9 +160,7 @@ export function defineScenarios(kit: BrowserKit): void {
         await driver.click(link, [modifier]);
 
         const expected = await fileSha(seed, harness);
-        await waitFor('the browser to finish the file', async () =>
-          (await driver.files()).some((f) => f.sha256 === expected),
-        );
+        await browserFinishedFile(driver, harness, expected);
         expect(await harness.received()).toEqual([]);
       },
     );
@@ -153,9 +169,7 @@ export function defineScenarios(kit: BrowserKit): void {
       await driver.click('#slow', ['Alt']);
 
       const expected = await fileSha('slow', harness);
-      await waitFor('the browser to finish the file', async () =>
-        (await driver.files()).some((f) => f.sha256 === expected),
-      );
+      await browserFinishedFile(driver, harness, expected);
       expect(await harness.received()).toEqual([]);
     });
 
@@ -197,9 +211,7 @@ export function defineScenarios(kit: BrowserKit): void {
       await driver.click('#post');
 
       const expected = await fileSha('post', harness);
-      await waitFor('the browser to finish the file', async () =>
-        (await driver.files()).some((f) => f.sha256 === expected),
-      );
+      await browserFinishedFile(driver, harness, expected);
       expect(await harness.received()).toEqual([]);
     });
 
@@ -208,9 +220,7 @@ export function defineScenarios(kit: BrowserKit): void {
       await driver.click('#excluded');
 
       const expected = await fileSha('excluded', harness);
-      await waitFor('the browser to finish the file', async () =>
-        (await driver.files()).some((f) => f.sha256 === expected),
-      );
+      await browserFinishedFile(driver, harness, expected);
       expect(await harness.received()).toEqual([]);
     });
 
@@ -420,9 +430,7 @@ export function defineScenarios(kit: BrowserKit): void {
       await driver.click('#attr');
 
       const expected = await page.sha256('attr', SIZE);
-      await waitFor('the browser to finish the file', async () =>
-        (await driver.files()).some((f) => f.sha256 === expected),
-      );
+      await browserFinishedFile(driver, { received: () => Promise.resolve([]) }, expected);
       expect(await driver.popupText()).toBe(NOT_CONNECTED);
       if ((await driver.badge()) !== undefined) {
         await waitFor('the failure badge', async () => (await driver.badge()) === '!');
