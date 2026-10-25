@@ -17,6 +17,12 @@ public sealed record MediaJobOptions
     /// <summary>The picker's chosen variant; null selects <see cref="MediaPresentation.SelectDefault"/>.</summary>
     public MediaVariant? SelectedVariant { get; init; }
 
+    /// <summary>The gated manifest loader reused for live playlist refreshes.</summary>
+    public MediaSourceLoader? LiveLoader { get; init; }
+
+    /// <summary>User Stop for a live capture: finish current segments and mux what was collected.</summary>
+    public CancellationToken LiveStopToken { get; init; }
+
     public MediaRequestContext RequestContext { get; init; } = MediaRequestContext.Empty;
 
     /// <summary>Whole segments in flight per stream; the setting allows 1 to 16 (default 6).</summary>

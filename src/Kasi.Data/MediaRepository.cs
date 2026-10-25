@@ -122,6 +122,40 @@ public sealed class MediaRepository(SqliteConnectionFactory factory) : IMediaRep
             row.RangeEnd))];
     }
 
+    public async Task AppendSegmentsAsync(JobId jobId, IReadOnlyList<MediaSegmentRecord> segments,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(segments);
+        if (segments.Count == 0)
+        {
+            return;
+        }
+
+        using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
+        using var transaction = (Microsoft.Data.Sqlite.SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var segment in segments)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                "INSERT INTO media_segment (job_id, stream_idx, idx, url, size, completed, iv, discontinuity, range_start, range_end) " +
+                "VALUES (@job, @stream, @index, @url, NULL, 0, @iv, @discontinuity, @rangeStart, @rangeEnd);",
+                new
+                {
+                    job = jobId.ToString(),
+                    stream = segment.StreamIndex,
+                    index = segment.Index,
+                    url = segment.Url,
+                    iv = segment.Iv,
+                    discontinuity = segment.Discontinuity ? 1 : 0,
+                    rangeStart = segment.RangeStart,
+                    rangeEnd = segment.RangeEnd,
+                },
+                transaction,
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task MarkCompletedAsync(
         JobId jobId,
         IReadOnlyList<MediaSegmentCompletion> completed,

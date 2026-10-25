@@ -15,6 +15,10 @@ public interface IMediaRepository
 
     Task<IReadOnlyList<MediaSegmentRecord>> LoadSegmentsAsync(JobId jobId, CancellationToken cancellationToken = default);
 
+    /// <summary>Appends newly observed live segments without resetting completed rows or job progress.</summary>
+    Task AppendSegmentsAsync(JobId jobId, IReadOnlyList<MediaSegmentRecord> segments,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Marks a batch of segments complete and updates the job's done/total bytes in one transaction.</summary>
     Task MarkCompletedAsync(
         JobId jobId,

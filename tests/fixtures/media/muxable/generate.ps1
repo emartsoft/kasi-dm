@@ -25,3 +25,35 @@ ffmpeg -y -hide_banner -loglevel error `
     -t 24 -c:a aac -b:a 48k (Join-Path $root 'audio.m4a')
 
 # The HLS master is hand-written; the generated media playlist is the source of the six 4 s segments.
+
+# A compact 600 s HLS fixture for the fake-clock live test. Store 150 segment sizes alongside one
+# concatenated transport stream so CI does not need to generate or track 150 individual files.
+$liveBuild = Join-Path ([IO.Path]::GetTempPath()) ('kasi-live-' + [guid]::NewGuid().ToString('N'))
+$liveRoot = Join-Path $root 'live'
+New-Item -ItemType Directory -Path $liveBuild, $liveRoot -Force | Out-Null
+try {
+    ffmpeg -y -hide_banner -loglevel error `
+        -f lavfi -i 'color=c=black:s=160x90:r=5' `
+        -f lavfi -i 'anullsrc=r=48000:cl=mono' `
+        -t 600 -c:v libx264 -preset ultrafast -pix_fmt yuv420p -g 20 -keyint_min 20 -sc_threshold 0 `
+        -c:a aac -b:a 16k -f segment -segment_time 4 -segment_format mpegts `
+        (Join-Path $liveBuild 'segment-%03d.ts')
+    if ($LASTEXITCODE -ne 0) { throw 'FFmpeg could not generate the live fixture.' }
+
+    $segments = @(Get-ChildItem -LiteralPath $liveBuild -Filter '*.ts' | Sort-Object Name)
+    if ($segments.Count -ne 150) { throw "Expected 150 live segments; found $($segments.Count)." }
+    $output = [IO.File]::Create((Join-Path $liveRoot 'segments.ts'))
+    try {
+        $sizes = foreach ($segment in $segments) {
+            $bytes = [IO.File]::ReadAllBytes($segment.FullName)
+            $output.Write($bytes)
+            $bytes.Length.ToString([Globalization.CultureInfo]::InvariantCulture)
+        }
+    }
+    finally { $output.Dispose() }
+    [IO.File]::WriteAllLines((Join-Path $liveRoot 'sizes.txt'), [string[]]$sizes)
+}
+finally {
+    Get-ChildItem -LiteralPath $liveBuild -File | Remove-Item
+    Remove-Item -LiteralPath $liveBuild
+}

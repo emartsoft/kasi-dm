@@ -232,7 +232,7 @@ internal static class Strings
 
     public static string MediaPickerSubtitlesLabel => Get(nameof(MediaPickerSubtitlesLabel));
 
-    public static string MediaPickerSubtitlesUnavailable => Get(nameof(MediaPickerSubtitlesUnavailable));
+    public static string MediaPickerNoSubtitles => Get(nameof(MediaPickerNoSubtitles));
 
     public static string MediaPickerAdd => Get(nameof(MediaPickerAdd));
 

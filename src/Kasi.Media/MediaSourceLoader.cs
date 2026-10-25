@@ -189,7 +189,8 @@ public sealed class MediaSourceLoader : IDisposable
             media.IsLive,
             media.Initialization,
             media.Segments,
-            media.Key);
+            media.Key,
+            TargetDurationSeconds: media.TargetDurationSeconds);
         return new MediaPresentation(null, media.DurationSeconds, media.IsLive, [new MediaVariant(track, null, null)], [], []);
     }
 

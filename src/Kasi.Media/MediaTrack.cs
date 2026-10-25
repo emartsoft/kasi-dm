@@ -18,7 +18,8 @@ public sealed record MediaTrack(
     MediaInitSegment? Initialization,
     IReadOnlyList<MediaSegment> Segments,
     MediaKey? Key = null,
-    IReadOnlyList<string>? ProtectionSchemes = null)
+    IReadOnlyList<string>? ProtectionSchemes = null,
+    double TargetDurationSeconds = 0)
 {
     public long EstimatedBytes => MediaSizes.Estimate(Bandwidth, DurationSeconds);
 

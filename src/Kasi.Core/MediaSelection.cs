@@ -5,4 +5,11 @@ namespace Kasi.Core;
 /// between runs, so a quality is identified by its height and bitrate, never by its URL.
 /// </summary>
 /// <param name="Format">Mp4, Matroska or AudioOnly.</param>
-public sealed record MediaSelection(string Format, int? Height = null, int? Bandwidth = null, string? Codecs = null, string? Language = null);
+public sealed record MediaSelection(
+    string Format,
+    int? Height = null,
+    int? Bandwidth = null,
+    string? Codecs = null,
+    string? Language = null,
+    bool IncludeSubtitle = false,
+    string? SubtitleLanguage = null);

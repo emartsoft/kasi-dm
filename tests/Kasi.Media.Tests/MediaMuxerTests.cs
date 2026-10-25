@@ -77,6 +77,32 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         probe.Streams.Should().Contain(stream => stream.CodecType == "audio");
     }
 
+    [Trait("Requirement", "KASI-MED-008")]
+    [Trait("TC", "TC-MED-008")]
+    [Fact]
+    public async Task Selected_WebVtt_is_saved_next_to_the_video()
+    {
+        if (!TryGetFfmpeg())
+        {
+            return;
+        }
+
+        var result = await DownloadAsync("/hls/muxable-vtt/master.m3u8", includeSubtitle: true);
+        var subtitle = result.Streams.Single(stream => stream.Role == "subtitle");
+        var joined = await File.ReadAllTextAsync(subtitle.Path, TestContext.Current.CancellationToken);
+        joined.Should().StartWith("WEBVTT\n\n");
+        joined.Split("WEBVTT", StringSplitOptions.None).Should().HaveCount(2, "the joined subtitle has one header");
+        joined.Should().Contain("Caption 0").And.Contain("Caption 5");
+
+        var output = Path.Combine(_folder, "out-vtt", "capture.mp4");
+        var muxed = await Muxer().MuxAsync(result, new MediaMuxOptions { OutputPath = output }, TestContext.Current.CancellationToken);
+
+        File.Exists(muxed.OutputPath).Should().BeTrue();
+        var sidecar = Path.Combine(_folder, "out-vtt", "capture.en.vtt");
+        (await File.ReadAllTextAsync(sidecar, TestContext.Current.CancellationToken)).Should().Be(joined);
+        Directory.Exists(result.WorkDirectory).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Hls_muxes_to_mkv_when_requested_or_when_mp4_cannot_hold_the_codecs()
     {
@@ -365,19 +391,21 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
 
     private MediaMuxer Muxer() => new(new FfmpegRunner(_ffmpeg));
 
-    private async Task<MediaJobResult> DownloadAsync(string path)
+    private async Task<MediaJobResult> DownloadAsync(string path, bool includeSubtitle = false)
     {
         using var loader = new MediaSourceLoader();
         var manifest = new Uri(_host.BaseAddress, path);
         var kind = path.EndsWith(".mpd", StringComparison.OrdinalIgnoreCase) ? MediaKind.Dash : MediaKind.Hls;
         var playable = (MediaSourceLoader.Playable)await loader.LoadAsync(kind, manifest, cancellationToken: TestContext.Current.CancellationToken);
         var runner = new MediaJobRunner(_media, _jobs);
+        var selected = includeSubtitle ? playable.Presentation.SelectDefault() : null;
         return await runner.RunAsync(playable, new MediaJobOptions
         {
             JobId = _jobId,
             ManifestUri = manifest,
             MediaRoot = Path.Combine(_folder, "media"),
             Parallelism = 2,
+            SelectedVariant = selected,
             CompletionInterval = TimeSpan.FromMilliseconds(20),
             Proxy = new ProxySettings { Mode = ProxyMode.None },
             RetryPolicy = new TransferRetryPolicy { BaseDelay = TimeSpan.FromMilliseconds(5), MaxDelay = TimeSpan.FromMilliseconds(20) },

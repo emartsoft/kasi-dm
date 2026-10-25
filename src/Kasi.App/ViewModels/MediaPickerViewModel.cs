@@ -27,22 +27,24 @@ internal sealed record MediaQualityChoice(
     string AutomationName,
     bool IsDefault);
 
-internal sealed record MediaSubtitleChoice(string Label, bool IsEnabled);
+internal sealed record MediaSubtitleChoice(string Label, MediaTrack? Track);
 
 internal sealed record MediaAudioChoice(MediaTrack Track, string Label);
 
 /// <summary>The picker's immutable answer: the chosen variant (or audio-only track) and container.</summary>
-internal sealed record MediaPickerSelection(MediaVariant? Variant, MediaTrack? AudioOnly, MediaPickerFormat Format)
+internal sealed record MediaPickerSelection(MediaVariant? Variant, MediaTrack? AudioOnly, MediaPickerFormat Format, MediaTrack? Subtitle = null)
 {
     /// <summary>The choice in the form the job keeps (identified by height and bitrate, not by URL).</summary>
     public MediaSelection ToJobSelection() => Variant is { } variant
-        ? new MediaSelection(Format.ToString(), variant.Height, variant.Video.Bandwidth, variant.Video.Codecs)
-        : new MediaSelection(MediaPickerFormat.AudioOnly.ToString(), Language: AudioOnly?.Language, Bandwidth: AudioOnly?.Bandwidth);
+        ? new MediaSelection(Format.ToString(), variant.Height, variant.Video.Bandwidth, variant.Video.Codecs,
+            IncludeSubtitle: Subtitle is not null, SubtitleLanguage: Subtitle?.Language)
+        : new MediaSelection(MediaPickerFormat.AudioOnly.ToString(), Language: AudioOnly?.Language, Bandwidth: AudioOnly?.Bandwidth,
+            IncludeSubtitle: Subtitle is not null, SubtitleLanguage: Subtitle?.Language);
 }
 
 /// <summary>
 /// The media picker (KASI-MED-002, TRD 12): every video quality with codec, bitrate and estimated size; the best default at or
-/// below the preferred maximum; MP4, MKV or audio-only; subtitle tracks listed but disabled until M3.7. Pure and testable without
+/// below the preferred maximum; MP4, MKV or audio-only; optional WebVTT subtitle selection. Pure and testable without
 /// Avalonia; the window binds to it.
 /// </summary>
 internal sealed partial class MediaPickerViewModel : ObservableObject
@@ -120,7 +122,8 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
         SelectedFormat = Formats.FirstOrDefault(choice => choice.Format == DefaultFormat(presentation, SelectedQuality?.Variant)) ?? FirstOrNull(Formats);
         AudioTracks = presentation.AudioOnly.Select(track => new MediaAudioChoice(track, AudioLabelOf(track))).ToArray();
         SelectedAudio = FirstOrNull(AudioTracks);
-        Subtitles = presentation.Subtitles.Select(track => new MediaSubtitleChoice(SubtitleLabel(track), IsEnabled: false)).ToArray();
+        Subtitles = [new MediaSubtitleChoice(Strings.MediaPickerNoSubtitles, null),
+            .. presentation.Subtitles.Select(track => new MediaSubtitleChoice(SubtitleLabel(track), track))];
         SelectedSubtitle = FirstOrNull(Subtitles);
     }
 
@@ -139,8 +142,6 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
     public string FormatLabel => Strings.MediaPickerFormatLabel;
 
     public string SubtitlesLabel => Strings.MediaPickerSubtitlesLabel;
-
-    public string SubtitlesUnavailable => Strings.MediaPickerSubtitlesUnavailable;
 
     public string AddLabel => Strings.MediaPickerAdd;
 
@@ -178,7 +179,7 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
                 return;
             }
 
-            Result = new MediaPickerSelection(null, SelectedAudio.Track, MediaPickerFormat.AudioOnly);
+            Result = new MediaPickerSelection(null, SelectedAudio.Track, MediaPickerFormat.AudioOnly, SelectedSubtitle?.Track);
         }
         else
         {
@@ -188,7 +189,8 @@ internal sealed partial class MediaPickerViewModel : ObservableObject
                 return;
             }
 
-            Result = new MediaPickerSelection(SelectedQuality.Variant, null, SelectedFormat?.Format ?? MediaPickerFormat.Mp4);
+            Result = new MediaPickerSelection(SelectedQuality.Variant, null, SelectedFormat?.Format ?? MediaPickerFormat.Mp4,
+                SelectedSubtitle?.Track);
         }
 
         Closed?.Invoke();
