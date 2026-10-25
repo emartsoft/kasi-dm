@@ -36,6 +36,8 @@ export interface BrowserDriver {
   captureFirstMedia(): Promise<void>;
   /** The toolbar badge text, or undefined when this driver cannot read it. */
   badge(): Promise<string | undefined>;
+  /** The media page tab's badge text, or undefined when this driver cannot read it. */
+  mediaBadge(): Promise<string | undefined>;
   close(): Promise<void>;
 }
 

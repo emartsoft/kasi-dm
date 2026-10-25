@@ -46,7 +46,7 @@ async function expectMedia(
   });
   expect(list).toContain(kind === 'direct' ? 'Media' : kind.toUpperCase());
   if (driver.family === 'chromium') {
-    expect(await driver.badge()).toBe('1');
+    expect(await driver.mediaBadge()).toBe('1');
   }
   await driver.captureFirstMedia();
   const captured = await waitFor(`${kind} capture to reach Kasi`, async () =>

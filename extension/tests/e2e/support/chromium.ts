@@ -176,6 +176,14 @@ export async function launchChromium(
       }
     },
     badge: () =>
+      worker.evaluate(() =>
+        (
+          globalThis as unknown as {
+            chrome: { action: { getBadgeText(d: object): Promise<string> } };
+          }
+        ).chrome.action.getBadgeText({}),
+      ),
+    mediaBadge: () =>
       worker.evaluate(async (pageUrl) => {
         const api = (
           globalThis as unknown as {

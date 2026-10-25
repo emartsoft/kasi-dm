@@ -146,6 +146,7 @@ export async function launchFirefox(
       });
     },
     badge: () => Promise.resolve(undefined),
+    mediaBadge: () => Promise.resolve(undefined),
     close: async () => {
       await session.quit();
       await rm(downloads, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
