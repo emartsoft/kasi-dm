@@ -14,7 +14,7 @@ Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5
 | M0 | 1 to 2 | Foundations: solution, data layer, test server, CI | End of M0 | ✅ closed for engineering; owner items open (code signing, Native AOT check) |
 | M1 | 3 to 8 | Download engine, resume, bandwidth | **Engine gate** | 🔶 16 of 16 tasks done (M1.1 to M1.16); the engine gate itself is still open |
 | M2 | 9 to 13 | Browser extension, host, queues, categories, main UI flows | **Internal alpha** | 🔶 M2.1 to M2.13 implemented and merged, M2.14 (the redesign) merged except UIR-6's high-contrast and Narrator passes; open: the store submissions of M2.6 and M2.7 (owner), and the internal-alpha gate checklist below |
-| M3 | 14 to 17 | Media capture, FFmpeg, scheduler wake and quotas | none (plan v0.4) | 🔶 M3.1 (parsers, #102), M3.2 (loader/DRM gate, #104), M3.3 (segment pipeline, #106) and M3.4 (FFmpeg mux, #111) merged; the 3e glue and M3.6 picker are in review; rest not started |
+| M3 | 14 to 17 | Media capture, FFmpeg, scheduler wake and quotas | none (plan v0.4) | 🔶 M3.1 (parsers, #102), M3.2 (loader/DRM gate, #104), M3.3 (segment pipeline, #106), M3.4 (FFmpeg mux, #111), the 3e glue (#115) and the M3.6 picker (#121) merged; extension detection (3g) and the scheduler extras are not started |
 | M4 | 18 to 21 | BitTorrent, installer, portable, updates, signing | **Public beta** | ⬜ not started |
 | M5 | 22 to 24 | UI polish, accessibility, localisation, full regression, release | **v1.0 release** | ⬜ not started |
 
