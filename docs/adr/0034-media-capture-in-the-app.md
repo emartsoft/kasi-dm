@@ -1,4 +1,4 @@
-# 0031. Media capture in the app: events, recovery and the capture flow
+# 0034. Media capture in the app: events, recovery and the capture flow
 
 - Status: Accepted (M3.5 glue, PR 3e)
 - Date: 2026-10-24
