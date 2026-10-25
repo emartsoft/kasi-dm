@@ -81,6 +81,22 @@ public class DesignSystemTests
         Contrast(Colour("KasiAccentColor", Variant(name)), card).Should().BeGreaterThanOrEqualTo(3.0, "the accent as a button or a bar must stand out from the card");
     }
 
+    [AvaloniaTheory]
+    [MemberData(nameof(Variants))]
+    public void High_contrast_standards_are_met_for_text_and_surfaces(string name)
+    {
+        var card = Colour("KasiCardColor", Variant(name));
+        var baseColor = Colour("KasiBaseColor", Variant(name));
+
+        // Primary text achieves WCAG AAA enhanced contrast (>= 7.0:1) on card and base in both dark and light
+        Contrast(Colour("KasiTextPrimaryColor", Variant(name)), card).Should().BeGreaterThanOrEqualTo(7.0);
+        Contrast(Colour("KasiTextPrimaryColor", Variant(name)), baseColor).Should().BeGreaterThanOrEqualTo(7.0);
+
+        // Every card and tool has explicit border brush for high-contrast visibility and boundary definition
+        Application.Current!.TryGetResource("KasiBorderBrush", Variant(name), out var b).Should().BeTrue();
+        b.Should().NotBeNull();
+    }
+
     [AvaloniaFact]
     public void The_accent_is_the_designs_indigo_whatever_accent_windows_has()
     {
