@@ -1,3 +1,5 @@
+using Kasi.Engine;
+
 namespace Kasi.Media;
 
 public enum MediaMuxContainer
@@ -14,6 +16,7 @@ public enum MediaMuxErrorKind
     ProbeFailed,
     DurationMismatch,
     Io,
+    FlaggedByAntivirus,
 }
 
 /// <summary>The mux or duration check failed. The work folder is kept for diagnosis.</summary>
@@ -42,6 +45,12 @@ public sealed record MediaMuxOptions
 
     /// <summary>Deletes the joined/segment work folder after a successful probe; a mismatch keeps it.</summary>
     public bool DeleteWorkDirectory { get; init; } = true;
+
+    /// <summary>The optional antivirus scan (off unless the setting is on); null scans nothing.</summary>
+    public Kasi.Core.IFileScanner? Scanner { get; init; }
+
+    /// <summary>Gets the safety step's fixed log lines.</summary>
+    public Action<string>? Log { get; init; }
 }
 
 public sealed record MediaMuxResult(string OutputPath, string Container, double DurationSeconds, bool WorkDirectoryDeleted);
@@ -124,6 +133,12 @@ public sealed class MediaMuxer(FfmpegRunner ffmpeg)
             throw new MediaMuxException(
                 MediaMuxErrorKind.DurationMismatch,
                 "The muxed duration does not match the manifest.");
+        }
+
+        // the scan and the Mark-of-the-Web, as for every download; a flagged file stays under its temporary name, never deleted by Kasi
+        if (await FileSafety.ApplyAsync(temporary, null, options.Scanner, options.Log, cancellationToken).ConfigureAwait(false))
+        {
+            throw new MediaMuxException(MediaMuxErrorKind.FlaggedByAntivirus, FileSafety.FlaggedMessage);
         }
 
         try
