@@ -95,15 +95,15 @@ internal static class PageServer
 
     private static string MediaPage(string kind, string testServer) => kind switch
     {
-        "hls" => $"""
+        "hls" => $$"""
             <!doctype html><meta charset="utf-8"><title>Kasi HLS</title><body>
             <h1>HLS</h1><video id="player" width="640" height="360" poster="/poster.jpg"></video>
-            <script>fetch('{testServer}/hls/clear/master.m3u8').catch(()=>undefined);</script></body>
+            <script>fetch('{{testServer}}/hls/clear/master.m3u8', { mode: 'no-cors' }).catch(()=>undefined);</script></body>
             """,
-        "dash" => $"""
+        "dash" => $$"""
             <!doctype html><meta charset="utf-8"><title>Kasi DASH</title><body>
             <h1>DASH</h1><video id="player" width="640" height="360" poster="/poster.jpg"></video>
-            <script>fetch('{testServer}/dash/clear/manifest.mpd').catch(()=>undefined);</script></body>
+            <script>fetch('{{testServer}}/dash/clear/manifest.mpd', { mode: 'no-cors' }).catch(()=>undefined);</script></body>
             """,
         _ => $"""
             <!doctype html><meta charset="utf-8"><title>Kasi direct media</title><body>
