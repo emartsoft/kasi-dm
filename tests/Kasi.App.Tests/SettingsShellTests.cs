@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using Kasi.App.Browser;
+using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.ViewModels;
 using Kasi.App.Views;
@@ -139,7 +140,54 @@ public class SettingsShellTests
         window.GetVisualDescendants().OfType<ToggleSwitch>().Where(t => t.IsEffectivelyVisible).Should().HaveCount(3);
         model.SelectedTab = 0;
         window.UpdateLayout();
-        window.GetVisualDescendants().OfType<ToggleSwitch>().Where(t => t.IsEffectivelyVisible).Should().BeEmpty("the Browser page is not shown on General");
+        window.GetVisualDescendants().OfType<ToggleSwitch>().Where(t => t.IsEffectivelyVisible).Should().HaveCount(1, "General has only the scan switch: the Browser page is not shown there");
         window.Close();
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-004")]
+    public async Task Scanning_downloads_is_off_by_default_is_saved_with_the_settings_and_Restore_Defaults_turns_it_off()
+    {
+        var ui = new MemoryUiSettings();
+        var model = new SettingsViewModel(new Store(new BrowserSettings()), ui);
+        model.ScanDownloads.Should().BeFalse("off is the default");
+        ui.Current.ScanDownloads.Should().BeFalse();
+
+        model.ScanDownloads = true;
+        await model.SaveCommand.ExecuteAsync(null);
+
+        ui.Current.ScanDownloads.Should().BeTrue();
+        model.SearchText = "antivirus";
+        model.Hits.Should().ContainSingle().Which.PageId.Should().Be(0);
+        model.RestoreDefaultsCommand.Execute(null);
+        model.ScanDownloads.Should().BeFalse();
+    }
+
+    [Fact]
+    [Trait("TC", "TC-CAT-004")]
+    public async Task The_engines_scanner_follows_the_setting_at_each_completion_and_scans_through_the_real_one_only_when_on()
+    {
+        var ui = new MemoryUiSettings();
+        var inner = new CountingScanner();
+        var gated = new SettingGatedScanner(ui, inner);
+
+        gated.IsEnabled.Should().BeFalse();
+        await ui.SaveAsync(ui.Current with { ScanDownloads = true }, TestContext.Current.CancellationToken);
+        gated.IsEnabled.Should().BeTrue("the setting is read each time, not once at start-up");
+        (await gated.ScanAsync("a.bin", TestContext.Current.CancellationToken)).Verdict.Should().Be(Kasi.Core.ScanVerdict.Clean);
+        inner.Calls.Should().Be(1);
+    }
+
+    private sealed class CountingScanner : Kasi.Core.IFileScanner
+    {
+        public int Calls { get; private set; }
+
+        public bool IsEnabled => true;
+
+        public Task<Kasi.Core.ScanResult> ScanAsync(string path, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(Kasi.Core.ScanResult.Clean);
+        }
     }
 }

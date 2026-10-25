@@ -38,6 +38,11 @@ A download takes its category from the dialog or a remembered site, otherwise it
 
 15. **The Mark-of-the-Web is written on every completed file, with no switch.** `MarkOfTheWeb.TryWrite` puts `[ZoneTransfer]`, `ZoneId=3` and `HostUrl=<address without user name, password, query and fragment>` into the `Zone.Identifier` stream of the sealed part file, after the checksum check and before the rename, in the one finalisation step all three transfer paths (empty file, single stream, segmented) share. The stream travels with the rename. A volume that cannot hold streams (FAT32, exFAT, some shares) is not an error: the job log gets one fixed line, "Mark-of-the-Web not supported on this volume", and the download completes, because it must not fail for a mark the volume cannot hold. A resumed download reaches finalisation once, so it is marked once.
 
+## Decision (11e)
+
+16. **An optional scan, off by default, through AMSI.** `IFileScanner` (Kasi.Core) and `AmsiScanner` (Kasi.Engine, P/Invoke `AmsiInitialize`, `AmsiOpenSession`, `AmsiScanBuffer`) so whatever antivirus is installed answers. The sealed part file is read in windows of 4 MiB overlapping by 64 KiB, files up to 512 MiB; larger files are left to Windows' own on-access scanning and the log says so. The scan runs after the checksum check and before the Mark-of-the-Web and the rename, only when the user's setting (Settings, General: "Scan finished downloads with my antivirus"; `UiSettings.ScanDownloads`, read at each completion by `SettingGatedScanner`) is on.
+17. **Only a detection ends the job, and Kasi never deletes the file.** A detection fails the job (`TransferErrorKind.FlaggedByAntivirus`) with the fixed message "Flagged by antivirus. Kasi leaves the file where the antivirus put it."; the part file stays, nothing is renamed. A scan that cannot run (no amsi.dll, no provider, an error code, a scanner that throws, a file over the limit) is "not scanned": the job log says so in fixed words and the download completes. The log lines are `Scan: clean`, `Scan: flagged by antivirus` and `Scan: not scanned (<fixed reason>)`; no path, address or name of what was found.
+
 ## Consequences
 
 - 11a changes no behaviour a user can see: nothing calls the resolver yet. 11b makes every way of creating a job use it.

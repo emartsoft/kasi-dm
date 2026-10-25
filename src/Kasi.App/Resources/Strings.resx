@@ -1270,4 +1270,10 @@
   <data name="DetailsChangeQueueAction" xml:space="preserve">
     <value>Change</value>
   </data>
+  <data name="SettingsScanDownloads" xml:space="preserve">
+    <value>Scan finished downloads with my antivirus</value>
+  </data>
+  <data name="SettingsScanDownloadsDescription" xml:space="preserve">
+    <value>Each file is checked through Windows antimalware (AMSI) before it gets its final name. A flagged file fails the download and Kasi leaves it where the antivirus put it. Files over 512 MB are left to Windows.</value>
+  </data>
 </root>

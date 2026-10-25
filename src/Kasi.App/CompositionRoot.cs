@@ -67,6 +67,7 @@ internal static class CompositionRoot
             sp.GetRequiredService<ICheckpointWriter>(),
             sp.GetRequiredService<BandwidthLimiter>(),
             secrets: sp.GetRequiredService<IJobSecretRepository>(),
+            scanner: new SettingGatedScanner(sp.GetRequiredService<IUiSettings>(), new AmsiScanner()),
             postProbeRouter: new CategoryRouter(
                 sp.GetRequiredService<ICategoryRepository>(),
                 sp.GetRequiredService<ICategoryRuleRepository>(),
