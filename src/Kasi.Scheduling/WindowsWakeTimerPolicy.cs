@@ -9,8 +9,8 @@ namespace Kasi.Scheduling;
 /// </summary>
 public sealed partial class WindowsWakeTimerPolicy : IWakeTimerPolicy
 {
-    private static readonly Guid SleepSubgroup = new("238C9FA8-0AAD-41ED-83F4-97BE242C8F20");
-    private static readonly Guid AllowRtcWake = new("BD3B718A-0680-4D9D-8AB2-E1D2B4AC806D");
+    private static readonly Guid _sleepSubgroup = new("238C9FA8-0AAD-41ED-83F4-97BE242C8F20");
+    private static readonly Guid _allowRtcWake = new("BD3B718A-0680-4D9D-8AB2-E1D2B4AC806D");
 
     [LibraryImport("powrprof.dll")]
     private static partial uint PowerGetActiveScheme(nint userRootPowerKey, out nint activePolicyGuid);
@@ -39,11 +39,11 @@ public sealed partial class WindowsWakeTimerPolicy : IWakeTimerPolicy
         try
         {
             var schemeGuid = Marshal.PtrToStructure<Guid>(scheme);
-            var subgroup = SleepSubgroup;
-            var setting = AllowRtcWake;
+            var subgroup = _sleepSubgroup;
+            var setting = _allowRtcWake;
             var ac = PowerReadACValueIndex(0, ref schemeGuid, ref subgroup, ref setting, out var acValue);
-            subgroup = SleepSubgroup;
-            setting = AllowRtcWake;
+            subgroup = _sleepSubgroup;
+            setting = _allowRtcWake;
             var dc = PowerReadDCValueIndex(0, ref schemeGuid, ref subgroup, ref setting, out var dcValue);
             if (ac != 0 && dc != 0)
             {
