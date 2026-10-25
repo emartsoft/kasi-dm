@@ -15,7 +15,8 @@ internal sealed class JobService(
     IQueueRunner? queueRunner = null,
     IQueueScheduleRepository? schedules = null,
     TimeProvider? timeProvider = null,
-    ICategoryRuleRepository? categoryRules = null) : IJobService
+    ICategoryRuleRepository? categoryRules = null,
+    IWakeTimerPolicy? wakePolicy = null) : IJobService
 {
     private static readonly TimeSpan _resumeWait = TimeSpan.FromSeconds(20);
     private readonly bool _wired = WireRunner(engine, queueRunner);
@@ -257,6 +258,8 @@ internal sealed class JobService(
 
     public Task StopQueueAsync(int queueId, CancellationToken cancellationToken = default) =>
         queueRunner?.StopQueueAsync(queueId, cancellationToken) ?? Task.CompletedTask;
+
+    public WakeTimerPolicy WakeTimers => wakePolicy?.Check() ?? WakeTimerPolicy.Allowed;
 
     public Task<QueueSchedule?> GetScheduleAsync(int queueId, CancellationToken cancellationToken = default) =>
         schedules?.GetAsync(queueId, cancellationToken) ?? Task.FromResult<QueueSchedule?>(null);

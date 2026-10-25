@@ -36,6 +36,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
     private int _subscriberFaults;
     private readonly IPostProbeRouter? _postProbeRouter;
     private readonly IFileScanner? _scanner;
+    private readonly IJobByteUsageSink? _usageSink;
 
     public DownloadEngine(
         IJobRepository jobs,
@@ -47,7 +48,8 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         TimeProvider? timeProvider = null,
         INetworkStatus? network = null,
         IPostProbeRouter? postProbeRouter = null,
-        IFileScanner? scanner = null)
+        IFileScanner? scanner = null,
+        IJobByteUsageSink? usageSink = null)
     {
         ArgumentNullException.ThrowIfNull(jobs);
         ArgumentNullException.ThrowIfNull(segments);
@@ -63,6 +65,7 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
         _network = network;
         _scanner = scanner;
         _postProbeRouter = postProbeRouter;
+        _usageSink = usageSink;
     }
 
     /// <summary>Raised on the single dispatcher after the transition is committed. A throwing handler is counted, never fatal.</summary>
@@ -648,6 +651,11 @@ public sealed class DownloadEngine : IAsyncDisposable, IJobControl
             }
 
             var written = scheduler.TotalWritten;
+            if (written > lastBytes)
+            {
+                _usageSink?.Report(job.Id, written - lastBytes);
+            }
+
             Publish(new JobProgressed(job.Id, written, scheduler.TotalBytes, Math.Max(0, (long)((written - lastBytes) / elapsed.TotalSeconds))));
             last = now;
             lastBytes = written;

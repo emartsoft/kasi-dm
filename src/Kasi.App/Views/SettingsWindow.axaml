@@ -50,7 +50,7 @@
     <!-- page -->
     <DockPanel Grid.Row="0" Grid.Column="1">
       <Grid DockPanel.Dock="Top" Margin="28,14,28,0" ZIndex="2">
-        <TextBox x:Name="FindBox" Text="{Binding SearchText}" Watermark="{Binding FindLabel}" Width="360" HorizontalAlignment="Right"
+        <TextBox x:Name="FindBox" Text="{Binding SearchText}" PlaceholderText="{Binding FindLabel}" Width="360" HorizontalAlignment="Right"
                  AutomationProperties.Name="{Binding FindName}" />
         <Border IsVisible="{Binding HasHits}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,40,0,0" Width="360" Classes="kasi-card" Padding="4">
           <ListBox x:Name="HitList" ItemsSource="{Binding Hits}" Background="Transparent" AutomationProperties.Name="{Binding FindName}">

@@ -101,4 +101,7 @@ internal interface IJobService
     Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default);
 
     Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default);
+
+    /// <summary>Whether Windows allows wake timers on the active power plan, for the Scheduler warning (KASI-QUE-005).</summary>
+    WakeTimerPolicy WakeTimers => WakeTimerPolicy.Allowed;
 }

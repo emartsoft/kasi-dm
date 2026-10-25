@@ -126,6 +126,68 @@ public sealed class QueueSchedulerTests
         runner.IsQueueRunning(1).Should().BeTrue();
     }
 
+    [Fact]
+    [Trait("Requirement", "KASI-QUE-005")]
+    [Trait("TC", "TC-QUE-005")]
+    public async Task The_next_schedule_start_arms_the_wake_timer_and_a_disabled_policy_disarms_it()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
+        var schedule = new QueueSchedule
+        {
+            QueueId = 1,
+            IsEnabled = true,
+            StartTime = new TimeOnly(23, 0),
+            StopTime = new TimeOnly(6, 0),
+            DaysOfWeek = DaysOfWeek.All,
+        };
+        using var timer = new FakeWakeTimer();
+        using var allowedRunner = new TestQueueRunner();
+        using (var allowed = new QueueScheduler(
+            allowedRunner,
+            new InMemoryScheduleRepository([schedule]),
+            clock,
+            wakeTimer: timer,
+            wakePolicy: new FixedPolicy(WakeTimerPolicy.Allowed)))
+        {
+            await allowed.StartAsync(Ct);
+            timer.ArmedFor.Should().Be(new DateTimeOffset(2026, 10, 25, 23, 0, 0, TimeSpan.Zero));
+
+            clock.Advance(TimeSpan.FromHours(11));
+            await allowed.EvaluateAllSchedulesAsync(Ct);
+            timer.ArmedFor.Should().Be(new DateTimeOffset(2026, 10, 26, 23, 0, 0, TimeSpan.Zero));
+        }
+
+        using var deniedRunner = new TestQueueRunner();
+        using var denied = new QueueScheduler(
+            deniedRunner,
+            new InMemoryScheduleRepository([schedule]),
+            clock,
+            wakeTimer: timer,
+            wakePolicy: new FixedPolicy(WakeTimerPolicy.Disabled));
+        await denied.EvaluateAllSchedulesAsync(Ct);
+        timer.ArmedFor.Should().BeNull();
+    }
+
+    private sealed class FixedPolicy(WakeTimerPolicy policy) : IWakeTimerPolicy
+    {
+        public WakeTimerPolicy Check() => policy;
+    }
+
+    private sealed class FakeWakeTimer : IWakeTimer
+    {
+        public DateTimeOffset? ArmedFor { get; private set; }
+
+#pragma warning disable CS0067
+        public event EventHandler? Fired;
+#pragma warning restore CS0067
+
+        public void Arm(DateTimeOffset wakeAtUtc) => ArmedFor = wakeAtUtc;
+
+        public void Disarm() => ArmedFor = null;
+
+        public void Dispose() => ArmedFor = null;
+    }
+
     private sealed class InMemoryScheduleRepository(IEnumerable<QueueSchedule> initial) : IQueueScheduleRepository
     {
         private readonly List<QueueSchedule> _items = [.. initial];

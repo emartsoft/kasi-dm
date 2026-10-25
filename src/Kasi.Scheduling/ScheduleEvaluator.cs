@@ -55,6 +55,33 @@ public static class ScheduleEvaluator
         return false;
     }
 
+    /// <summary>The next local start strictly after <paramref name="now"/>, or null when no day matches within two weeks.</summary>
+    public static DateTimeOffset? NextStart(QueueSchedule schedule, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(schedule);
+        if (!schedule.IsEnabled)
+        {
+            return null;
+        }
+
+        for (var day = 0; day <= 14; day++)
+        {
+            var date = now.Date.AddDays(day);
+            if (!IsDayEnabled(schedule.DaysOfWeek, date.DayOfWeek))
+            {
+                continue;
+            }
+
+            var candidate = new DateTimeOffset(date + schedule.StartTime.ToTimeSpan(), now.Offset);
+            if (candidate > now)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Checks whether the bit for <paramref name="day"/> is set in <paramref name="mask"/>.</summary>
     public static bool IsDayEnabled(DaysOfWeek mask, DayOfWeek day)
     {
