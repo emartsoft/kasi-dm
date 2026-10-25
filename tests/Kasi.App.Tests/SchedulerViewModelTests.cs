@@ -1,4 +1,5 @@
 using Kasi.App.Engine;
+using Kasi.App.Resources;
 using Kasi.App.ViewModels;
 using Kasi.Core;
 
@@ -71,9 +72,43 @@ public sealed class SchedulerViewModelTests
         jobService.SavedQueue.Should().BeNull();
     }
 
+    [Fact]
+    public async Task SchedulerViewModel_saves_the_quota_and_shows_the_wake_timer_warning()
+    {
+        var jobService = new FakeJobService { WakeTimers = WakeTimerPolicy.Disabled };
+        var model = new SchedulerViewModel(jobService);
+        await model.LoadAsync(1, Ct);
+
+        model.WakeTimerWarning.Should().BeTrue();
+        model.QuotaEnabled = true;
+        model.QuotaGigabytes = 2.5m;
+        model.SelectedQuotaReset = model.QuotaResets.First(choice => choice.Reset == QuotaReset.Weekly);
+
+        await model.SaveCommand.ExecuteAsync(null);
+
+        jobService.SavedQueue.Should().NotBeNull();
+        jobService.SavedQueue!.QuotaBytes.Should().Be(2_500_000_000);
+        jobService.SavedQueue.QuotaReset.Should().Be(QuotaReset.Weekly);
+    }
+
+    [Fact]
+    public async Task SchedulerViewModel_refuses_an_invalid_quota()
+    {
+        var jobService = new FakeJobService();
+        var model = new SchedulerViewModel(jobService);
+        await model.LoadAsync(1, Ct);
+
+        model.QuotaEnabled = true;
+        model.QuotaGigabytes = 0;
+        await model.SaveCommand.ExecuteAsync(null);
+
+        model.StatusText.Should().Be(Strings.SchedulerErrQuota);
+        jobService.SavedQueue.Should().BeNull();
+    }
     private sealed class FakeJobService : IJobService
     {
         public Core.Queue? SavedQueue { get; private set; }
+        public WakeTimerPolicy WakeTimers { get; set; } = WakeTimerPolicy.Allowed;
         public QueueSchedule? SavedSchedule { get; private set; }
 
 #pragma warning disable CS0067

@@ -11,6 +11,9 @@ public sealed class QueueScheduler : IDisposable
     private readonly IQueueRunner _runner;
     private readonly IQueueScheduleRepository _scheduleRepository;
     private readonly TimeProvider _timeProvider;
+    private readonly IQueueQuota? _quota;
+    private readonly IWakeTimer? _wakeTimer;
+    private readonly IWakeTimerPolicy? _wakePolicy;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<int, bool> _wasActive = [];
     private ITimer? _timer;
@@ -18,11 +21,23 @@ public sealed class QueueScheduler : IDisposable
     public QueueScheduler(
         IQueueRunner runner,
         IQueueScheduleRepository scheduleRepository,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IQueueQuota? quota = null,
+        IWakeTimer? wakeTimer = null,
+        IWakeTimerPolicy? wakePolicy = null)
     {
         _runner = runner;
         _scheduleRepository = scheduleRepository;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _quota = quota;
+        _wakeTimer = wakeTimer;
+        _wakePolicy = wakePolicy;
+#pragma warning disable IDE0031 // an event add cannot use the null-conditional operator
+        if (_wakeTimer is not null)
+        {
+            _wakeTimer.Fired += OnWakeTimerFired;
+        }
+#pragma warning restore IDE0031
     }
 
     /// <summary>Raised when a periodic evaluation throws; the timer keeps running.</summary>
@@ -71,7 +86,15 @@ public sealed class QueueScheduler : IDisposable
                 {
                     await _runner.StopQueueAsync(schedule.QueueId, cancellationToken).ConfigureAwait(false);
                 }
+
+                // A queue quota paused resumes on the first tick of the new period, in queue order (KASI-QUE-007).
+                if (_quota is not null && _wasActive.TryGetValue(schedule.QueueId, out var windowActive) && windowActive)
+                {
+                    await _runner.TryResumeAfterQuotaAsync(schedule.QueueId, cancellationToken).ConfigureAwait(false);
+                }
             }
+
+            RearmWake(schedules, now);
         }
         finally
         {
@@ -79,8 +102,48 @@ public sealed class QueueScheduler : IDisposable
         }
     }
 
+    private void RearmWake(IReadOnlyList<QueueSchedule> schedules, DateTimeOffset now)
+    {
+        if (_wakeTimer is null)
+        {
+            return;
+        }
+
+        if (_wakePolicy?.Check() == WakeTimerPolicy.Disabled)
+        {
+            _wakeTimer.Disarm();
+            return;
+        }
+
+        DateTimeOffset? next = null;
+        foreach (var schedule in schedules)
+        {
+            if (ScheduleEvaluator.NextStart(schedule, now) is { } candidate && (next is null || candidate < next))
+            {
+                next = candidate;
+            }
+        }
+
+        if (next is { } wakeAt)
+        {
+            _wakeTimer.Arm(wakeAt);
+        }
+        else
+        {
+            _wakeTimer.Disarm();
+        }
+    }
+
+    private void OnWakeTimerFired(object? sender, EventArgs args) => _ = EvaluateSafeAsync();
+
     public void Dispose()
     {
+        if (_wakeTimer is not null)
+        {
+            _wakeTimer.Fired -= OnWakeTimerFired;
+            _wakeTimer.Dispose();
+        }
+
         _timer?.Dispose();
         _gate.Dispose();
     }

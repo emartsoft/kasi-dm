@@ -680,4 +680,28 @@ internal static class Strings
     public static string AppTagline => Get(nameof(AppTagline));
 
     public static string QueueFrom => Get(nameof(QueueFrom));
+
+    public static string SchedulerQuota => Get(nameof(SchedulerQuota));
+
+    public static string SchedulerQuotaEnable => Get(nameof(SchedulerQuotaEnable));
+
+    public static string SchedulerQuotaEnableName => Get(nameof(SchedulerQuotaEnableName));
+
+    public static string SchedulerQuotaSizeName => Get(nameof(SchedulerQuotaSizeName));
+
+    public static string SchedulerQuotaUnit => Get(nameof(SchedulerQuotaUnit));
+
+    public static string SchedulerQuotaResetName => Get(nameof(SchedulerQuotaResetName));
+
+    public static string SchedulerQuotaDaily => Get(nameof(SchedulerQuotaDaily));
+
+    public static string SchedulerQuotaWeekly => Get(nameof(SchedulerQuotaWeekly));
+
+    public static string SchedulerQuotaNever => Get(nameof(SchedulerQuotaNever));
+
+    public static string SchedulerQuotaSoft => Get(nameof(SchedulerQuotaSoft));
+
+    public static string SchedulerErrQuota => Get(nameof(SchedulerErrQuota));
+
+    public static string SchedulerWakeWarning => Get(nameof(SchedulerWakeWarning));
 }

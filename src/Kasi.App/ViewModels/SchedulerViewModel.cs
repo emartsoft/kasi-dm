@@ -10,6 +10,8 @@ namespace Kasi.App.ViewModels;
 
 internal sealed record PostActionChoice(PostActionKind Kind, string Label);
 
+internal sealed record QuotaResetChoice(QuotaReset Reset, string Label);
+
 /// <summary>The words for what a queue does when it has finished: the Scheduler's list and the Active Transfer window's footer use the same.</summary>
 internal static class PostActionText
 {
@@ -86,10 +88,29 @@ internal sealed partial class SchedulerViewModel : ObservableObject
     [ObservableProperty]
     private string _statusText = string.Empty;
 
+    [ObservableProperty]
+    private bool _quotaEnabled;
+
+    [ObservableProperty]
+    private decimal? _quotaGigabytes;
+
+    [ObservableProperty]
+    private QuotaResetChoice _selectedQuotaReset;
+
+    [ObservableProperty]
+    private bool _wakeTimerWarning;
+
     public IReadOnlyList<PostActionChoice> PostActions { get; } =
     [
         .. new[] { PostActionKind.None, PostActionKind.Sleep, PostActionKind.Hibernate, PostActionKind.Shutdown, PostActionKind.ExitKasi, PostActionKind.RunProgram }
             .Select(kind => new PostActionChoice(kind, PostActionText.Label(kind))),
+    ];
+
+    public IReadOnlyList<QuotaResetChoice> QuotaResets { get; } =
+    [
+        new(QuotaReset.Daily, Strings.SchedulerQuotaDaily),
+        new(QuotaReset.Weekly, Strings.SchedulerQuotaWeekly),
+        new(QuotaReset.Never, Strings.SchedulerQuotaNever),
     ];
 
     public event Action? RequestClose;
@@ -98,10 +119,12 @@ internal sealed partial class SchedulerViewModel : ObservableObject
     {
         _jobService = jobService;
         _selectedPostAction = PostActions[0];
+        _selectedQuotaReset = QuotaResets[0];
     }
 
     public async Task LoadAsync(int? selectQueueId = null, CancellationToken cancellationToken = default)
     {
+        WakeTimerWarning = _jobService.WakeTimers == WakeTimerPolicy.Disabled;
         var list = await _jobService.QueuesAsync(cancellationToken).ConfigureAwait(true);
         Queues = new ObservableCollection<Core.Queue>(list);
         SelectedQueue = list.FirstOrDefault(q => q.Id == (selectQueueId ?? 1)) ?? (list.Count > 0 ? list[0] : null);
@@ -230,9 +253,23 @@ internal sealed partial class SchedulerViewModel : ObservableObject
             Arguments = SelectedPostAction.Kind == PostActionKind.RunProgram ? ProgramArguments : null,
         };
 
+        long? quotaBytes = null;
+        if (QuotaEnabled)
+        {
+            if (QuotaGigabytes is not { } gigabytes || gigabytes <= 0 || gigabytes > 1_000_000)
+            {
+                StatusText = Strings.SchedulerErrQuota;
+                return;
+            }
+
+            quotaBytes = checked((long)(gigabytes * 1_000_000_000m));
+        }
+
         var updatedQueue = _currentQueue with
         {
             MaxParallel = MaxParallel,
+            QuotaBytes = quotaBytes,
+            QuotaReset = QuotaEnabled ? SelectedQuotaReset.Reset : null,
             PostAction = PostActionParser.Format(postActionConfig),
         };
 

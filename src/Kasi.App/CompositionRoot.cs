@@ -57,10 +57,20 @@ internal static class CompositionRoot
         services.AddSingleton<ICategoryRuleRepository>(sp => new CategoryRuleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueRepository>(sp => new QueueRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueScheduleRepository>(sp => new QueueScheduleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<IQueueUsageRepository>(sp => new QueueUsageRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobSecretRepository>(sp => new JobSecretRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton(sp => new CheckpointWriter(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICheckpointWriter>(sp => sp.GetRequiredService<CheckpointWriter>());
         services.AddSingleton(_ => new BandwidthLimiter());
+        services.AddSingleton<QueueQuotaService>(sp => new QueueQuotaService(
+            sp.GetRequiredService<IQueueRepository>(),
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IQueueUsageRepository>(),
+            TimeProvider.System));
+        services.AddSingleton<IQueueQuota>(sp => sp.GetRequiredService<QueueQuotaService>());
+        services.AddSingleton<IJobByteUsageSink>(sp => sp.GetRequiredService<QueueQuotaService>());
+        services.AddSingleton<IWakeTimer, WindowsWakeTimer>();
+        services.AddSingleton<IWakeTimerPolicy, WindowsWakeTimerPolicy>();
         services.AddSingleton<IFileScanner>(sp => new SettingGatedScanner(sp.GetRequiredService<IUiSettings>(), new AmsiScanner()));
         services.AddSingleton(sp => new DownloadEngine(
             sp.GetRequiredService<IJobRepository>(),
@@ -69,6 +79,7 @@ internal static class CompositionRoot
             sp.GetRequiredService<BandwidthLimiter>(),
             secrets: sp.GetRequiredService<IJobSecretRepository>(),
             scanner: sp.GetRequiredService<IFileScanner>(),
+            usageSink: sp.GetRequiredService<IJobByteUsageSink>(),
             postProbeRouter: new CategoryRouter(
                 sp.GetRequiredService<ICategoryRepository>(),
                 sp.GetRequiredService<ICategoryRuleRepository>(),
@@ -96,7 +107,8 @@ internal static class CompositionRoot
         services.AddSingleton<IQueueRunner>(sp => new QueueRunner(
             sp.GetRequiredService<IQueueRepository>(),
             sp.GetRequiredService<IJobRepository>(),
-            sp.GetRequiredService<IJobControl>()));
+            sp.GetRequiredService<IJobControl>(),
+            sp.GetRequiredService<IQueueQuota>()));
         services.AddSingleton<IPowerController, WindowsPowerController>();
         services.AddSingleton<IProgramRunner, ProcessProgramRunner>();
         services.AddSingleton(sp => new PostActionCoordinator(
@@ -109,7 +121,10 @@ internal static class CompositionRoot
         services.AddSingleton(sp => new QueueScheduler(
             sp.GetRequiredService<IQueueRunner>(),
             sp.GetRequiredService<IQueueScheduleRepository>(),
-            TimeProvider.System));
+            TimeProvider.System,
+            sp.GetRequiredService<IQueueQuota>(),
+            sp.GetRequiredService<IWakeTimer>(),
+            sp.GetRequiredService<IWakeTimerPolicy>()));
         services.AddSingleton<IJobService>(sp => new JobService(
             sp.GetRequiredService<DownloadEngine>(),
             sp.GetRequiredService<IJobRepository>(),
@@ -120,7 +135,8 @@ internal static class CompositionRoot
             sp.GetRequiredService<BandwidthLimiter>(),
             sp.GetRequiredService<IQueueRunner>(),
             sp.GetRequiredService<IQueueScheduleRepository>(),
-            categoryRules: sp.GetRequiredService<ICategoryRuleRepository>()));
+            categoryRules: sp.GetRequiredService<ICategoryRuleRepository>(),
+            wakePolicy: sp.GetRequiredService<IWakeTimerPolicy>()));
         services.AddSingleton<IMediaPicker, AvaloniaMediaPicker>();
         services.AddSingleton<IBrowserMediaCapture>(sp => new BrowserMediaCapture(
             sp.GetRequiredService<MediaSourceLoader>(),

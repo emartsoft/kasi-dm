@@ -7,15 +7,35 @@ namespace Kasi.Scheduling;
 /// Enforces per-queue concurrency limits (<see cref="Queue.MaxParallel"/>), dispatches queued jobs,
 /// shifts failing jobs to queue tails, and manages fractional-index job reordering (TRD 10.1, KASI-QUE-001, KASI-QUE-002).
 /// </summary>
-public sealed class QueueRunner(
-    IQueueRepository queueRepository,
-    IJobRepository jobRepository,
-    IJobControl jobControl) : IQueueRunner
+public sealed class QueueRunner : IQueueRunner
 {
+    private readonly IQueueRepository _queueRepository;
+    private readonly IJobRepository _jobRepository;
+    private readonly IJobControl _jobControl;
+    private readonly IQueueQuota? _quota;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly ConcurrentDictionary<int, bool> _runningQueues = new();
     private readonly ConcurrentDictionary<JobId, int> _activeJobs = new();
     private readonly ConcurrentDictionary<int, bool> _ranSinceStart = new();
+    private readonly ConcurrentDictionary<int, bool> _quotaPaused = new();
+
+    public QueueRunner(
+        IQueueRepository queueRepository,
+        IJobRepository jobRepository,
+        IJobControl jobControl,
+        IQueueQuota? quota = null)
+    {
+        _queueRepository = queueRepository;
+        _jobRepository = jobRepository;
+        _jobControl = jobControl;
+        _quota = quota;
+#pragma warning disable IDE0031 // an event add cannot use the null-conditional operator
+        if (_quota is not null)
+        {
+            _quota.QuotaReached += (_, queueId) => _ = PauseForQuotaAsync(queueId);
+        }
+#pragma warning restore IDE0031
+    }
 
     public event EventHandler<int>? QueueCompleted;
 
@@ -46,7 +66,7 @@ public sealed class QueueRunner(
 
         foreach (var id in toPause)
         {
-            await jobControl.PauseJobAsync(id, cancellationToken).ConfigureAwait(false);
+            await _jobControl.PauseJobAsync(id, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -75,10 +95,15 @@ public sealed class QueueRunner(
         {
             if (newState is JobState.Completed or JobState.Failed or JobState.Paused)
             {
+                if (_quota is not null)
+                {
+                    await _quota.ReleaseAsync(jobId, cancellationToken).ConfigureAwait(false);
+                }
+
                 _activeJobs.TryRemove(jobId, out var queueId);
                 if (queueId == 0)
                 {
-                    var job = await jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+                    var job = await _jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
                     if (job is not null)
                     {
                         queueId = job.QueueId;
@@ -92,10 +117,10 @@ public sealed class QueueRunner(
 
                 if (newState == JobState.Failed && queueId > 0)
                 {
-                    var allJobs = await jobRepository.ListAsync(queueId: queueId, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    var allJobs = await _jobRepository.ListAsync(queueId: queueId, cancellationToken: cancellationToken).ConfigureAwait(false);
                     double maxPos = allJobs.Count > 0 ? allJobs.Max(j => j.QueuePos) : 0.0;
                     double tailPos = FractionalIndex.After(maxPos);
-                    await jobRepository.UpdateQueuePositionAsync(jobId, queueId, tailPos, cancellationToken).ConfigureAwait(false);
+                    await _jobRepository.UpdateQueuePositionAsync(jobId, queueId, tailPos, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (queueId > 0 && IsQueueRunning(queueId))
@@ -105,7 +130,7 @@ public sealed class QueueRunner(
             }
             else if (IsActiveState(newState))
             {
-                var job = await jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+                var job = await _jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
                 if (job is not null)
                 {
                     _activeJobs[jobId] = job.QueueId;
@@ -128,14 +153,14 @@ public sealed class QueueRunner(
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var job = await jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+            var job = await _jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
             if (job is null)
             {
                 return false;
             }
 
-            var beforeJob = beforeJobId is { } bId ? await jobRepository.GetAsync(bId, cancellationToken).ConfigureAwait(false) : null;
-            var afterJob = afterJobId is { } aId ? await jobRepository.GetAsync(aId, cancellationToken).ConfigureAwait(false) : null;
+            var beforeJob = beforeJobId is { } bId ? await _jobRepository.GetAsync(bId, cancellationToken).ConfigureAwait(false) : null;
+            var afterJob = afterJobId is { } aId ? await _jobRepository.GetAsync(aId, cancellationToken).ConfigureAwait(false) : null;
 
             if (beforeJobId is not null && beforeJob is null)
             {
@@ -153,8 +178,8 @@ public sealed class QueueRunner(
                 if (FractionalIndex.NeedsRebalance(beforeJob.QueuePos, afterJob.QueuePos))
                 {
                     await RebalanceQueueUnderLockAsync(job.QueueId, cancellationToken).ConfigureAwait(false);
-                    beforeJob = await jobRepository.GetAsync(beforeJob.Id, cancellationToken).ConfigureAwait(false);
-                    afterJob = await jobRepository.GetAsync(afterJob.Id, cancellationToken).ConfigureAwait(false);
+                    beforeJob = await _jobRepository.GetAsync(beforeJob.Id, cancellationToken).ConfigureAwait(false);
+                    afterJob = await _jobRepository.GetAsync(afterJob.Id, cancellationToken).ConfigureAwait(false);
                 }
 
                 newPos = FractionalIndex.Between(beforeJob!.QueuePos, afterJob!.QueuePos);
@@ -172,7 +197,7 @@ public sealed class QueueRunner(
                 newPos = FractionalIndex.DefaultStep;
             }
 
-            return await jobRepository.UpdateQueuePositionAsync(jobId, job.QueueId, newPos, cancellationToken).ConfigureAwait(false);
+            return await _jobRepository.UpdateQueuePositionAsync(jobId, job.QueueId, newPos, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -195,20 +220,20 @@ public sealed class QueueRunner(
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var job = await jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+            var job = await _jobRepository.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
             if (job is null)
             {
                 return false;
             }
 
-            var targetQueue = await queueRepository.GetAsync(targetQueueId, cancellationToken).ConfigureAwait(false);
+            var targetQueue = await _queueRepository.GetAsync(targetQueueId, cancellationToken).ConfigureAwait(false);
             if (targetQueue is null)
             {
                 return false;
             }
 
-            var beforeJob = beforeJobId is { } bId ? await jobRepository.GetAsync(bId, cancellationToken).ConfigureAwait(false) : null;
-            var afterJob = afterJobId is { } aId ? await jobRepository.GetAsync(aId, cancellationToken).ConfigureAwait(false) : null;
+            var beforeJob = beforeJobId is { } bId ? await _jobRepository.GetAsync(bId, cancellationToken).ConfigureAwait(false) : null;
+            var afterJob = afterJobId is { } aId ? await _jobRepository.GetAsync(aId, cancellationToken).ConfigureAwait(false) : null;
 
             if (beforeJobId is not null && (beforeJob is null || beforeJob.QueueId != targetQueueId))
             {
@@ -226,8 +251,8 @@ public sealed class QueueRunner(
                 if (FractionalIndex.NeedsRebalance(beforeJob.QueuePos, afterJob.QueuePos))
                 {
                     await RebalanceQueueUnderLockAsync(targetQueueId, cancellationToken).ConfigureAwait(false);
-                    beforeJob = await jobRepository.GetAsync(beforeJob.Id, cancellationToken).ConfigureAwait(false);
-                    afterJob = await jobRepository.GetAsync(afterJob.Id, cancellationToken).ConfigureAwait(false);
+                    beforeJob = await _jobRepository.GetAsync(beforeJob.Id, cancellationToken).ConfigureAwait(false);
+                    afterJob = await _jobRepository.GetAsync(afterJob.Id, cancellationToken).ConfigureAwait(false);
                 }
 
                 newPos = FractionalIndex.Between(beforeJob!.QueuePos, afterJob!.QueuePos);
@@ -242,12 +267,12 @@ public sealed class QueueRunner(
             }
             else
             {
-                var targetJobs = await jobRepository.ListAsync(queueId: targetQueueId, cancellationToken: cancellationToken).ConfigureAwait(false);
+                var targetJobs = await _jobRepository.ListAsync(queueId: targetQueueId, cancellationToken: cancellationToken).ConfigureAwait(false);
                 newPos = targetJobs.Count > 0 ? FractionalIndex.After(targetJobs.Max(j => j.QueuePos)) : FractionalIndex.DefaultStep;
             }
 
             int oldQueueId = job.QueueId;
-            bool moved = await jobRepository.UpdateQueuePositionAsync(jobId, targetQueueId, newPos, cancellationToken).ConfigureAwait(false);
+            bool moved = await _jobRepository.UpdateQueuePositionAsync(jobId, targetQueueId, newPos, cancellationToken).ConfigureAwait(false);
             if (moved)
             {
                 if (_activeJobs.ContainsKey(jobId))
@@ -286,13 +311,13 @@ public sealed class QueueRunner(
             return;
         }
 
-        var queue = await queueRepository.GetAsync(queueId, cancellationToken).ConfigureAwait(false);
+        var queue = await _queueRepository.GetAsync(queueId, cancellationToken).ConfigureAwait(false);
         if (queue is null)
         {
             return;
         }
 
-        var jobs = await jobRepository.ListAsync(queueId: queueId, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var jobs = await _jobRepository.ListAsync(queueId: queueId, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         foreach (var j in jobs)
         {
@@ -319,16 +344,28 @@ public sealed class QueueRunner(
                     break;
                 }
 
+                if (_quota is not null && !await _quota.TryReserveAsync(nextJob, queue, cancellationToken).ConfigureAwait(false))
+                {
+                    _quotaPaused[queueId] = true;
+                    _runningQueues[queueId] = false;
+                    break;
+                }
+
                 _activeJobs[nextJob.Id] = queueId;
                 try
                 {
-                    await jobControl.StartJobAsync(nextJob.Id, cancellationToken).ConfigureAwait(false);
+                    await _jobControl.StartJobAsync(nextJob.Id, cancellationToken).ConfigureAwait(false);
                     _ranSinceStart[queueId] = true;
                     availableSlots--;
                 }
                 catch
                 {
                     _activeJobs.TryRemove(nextJob.Id, out _);
+                    if (_quota is not null)
+                    {
+                        await _quota.ReleaseAsync(nextJob.Id, cancellationToken).ConfigureAwait(false);
+                    }
+
                     throw;
                 }
             }
@@ -343,16 +380,78 @@ public sealed class QueueRunner(
         }
     }
 
+    /// <summary>Restarts a queue that quota enforcement paused, once its period has capacity again (rollover or a cap change).</summary>
+    public async Task<bool> TryResumeAfterQuotaAsync(int queueId, CancellationToken cancellationToken = default)
+    {
+        if (_quota is null)
+        {
+            return false;
+        }
+
+        var pausedForQuota = _quotaPaused.ContainsKey(queueId)
+            || (await _jobRepository.ListAsync(queueId: queueId, state: JobState.Paused, cancellationToken: cancellationToken).ConfigureAwait(false))
+                .Any(job => job.PauseReason == PauseReason.Quota);
+        if (!pausedForQuota || !await _quota.HasCapacityAsync(queueId, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        _quotaPaused.TryRemove(queueId, out _);
+        foreach (var job in await _jobRepository.ListAsync(queueId: queueId, state: JobState.Paused, cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            if (job.PauseReason == PauseReason.Quota)
+            {
+                await _jobRepository.TryChangeStateAsync(job.Id, JobState.Paused, JobState.Queued, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        await StartQueueAsync(queueId, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    private async Task PauseForQuotaAsync(int queueId)
+    {
+        List<JobId> active;
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            _quotaPaused[queueId] = true;
+            _runningQueues[queueId] = false;
+            active = [.. _activeJobs.Where(kvp => kvp.Value == queueId).Select(kvp => kvp.Key)];
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        foreach (var id in active)
+        {
+            try
+            {
+                await _jobControl.PauseJobAsync(id).ConfigureAwait(false);
+                var job = await _jobRepository.GetAsync(id).ConfigureAwait(false);
+                if (job is { State: JobState.Paused })
+                {
+                    await _jobRepository.TryChangeStateAsync(id, JobState.Paused, JobState.Paused, "Data quota reached", PauseReason.Quota).ConfigureAwait(false);
+                }
+            }
+            catch (Exception)
+            {
+                // A job that changed state meanwhile must not stop the others; the queue stays stopped either way.
+            }
+        }
+    }
+
     private async Task RebalanceQueueUnderLockAsync(int queueId, CancellationToken cancellationToken)
     {
-        var jobs = await jobRepository.ListAsync(queueId: queueId, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var jobs = await _jobRepository.ListAsync(queueId: queueId, cancellationToken: cancellationToken).ConfigureAwait(false);
         var sorted = jobs.OrderBy(j => j.QueuePos).ToList();
         for (int i = 0; i < sorted.Count; i++)
         {
             double newPos = (i + 1) * FractionalIndex.DefaultStep;
             if (Math.Abs(sorted[i].QueuePos - newPos) > 1e-9)
             {
-                await jobRepository.UpdateQueuePositionAsync(sorted[i].Id, queueId, newPos, cancellationToken).ConfigureAwait(false);
+                await _jobRepository.UpdateQueuePositionAsync(sorted[i].Id, queueId, newPos, cancellationToken).ConfigureAwait(false);
             }
         }
     }
