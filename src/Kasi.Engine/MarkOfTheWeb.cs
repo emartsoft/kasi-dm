@@ -8,7 +8,7 @@ namespace Kasi.Engine;
 /// <c>ZoneId=3</c> and the address the file came from <b>without user name, password, query or fragment</b>. There is no switch: this is a
 /// safety property, like the DRM refusal.
 /// </summary>
-internal static class MarkOfTheWeb
+public static class MarkOfTheWeb
 {
     public const string StreamName = "Zone.Identifier";
 

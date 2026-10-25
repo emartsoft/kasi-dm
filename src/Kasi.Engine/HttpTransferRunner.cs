@@ -1562,43 +1562,13 @@ public sealed class HttpTransferRunner
             }
         }
 
-        if (options.Scanner is { IsEnabled: true } scanner)
+        if (await FileSafety.ApplyAsync(writer.PartPath, source, options.Scanner, options.Log, cancellationToken, options.MarkWriter).ConfigureAwait(false))
         {
-            var scan = await ScanQuietlyAsync(scanner, writer.PartPath, cancellationToken).ConfigureAwait(false);
-            switch (scan.Verdict)
-            {
-                case ScanVerdict.Detected:
-                    options.Log?.Invoke("Scan: flagged by antivirus");
-                    return new TransferFailure(TransferErrorKind.FlaggedByAntivirus, "Flagged by antivirus. Kasi leaves the file where the antivirus put it.");
-                case ScanVerdict.Clean:
-                    options.Log?.Invoke("Scan: clean");
-                    break;
-                default:
-                    options.Log?.Invoke("Scan: not scanned" + (scan.Note is { } note ? " (" + note + ")" : string.Empty));
-                    break;
-            }
-        }
-
-        if (!MarkOfTheWeb.TryWrite(writer.PartPath, source))
-        {
-            options.Log?.Invoke("Mark-of-the-Web not supported on this volume");
+            return new TransferFailure(TransferErrorKind.FlaggedByAntivirus, FileSafety.FlaggedMessage);
         }
 
         var commit = await writer.CommitAsync(options.OverwriteDestination, cancellationToken).ConfigureAwait(false);
         return commit.IsSuccess ? null : DiskFailure(commit);
-    }
-
-    // a scanner that fails for any reason other than being cancelled has not scanned: it never fails the download
-    private static async Task<ScanResult> ScanQuietlyAsync(IFileScanner scanner, string path, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await scanner.ScanAsync(path, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
-        {
-            return ScanResult.NotScanned("the scan failed");
-        }
     }
 
     private static async ValueTask<int> ReadBodyAsync(

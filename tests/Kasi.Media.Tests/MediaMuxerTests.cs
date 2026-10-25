@@ -269,6 +269,68 @@ public sealed class MediaMuxerTests : IAsyncLifetime, IDisposable
         probe.Streams.Should().OnlyContain(stream => stream.CodecType == "audio");
     }
 
+    private sealed class FakeScanner(ScanResult answer) : IFileScanner
+    {
+        public bool IsEnabled => true;
+
+        public Task<ScanResult> ScanAsync(string path, CancellationToken cancellationToken) => Task.FromResult(answer);
+    }
+
+    private MediaJobResult AudioResult(string name)
+    {
+        var audioPath = Path.Combine(_folder, name + ".m4a");
+        File.Copy(Path.Combine(MuxableFixturesSource(), "audio.m4a"), audioPath);
+        var work = Path.Combine(_folder, name + "-work");
+        Directory.CreateDirectory(work);
+        var track = new MediaTrack("audio", MediaRole.Audio, "en", "mp4a.40.2", "audio/mp4", 48000, null, null, 24, false, null, []);
+        return new MediaJobResult(
+            _jobId,
+            [new MediaJoinedTrack(0, "audio", audioPath, new FileInfo(audioPath).Length, "audio/mp4")],
+            new FileInfo(audioPath).Length,
+            new MediaVariant(track, track, null),
+            work);
+    }
+
+    [Trait("Requirement", "KASI-CAT-003")]
+    [Trait("TC", "TC-CAT-003")]
+    [Fact]
+    public async Task A_muxed_file_is_scanned_and_carries_the_mark_of_the_web()
+    {
+        if (!TryGetFfmpeg())
+        {
+            return;
+        }
+
+        var log = new List<string>();
+        var output = Path.Combine(_folder, "out", "marked.m4a");
+
+        var muxed = await Muxer().MuxAsync(
+            AudioResult("marked"), new MediaMuxOptions { OutputPath = output, Scanner = new FakeScanner(ScanResult.Clean), Log = log.Add }, TestContext.Current.CancellationToken);
+
+        log.Should().Contain("Scan: clean");
+        (await File.ReadAllTextAsync(muxed.OutputPath + ":Zone.Identifier", TestContext.Current.CancellationToken)).Should().Contain("ZoneId=3");
+    }
+
+    [Trait("Requirement", "KASI-CAT-004")]
+    [Trait("TC", "TC-CAT-004")]
+    [Fact]
+    public async Task A_flagged_muxed_file_fails_the_job_and_stays_under_its_temporary_name()
+    {
+        if (!TryGetFfmpeg())
+        {
+            return;
+        }
+
+        var output = Path.Combine(_folder, "out", "flagged.m4a");
+
+        var act = () => Muxer().MuxAsync(
+            AudioResult("flagged"), new MediaMuxOptions { OutputPath = output, Scanner = new FakeScanner(ScanResult.Detected) }, TestContext.Current.CancellationToken);
+
+        (await act.Should().ThrowAsync<MediaMuxException>()).Which.Kind.Should().Be(MediaMuxErrorKind.FlaggedByAntivirus);
+        File.Exists(output).Should().BeFalse("nothing flagged gets its real name");
+        File.Exists(output + ".part.m4a").Should().BeTrue("and Kasi does not delete it: the antivirus has dealt with it");
+    }
+
     private static string MuxableFixturesSource()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
