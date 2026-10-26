@@ -170,7 +170,7 @@ export async function launchChromium(
       try {
         await popup.goto(`chrome-extension://${extension.id}/src/popup/index.html`);
         await page.bringToFront();
-        await popup.locator('#media-list li button').first().click();
+        await popup.locator('#media-list li button').first().click({ force: true });
       } finally {
         await popup.close();
       }

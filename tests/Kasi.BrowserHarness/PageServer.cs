@@ -105,10 +105,10 @@ internal static class PageServer
             <h1>DASH</h1><video id="player" width="640" height="360" poster="/poster.jpg"></video>
             <script>fetch('{{testServer}}/dash/clear/manifest.mpd', { mode: 'no-cors' }).catch(()=>undefined);</script></body>
             """,
-        _ => $"""
+        _ => $$"""
             <!doctype html><meta charset="utf-8"><title>Kasi direct media</title><body>
-            <h1>Direct</h1><video id="player" width="640" height="360" controls src="{testServer}/media/direct/2000000"></video>
-            </body>
+            <h1>Direct</h1><video id="player" width="640" height="360" controls preload="auto" src="{{testServer}}/media/direct/2000000"></video>
+            <script>fetch('{{testServer}}/media/direct/2000000').catch(()=>undefined);</script></body>
             """,
     };
 
