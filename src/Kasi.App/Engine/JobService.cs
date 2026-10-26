@@ -16,7 +16,8 @@ internal sealed class JobService(
     IQueueScheduleRepository? schedules = null,
     TimeProvider? timeProvider = null,
     ICategoryRuleRepository? categoryRules = null,
-    IWakeTimerPolicy? wakePolicy = null) : IJobService
+    IWakeTimerPolicy? wakePolicy = null,
+    ISpeedProfileRepository? speedProfiles = null) : IJobService
 {
     private static readonly TimeSpan _resumeWait = TimeSpan.FromSeconds(20);
     private readonly bool _wired = WireRunner(engine, queueRunner);
@@ -266,6 +267,35 @@ internal sealed class JobService(
 
     public Task SaveScheduleAsync(QueueSchedule schedule, CancellationToken cancellationToken = default) =>
         schedules?.UpsertAsync(schedule, cancellationToken) ?? Task.CompletedTask;
+
+    public Task<IReadOnlyList<SpeedProfile>> SpeedProfilesAsync(CancellationToken cancellationToken = default) =>
+        speedProfiles is null ? Task.FromResult<IReadOnlyList<SpeedProfile>>([]) : speedProfiles.ListAsync(cancellationToken);
+
+    public async Task SaveSpeedProfileAsync(SpeedProfile profile, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (speedProfiles is null)
+        {
+            return;
+        }
+
+        if (profile.Id > 0)
+        {
+            await speedProfiles.UpdateAsync(profile, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await speedProfiles.AddAsync(profile, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public async Task DeleteSpeedProfileAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (speedProfiles is not null)
+        {
+            await speedProfiles.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     public async Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default)
     {

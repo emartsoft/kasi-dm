@@ -704,4 +704,24 @@ internal static class Strings
     public static string SchedulerErrQuota => Get(nameof(SchedulerErrQuota));
 
     public static string SchedulerWakeWarning => Get(nameof(SchedulerWakeWarning));
+
+    public static string SchedulerSpeedProfile => Get(nameof(SchedulerSpeedProfile));
+
+    public static string SchedulerSpeedProfileName => Get(nameof(SchedulerSpeedProfileName));
+
+    public static string SchedulerNoProfile => Get(nameof(SchedulerNoProfile));
+
+    public static string SettingsSpeedProfiles => Get(nameof(SettingsSpeedProfiles));
+
+    public static string SettingsSpeedProfileName => Get(nameof(SettingsSpeedProfileName));
+
+    public static string SettingsSpeedProfileLimit => Get(nameof(SettingsSpeedProfileLimit));
+
+    public static string SettingsSpeedProfileAdd => Get(nameof(SettingsSpeedProfileAdd));
+
+    public static string SettingsSpeedProfileSave => Get(nameof(SettingsSpeedProfileSave));
+
+    public static string SettingsSpeedProfileDelete => Get(nameof(SettingsSpeedProfileDelete));
+
+    public static string SettingsSpeedProfileEmpty => Get(nameof(SettingsSpeedProfileEmpty));
 }

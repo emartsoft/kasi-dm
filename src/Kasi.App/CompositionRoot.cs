@@ -57,6 +57,7 @@ internal static class CompositionRoot
         services.AddSingleton<ICategoryRuleRepository>(sp => new CategoryRuleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueRepository>(sp => new QueueRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueScheduleRepository>(sp => new QueueScheduleRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<ISpeedProfileRepository>(sp => new SpeedProfileRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueUsageRepository>(sp => new QueueUsageRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobSecretRepository>(sp => new JobSecretRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton(sp => new CheckpointWriter(sp.GetRequiredService<SqliteConnectionFactory>()));

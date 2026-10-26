@@ -3,6 +3,7 @@
         xmlns:vm="using:Kasi.App.ViewModels"
         xmlns:views="using:Kasi.App.Views"
         xmlns:c="using:Kasi.App.Controls"
+        xmlns:core="using:Kasi.Core"
         x:Class="Kasi.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="{Binding Title}"
@@ -148,6 +149,31 @@
           <StackPanel IsVisible="{Binding IsSchedulerPage}" Spacing="10">
             <Border Classes="kasi-card">
               <Button Content="{Binding OpenSchedulerLabel}" Command="{Binding OpenSchedulerCommand}" Classes="accent" HorizontalAlignment="Left" AutomationProperties.Name="{Binding OpenSchedulerLabel}" />
+            </Border>
+            <Border Classes="kasi-card">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding SpeedProfilesLabel}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SpeedProfileEmptyLabel}" Classes="kasi-secondary" IsVisible="{Binding !HasSpeedProfiles}" TextWrapping="Wrap" />
+                <ListBox ItemsSource="{Binding SpeedProfiles}" SelectedItem="{Binding SelectedSpeedProfile}" MinHeight="80" AutomationProperties.Name="{Binding SpeedProfilesLabel}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="core:SpeedProfile">
+                      <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,8,Auto,8,Auto" RowSpacing="4">
+                  <TextBlock Grid.Row="0" Text="{Binding SpeedProfileNameLabel}" Classes="kasi-secondary" />
+                  <TextBox Grid.Row="2" Text="{Binding SpeedProfileNameText}" AutomationProperties.Name="{Binding SpeedProfileNameLabel}" />
+                  <TextBlock Grid.Row="4" Text="{Binding SpeedProfileLimitLabel}" Classes="kasi-secondary" />
+                  <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding SpeedProfileMegabytes}" Minimum="0" Maximum="1000000" Increment="0.5" FormatString="0.##" Width="180" AutomationProperties.Name="{Binding SpeedProfileLimitLabel}" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="{Binding SpeedProfileAddLabel}" Command="{Binding AddSpeedProfileCommand}" AutomationProperties.Name="{Binding SpeedProfileAddLabel}" />
+                  <Button Content="{Binding SpeedProfileSaveLabel}" Command="{Binding SaveSpeedProfileCommand}" AutomationProperties.Name="{Binding SpeedProfileSaveLabel}" />
+                  <Button Content="{Binding SpeedProfileDeleteLabel}" Command="{Binding DeleteSpeedProfileCommand}" AutomationProperties.Name="{Binding SpeedProfileDeleteLabel}" />
+                  <TextBlock Text="{Binding SpeedProfileStatus}" Classes="kasi-secondary" VerticalAlignment="Center" />
+                </StackPanel>
+              </StackPanel>
             </Border>
           </StackPanel>
 

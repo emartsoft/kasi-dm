@@ -12,6 +12,8 @@ internal sealed record PostActionChoice(PostActionKind Kind, string Label);
 
 internal sealed record QuotaResetChoice(QuotaReset Reset, string Label);
 
+internal sealed record SpeedProfileChoice(int? Id, string Label);
+
 /// <summary>The words for what a queue does when it has finished: the Scheduler's list and the Active Transfer window's footer use the same.</summary>
 internal static class PostActionText
 {
@@ -100,6 +102,12 @@ internal sealed partial class SchedulerViewModel : ObservableObject
     [ObservableProperty]
     private bool _wakeTimerWarning;
 
+    [ObservableProperty]
+    private ObservableCollection<SpeedProfileChoice> _speedProfiles = [];
+
+    [ObservableProperty]
+    private SpeedProfileChoice? _selectedScheduleProfile;
+
     public IReadOnlyList<PostActionChoice> PostActions { get; } =
     [
         .. new[] { PostActionKind.None, PostActionKind.Sleep, PostActionKind.Hibernate, PostActionKind.Shutdown, PostActionKind.ExitKasi, PostActionKind.RunProgram }
@@ -125,6 +133,12 @@ internal sealed partial class SchedulerViewModel : ObservableObject
     public async Task LoadAsync(int? selectQueueId = null, CancellationToken cancellationToken = default)
     {
         WakeTimerWarning = _jobService.WakeTimers == WakeTimerPolicy.Disabled;
+        var profiles = await _jobService.SpeedProfilesAsync(cancellationToken).ConfigureAwait(true);
+        SpeedProfiles = new ObservableCollection<SpeedProfileChoice>(
+        [
+            new(null, Strings.SchedulerNoProfile),
+            .. profiles.Select(profile => new SpeedProfileChoice(profile.Id, profile.Name)),
+        ]);
         var list = await _jobService.QueuesAsync(cancellationToken).ConfigureAwait(true);
         Queues = new ObservableCollection<Core.Queue>(list);
         SelectedQueue = list.FirstOrDefault(q => q.Id == (selectQueueId ?? 1)) ?? (list.Count > 0 ? list[0] : null);
@@ -173,6 +187,7 @@ internal sealed partial class SchedulerViewModel : ObservableObject
             Thursday = (schedule.DaysOfWeek & DaysOfWeek.Thursday) != 0;
             Friday = (schedule.DaysOfWeek & DaysOfWeek.Friday) != 0;
             Saturday = (schedule.DaysOfWeek & DaysOfWeek.Saturday) != 0;
+            SelectedScheduleProfile = SpeedProfiles.FirstOrDefault(choice => choice.Id == schedule.ProfileId) ?? SpeedProfiles[0];
         }
         else
         {
@@ -181,6 +196,7 @@ internal sealed partial class SchedulerViewModel : ObservableObject
             StopTimeText = "06:00";
             RunUntilEmpty = false;
             Sunday = Monday = Tuesday = Wednesday = Thursday = Friday = Saturday = true;
+            SelectedScheduleProfile = SpeedProfiles.Count > 0 ? SpeedProfiles[0] : null;
         }
     }
 
@@ -280,6 +296,7 @@ internal sealed partial class SchedulerViewModel : ObservableObject
             StartTime = startTime,
             StopTime = stopTime,
             DaysOfWeek = days,
+            ProfileId = SelectedScheduleProfile?.Id,
         };
 
         await _jobService.SaveQueueAsync(updatedQueue).ConfigureAwait(true);

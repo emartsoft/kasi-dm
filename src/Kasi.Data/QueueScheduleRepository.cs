@@ -7,7 +7,7 @@ namespace Kasi.Data;
 public sealed class QueueScheduleRepository(SqliteConnectionFactory factory) : IQueueScheduleRepository
 {
     private const string Select =
-        "SELECT queue_id AS QueueId, is_enabled AS IsEnabled, start_time AS StartTime, stop_time AS StopTime, days_of_week AS DaysOfWeek FROM queue_schedule";
+        "SELECT queue_id AS QueueId, is_enabled AS IsEnabled, start_time AS StartTime, stop_time AS StopTime, days_of_week AS DaysOfWeek, profile_id AS ProfileId FROM queue_schedule";
 
     public async Task<QueueSchedule?> GetAsync(int queueId, CancellationToken cancellationToken = default)
     {
@@ -30,13 +30,14 @@ public sealed class QueueScheduleRepository(SqliteConnectionFactory factory) : I
         ArgumentNullException.ThrowIfNull(schedule);
         using var connection = await factory.OpenAsync(cancellationToken).ConfigureAwait(false);
         const string sql = """
-            INSERT INTO queue_schedule (queue_id, is_enabled, start_time, stop_time, days_of_week)
-            VALUES (@queueId, @isEnabled, @startTime, @stopTime, @daysOfWeek)
+            INSERT INTO queue_schedule (queue_id, is_enabled, start_time, stop_time, days_of_week, profile_id)
+            VALUES (@queueId, @isEnabled, @startTime, @stopTime, @daysOfWeek, @profileId)
             ON CONFLICT(queue_id) DO UPDATE SET
                 is_enabled = excluded.is_enabled,
                 start_time = excluded.start_time,
                 stop_time = excluded.stop_time,
-                days_of_week = excluded.days_of_week;
+                days_of_week = excluded.days_of_week,
+                profile_id = excluded.profile_id;
             """;
         await connection.ExecuteAsync(new CommandDefinition(
             sql,
@@ -47,6 +48,7 @@ public sealed class QueueScheduleRepository(SqliteConnectionFactory factory) : I
                 startTime = schedule.StartTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
                 stopTime = schedule.StopTime?.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
                 daysOfWeek = (int)schedule.DaysOfWeek,
+                profileId = schedule.ProfileId,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -75,6 +77,8 @@ public sealed class QueueScheduleRepository(SqliteConnectionFactory factory) : I
 
         public long DaysOfWeek { get; set; }
 
+        public long? ProfileId { get; set; }
+
         public QueueSchedule ToSchedule() => new()
         {
             QueueId = checked((int)QueueId),
@@ -82,6 +86,7 @@ public sealed class QueueScheduleRepository(SqliteConnectionFactory factory) : I
             StartTime = TimeOnly.Parse(StartTime, CultureInfo.InvariantCulture),
             StopTime = StopTime is null ? null : TimeOnly.Parse(StopTime, CultureInfo.InvariantCulture),
             DaysOfWeek = (DaysOfWeek)DaysOfWeek,
+            ProfileId = ProfileId is { } profileId ? checked((int)profileId) : null,
         };
     }
 }

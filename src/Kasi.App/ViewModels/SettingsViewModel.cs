@@ -6,6 +6,7 @@ using Kasi.App.Controls;
 using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Resources;
+using Kasi.Core;
 using Kasi.Ipc.Messages;
 
 namespace Kasi.App.ViewModels;
@@ -36,7 +37,23 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private readonly IBrowserSettings _store;
     private readonly IUiSettings? _ui;
     private readonly SettingsEnvironment? _environment;
+    private readonly IJobService? _jobs;
     private bool _syncingPage;
+
+    [ObservableProperty]
+    private ObservableCollection<SpeedProfile> _speedProfiles = [];
+
+    [ObservableProperty]
+    private SpeedProfile? _selectedSpeedProfile;
+
+    [ObservableProperty]
+    private string _speedProfileNameText = string.Empty;
+
+    [ObservableProperty]
+    private decimal _speedProfileMegabytes;
+
+    [ObservableProperty]
+    private string _speedProfileStatus = string.Empty;
 
     [ObservableProperty]
     private ThemeChoice _selectedTheme;
@@ -82,11 +99,12 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = string.Empty;
 
-    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null, SettingsEnvironment? environment = null)
+    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null, SettingsEnvironment? environment = null, IJobService? jobs = null)
     {
         _store = store;
         _ui = ui;
         _environment = environment;
+        _jobs = jobs;
         Categories = categories;
         var pages = new List<SettingsPage>
         {
@@ -196,6 +214,22 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public string AboutOwner => Strings.AboutOwner;
 
     public string AboutNoticesLabel => Strings.AboutNotices;
+
+    public string SpeedProfilesLabel => Strings.SettingsSpeedProfiles;
+
+    public string SpeedProfileNameLabel => Strings.SettingsSpeedProfileName;
+
+    public string SpeedProfileLimitLabel => Strings.SettingsSpeedProfileLimit;
+
+    public string SpeedProfileAddLabel => Strings.SettingsSpeedProfileAdd;
+
+    public string SpeedProfileSaveLabel => Strings.SettingsSpeedProfileSave;
+
+    public string SpeedProfileDeleteLabel => Strings.SettingsSpeedProfileDelete;
+
+    public string SpeedProfileEmptyLabel => Strings.SettingsSpeedProfileEmpty;
+
+    public bool HasSpeedProfiles => SpeedProfiles.Count > 0;
 
     public IReadOnlyList<string> Notices { get; } =
     [
@@ -357,6 +391,88 @@ internal sealed partial class SettingsViewModel : ObservableObject
         AckTimeoutMs = _store.Current.AckTimeoutMs,
         MinSizeBytes = MinSizeMegabytes > 0 ? (long)Math.Min(MinSizeMegabytes * MegabyteBytes, long.MaxValue) : null,
     };
+
+    public async Task LoadSpeedProfilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_jobs is null)
+        {
+            return;
+        }
+
+        var list = await _jobs.SpeedProfilesAsync(cancellationToken).ConfigureAwait(true);
+        SpeedProfiles = new ObservableCollection<SpeedProfile>(list);
+        OnPropertyChanged(nameof(HasSpeedProfiles));
+        SelectedSpeedProfile = list.Count > 0 ? list[0] : null;
+        if (list.Count == 0)
+        {
+            SpeedProfileNameText = string.Empty;
+            SpeedProfileMegabytes = 0;
+        }
+    }
+
+    partial void OnSelectedSpeedProfileChanged(SpeedProfile? value)
+    {
+        SpeedProfileNameText = value?.Name ?? string.Empty;
+        SpeedProfileMegabytes = value?.LimitBps is { } limit ? (decimal)limit / MegabyteBytes : 0;
+    }
+
+    [RelayCommand]
+    private async Task AddSpeedProfileAsync()
+    {
+        if (_jobs is null || !TryReadProfile(out var profile))
+        {
+            return;
+        }
+
+        await _jobs.SaveSpeedProfileAsync(profile with { SortOrder = SpeedProfiles.Count }).ConfigureAwait(true);
+        await LoadSpeedProfilesAsync().ConfigureAwait(true);
+        SpeedProfileStatus = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task SaveSpeedProfileAsync()
+    {
+        if (_jobs is null || SelectedSpeedProfile is null || !TryReadProfile(out var profile))
+        {
+            return;
+        }
+
+        await _jobs.SaveSpeedProfileAsync(profile with { Id = SelectedSpeedProfile.Id, SortOrder = SelectedSpeedProfile.SortOrder }).ConfigureAwait(true);
+        await LoadSpeedProfilesAsync().ConfigureAwait(true);
+        SpeedProfileStatus = string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task DeleteSpeedProfileAsync()
+    {
+        if (_jobs is null || SelectedSpeedProfile is null)
+        {
+            return;
+        }
+
+        await _jobs.DeleteSpeedProfileAsync(SelectedSpeedProfile.Id).ConfigureAwait(true);
+        await LoadSpeedProfilesAsync().ConfigureAwait(true);
+    }
+
+    private bool TryReadProfile(out SpeedProfile profile)
+    {
+        var name = SpeedProfileNameText.Trim();
+        if (name.Length == 0)
+        {
+            SpeedProfileStatus = Strings.SettingsSpeedProfileName;
+            profile = null!;
+            return false;
+        }
+
+        profile = new SpeedProfile
+        {
+            Id = SelectedSpeedProfile?.Id ?? 0,
+            Name = name,
+            LimitBps = SpeedProfileMegabytes <= 0 ? null : checked((long)(SpeedProfileMegabytes * MegabyteBytes)),
+            SortOrder = SelectedSpeedProfile?.SortOrder ?? SpeedProfiles.Count,
+        };
+        return true;
+    }
 
     [RelayCommand]
     private async Task SaveAsync()

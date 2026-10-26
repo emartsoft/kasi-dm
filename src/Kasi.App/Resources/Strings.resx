@@ -1311,4 +1311,33 @@
   </data>
   <data name="SchedulerWakeWarning" xml:space="preserve">
     <value>Windows wake timers are off for the active power plan, so Kasi cannot wake the PC for a scheduled start. Turn on "Allow wake timers" in Power Options.</value>
+  </data>  <data name="SchedulerSpeedProfile" xml:space="preserve">
+    <value>Speed profile</value>
+  </data>
+  <data name="SchedulerSpeedProfileName" xml:space="preserve">
+    <value>Speed profile for this schedule</value>
+  </data>
+  <data name="SchedulerNoProfile" xml:space="preserve">
+    <value>No profile (manual limit)</value>
+  </data>
+  <data name="SettingsSpeedProfiles" xml:space="preserve">
+    <value>Speed profiles</value>
+  </data>
+  <data name="SettingsSpeedProfileName" xml:space="preserve">
+    <value>Profile name</value>
+  </data>
+  <data name="SettingsSpeedProfileLimit" xml:space="preserve">
+    <value>Limit in MB/s (0 = unlimited)</value>
+  </data>
+  <data name="SettingsSpeedProfileAdd" xml:space="preserve">
+    <value>Add profile</value>
+  </data>
+  <data name="SettingsSpeedProfileSave" xml:space="preserve">
+    <value>Save profile</value>
+  </data>
+  <data name="SettingsSpeedProfileDelete" xml:space="preserve">
+    <value>Delete profile</value>
+  </data>
+  <data name="SettingsSpeedProfileEmpty" xml:space="preserve">
+    <value>No profiles yet. Add one to use it in a schedule or the tray.</value>
   </data></root>

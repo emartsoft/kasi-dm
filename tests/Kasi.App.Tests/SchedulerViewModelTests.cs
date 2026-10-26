@@ -73,6 +73,23 @@ public sealed class SchedulerViewModelTests
     }
 
     [Fact]
+    public async Task SchedulerViewModel_selects_and_saves_a_speed_profile_for_the_window()
+    {
+        var jobService = new FakeJobService
+        {
+            Profiles = [new SpeedProfile { Id = 4, Name = "Night", LimitBps = 2_000_000, SortOrder = 0 }],
+        };
+        var model = new SchedulerViewModel(jobService);
+        await model.LoadAsync(1, Ct);
+
+        model.SpeedProfiles.Should().Contain(choice => choice.Id == 4 && choice.Label == "Night");
+        model.SelectedScheduleProfile = model.SpeedProfiles.Single(choice => choice.Id == 4);
+        await model.SaveCommand.ExecuteAsync(null);
+
+        jobService.SavedSchedule!.ProfileId.Should().Be(4);
+    }
+
+    [Fact]
     public async Task SchedulerViewModel_saves_the_quota_and_shows_the_wake_timer_warning()
     {
         var jobService = new FakeJobService { WakeTimers = WakeTimerPolicy.Disabled };
@@ -109,11 +126,15 @@ public sealed class SchedulerViewModelTests
     {
         public Core.Queue? SavedQueue { get; private set; }
         public WakeTimerPolicy WakeTimers { get; set; } = WakeTimerPolicy.Allowed;
+        public IReadOnlyList<SpeedProfile> Profiles { get; set; } = [];
         public QueueSchedule? SavedSchedule { get; private set; }
 
 #pragma warning disable CS0067
         public event Action<EngineEvent>? EventRaised;
 #pragma warning restore CS0067
+
+        public Task<IReadOnlyList<SpeedProfile>> SpeedProfilesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(Profiles);
 
         public Task<IReadOnlyList<Job>> ListAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Job>>([]);

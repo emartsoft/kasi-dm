@@ -30,4 +30,7 @@ public sealed record QueueSchedule
 
     /// <summary>Days of the week when this schedule is active.</summary>
     public DaysOfWeek DaysOfWeek { get; init; } = DaysOfWeek.All;
+
+    /// <summary>The speed profile applied while this window is active; null leaves the manual limit alone.</summary>
+    public int? ProfileId { get; init; }
 }
