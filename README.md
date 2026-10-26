@@ -8,7 +8,7 @@
 ![Windows 10 22H2+ and 11](https://img.shields.io/badge/Windows-10%2022H2%2B%20%7C%2011-0078D4)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-green)](LICENSE)
 
-Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates downloads with dynamic segmentation, resumes from the exact saved byte after any interruption, captures unencrypted HLS/DASH streams, and runs HTTP, FTP, media and BitTorrent jobs in one queue with one set of bandwidth limits.
+Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates downloads with dynamic segmentation, resumes from the exact saved byte after any interruption, captures unencrypted HLS/DASH streams, and runs HTTP, FTP and media jobs in one queue with one set of bandwidth limits. BitTorrent is planned for v1.1.
 
 | | |
 | --- | --- |
@@ -33,7 +33,7 @@ kasi-dm/
 │   ├── Kasi.Core/            Domain model (Job, Segment, Queue, Category), interfaces, events
 │   ├── Kasi.Engine/          Probe, HTTP/FTP transfer, dynamic segmentation, file writer, throttling, retry
 │   ├── Kasi.Media/           HLS/DASH parsers, loader/DRM gate, segment runner and FFmpeg mux (M3.1–3.4)
-│   ├── Kasi.Torrent/         MonoTorrent adapter (placeholder, M4)
+│   ├── Kasi.Torrent/         MonoTorrent adapter (placeholder, deferred to v1.1)
 │   ├── Kasi.Scheduling/      Queue runner, schedules, post-actions, wake timers (placeholder, M2)
 │   ├── Kasi.Data/            SQLite repositories, migrations, checkpoint writer
 │   ├── Kasi.Ipc/             Strict message contracts and serializer, hardened named-pipe client/server (M2.1)

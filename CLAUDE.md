@@ -1,6 +1,6 @@
 # CLAUDE.md — Kasi Download Manager
 
-Kasi is a Windows download manager (owner: MartSoft Solutions) built on .NET 10 and Avalonia. It accelerates downloads with dynamic segmentation, resumes from the exact saved byte after any interruption, captures unencrypted HLS/DASH streams, and runs HTTP, FTP, media and BitTorrent jobs in one queue.
+Kasi is a Windows download manager (owner: MartSoft Solutions) built on .NET 10 and Avalonia. It accelerates downloads with dynamic segmentation, resumes from the exact saved byte after any interruption, captures unencrypted HLS/DASH streams, and runs HTTP, FTP and media jobs in one queue (BitTorrent is deferred to v1.1).
 
 ## Source of truth
 
@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M3 — media capture, scheduler wake and quotas (TRD section 16; plan.md section 5).** M3.1 to M3.9 are implemented and merged: extension media detection (#134), data quota/wake timers (#135), WebVTT/live capture (#137), periodic sync (#138) and plan v0.4 (#139). The M1 engine gate still awaits owner benchmark and fault-injection evidence; the M2 store submissions remain owner steps. Update this line when the phase changes.
+**M3 — media capture, scheduler wake and quotas (TRD section 16; plan.md section 5).** M3.1 to M3.9 are implemented and merged: extension media detection (#134), data quota/wake timers (#135), WebVTT/live capture (#137), periodic sync (#138) and plan v0.4 (#139). The M1 engine gate still awaits owner benchmark and fault-injection evidence; the M2 store submissions remain owner steps. Next is M4 (installer, updates, signing, beta), to be planned; all torrent tasks (M4.1 to M4.3) are deferred to v1.1 by the owner (2026-10-26), so do not add MonoTorrent or torrent code before then. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 

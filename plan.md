@@ -15,7 +15,7 @@ Working plan for building Kasi from the foundations (M0) to the v1.0 release (M5
 | M1 | 3 to 8 | Download engine, resume, bandwidth | **Engine gate** | 🔶 16 of 16 tasks done (M1.1 to M1.16); the engine gate itself is still open |
 | M2 | 9 to 13 | Browser extension, host, queues, categories, main UI flows | **Internal alpha** | 🔶 M2.1 to M2.13 implemented and merged, M2.14 (the redesign) merged except UIR-6's high-contrast and Narrator passes; open: the store submissions of M2.6 and M2.7 (owner), and the internal-alpha gate checklist below |
 | M3 | 14 to 17 | Media capture, FFmpeg, scheduler wake and quotas | none (plan v0.4) | ✅ M3.1 to M3.9 merged (3g #134, 3h/3i #135, 3j #137, 3k #138, 3l #139); M3 gate evidence items remain |
-| M4 | 18 to 21 | BitTorrent, installer, portable, updates, signing | **Public beta** | ⬜ not started |
+| M4 | 18 to 21 | Installer, portable, updates, signing, beta (BitTorrent deferred to v1.1) | **Public beta** | ⬜ not started; M4.1 to M4.3 deferred to v1.1 by the owner on 2026-10-26 |
 | M5 | 22 to 24 | UI polish, accessibility, localisation, full regression, release | **v1.0 release** | ⬜ not started |
 
 Status markers in the task tables: ✅ done, 🔶 in progress or partly done, ⬜ not started. (Markdown shows `[x]` as plain text inside tables, so tables use these symbols; the gate checklists below keep `- [ ]` boxes.)
@@ -159,15 +159,17 @@ Suggested order by week: 3 (M1.1 to M1.3, CI Ubuntu leg), 4 (M1.4, M1.5 logic), 
 | ✅ M3.8 | **Scheduler extras:** wake from sleep with a waitable timer and a check that wake timers are allowed (QUE-005, TC-QUE-005); data quota with daily, weekly or never reset (QUE-007, TC-QUE-006); periodic sync (QUE-006, TC-QUE-008) | as listed | **merged (#135, #138):** `queue_usage` migration + UTC period accounting, engine delta sink, reservations/soft cap, `PauseReason.Quota`, rollover requeue, Scheduler quota editor and wake-timer warning; `IWakeTimer`/Win32 `SetWaitableTimer` with resume, power-plan policy, re-arm on every schedule tick; periodic sync (`PeriodicSyncCoordinator`, `IRemoteFileChecker`, `Completed` -> `Queued` re-download) verified by `TC-QUE-008`; `TC-QUE-005` remains hardware-unverified |
 | ✅ M3.9 | **Plan v0.4:** detail the M4 test cases (torrent, installer, update, compatibility) | TPL 1.3 | **merged (#139):** TPL v0.4 with full media (5.4), scheduler (5.6, including TC-QUE-008), M4 torrent/bandwidth/system and compatibility cases; README, plan and CLAUDE phase updated |
 
-## 7. M4: BitTorrent, packaging, updates (weeks 18 to 21)
+## 7. M4: Packaging, updates, signing and beta (weeks 18 to 21)
 
-**Goal:** signed installer and portable builds with in-place updates, torrents in the same queue, and the public beta. Start-of-M4 items: choose the crash-reporting backend (Appendix B #6, Sentry), pick 50 or more beta users including people on metered and unstable connections.
+**Scope decision (2026-10-26):** the owner deferred every torrent task, M4.1 to M4.3, to v1.1. All six `KASI-TOR` requirements are P2, so this is the P2 deferral of section 1 with the owner's approval: `Kasi.Torrent` stays an empty placeholder, MonoTorrent is not added, the `TC-TOR-001` to `TC-TOR-006` cases (and the torrent leg of the bandwidth case in TPL 5.8) are deferred with them and do not count against the beta gate, and the installer budget loses the torrent engine. The shared bandwidth limiter (M1.11) stays ready for them.
+
+**Goal:** signed installer and portable builds with in-place updates, and the public beta. Start-of-M4 items: choose the crash-reporting backend (Appendix B #6, Sentry), pick 50 or more beta users including people on metered and unstable connections.
 
 | # | Task | Covers | Verified by |
 | --- | --- | --- | --- |
-| ⬜ M4.1 | **`Kasi.Torrent` adapter**: one MonoTorrent engine, magnet and `.torrent` and browser hand-off, metadata fetch with 5-minute wait, file tree dialog, `DoNotDownload` for unticked files, state mapping, seeding at ratio 1.0 or 24 h that does not count toward the queue limit, fast-resume in `torrent_state` | TOR-001 to 004, TC-TOR-001 to 004 | opentracker plus three MonoTorrent seeders in Testcontainers (Ubuntu CI job); trackerless magnet finds peers through DHT in the staging swarm |
-| ⬜ M4.2 | **Shared bandwidth:** MonoTorrent rate limiters replaced by adapters on the global token bucket | TOR-005, TC-TOR-005 | 1 MB/s cap holds within 5% across two HTTP jobs and one torrent |
-| ⬜ M4.3 | **File associations** for `magnet:` and `.torrent` under HKCU with consent, then open Default Apps | TOR-006, TC-TOR-006 | registered per user; opens Kasi |
+| ⏸ M4.1 (deferred to v1.1) | **`Kasi.Torrent` adapter**: one MonoTorrent engine, magnet and `.torrent` and browser hand-off, metadata fetch with 5-minute wait, file tree dialog, `DoNotDownload` for unticked files, state mapping, seeding at ratio 1.0 or 24 h that does not count toward the queue limit, fast-resume in `torrent_state` | TOR-001 to 004, TC-TOR-001 to 004 | opentracker plus three MonoTorrent seeders in Testcontainers (Ubuntu CI job); trackerless magnet finds peers through DHT in the staging swarm |
+| ⏸ M4.2 (deferred to v1.1) | **Shared bandwidth:** MonoTorrent rate limiters replaced by adapters on the global token bucket | TOR-005, TC-TOR-005 | 1 MB/s cap holds within 5% across two HTTP jobs and one torrent |
+| ⏸ M4.3 (deferred to v1.1) | **File associations** for `magnet:` and `.torrent` under HKCU with consent, then open Default Apps | TOR-006, TC-TOR-006 | registered per user; opens Kasi |
 | ⬜ M4.4 | **Speed profiles on a schedule**, tray presets | BWL-001, BWL-003, TC-BWL-001, 002 | profile switches at the set time; tray change applies within 1 s |
 | ⬜ M4.5 | **Velopack packaging**: per-user installer without admin (under 60 MB with FFmpeg), portable zip with `portable.marker` and `.\data`, x64 and ARM64, host manifests in HKCU, AUMID, start menu, uninstall entry that asks to keep history, optional startup with Windows, store page for each detected browser | SYS-001, SYS-003, NFR-020, TC-SYS-001, 002, 004 | install and uninstall on a clean VM leaves no host manifests; portable writes no registry keys until browser integration is on |
 | ⬜ M4.6 | **Signing and release pipeline:** EV certificate or Azure Trusted Signing, timestamps, signed installer and update packages, signed beta build published to the `beta` channel on every merge to `main` (TRD 14.5 step 2), static feed on object storage behind a CDN. Pipeline changes need the lead developer or CTO | NFR-012 | signed artefacts verified; tampered package rejected |
@@ -180,7 +182,7 @@ Suggested order by week: 3 (M1.1 to M1.3, CI Ubuntu leg), 4 (M1.4, M1.5 logic), 
 
 ### 7.1 Public beta gate (end of M4), from TPL 4
 
-- [ ] All P1 cases pass; at least 90% of P2 cases pass, deferrals approved
+- [ ] All P1 cases pass; at least 90% of P2 cases pass, deferrals approved (the torrent cases `TC-TOR-001` to `006` are an approved deferral)
 - [ ] Update from the previous beta build verified; DRM refusal cases pass
 - [ ] Compatibility matrix smoke run green; signed installer and portable builds produced
 - [ ] No open Critical or High defect
@@ -307,16 +309,16 @@ Every requirement from TRD sections 3 and 4 and the phase that delivers it. Prio
 | MED-007 Live streams | P3 | M3 if capacity | M3.7 |
 | MED-008 WebVTT subtitles | P3 | M3 if capacity | M3.7 |
 
-### 12.5 BitTorrent (TOR), all P2
+### 12.5 BitTorrent (TOR), all P2, all deferred to v1.1 (owner decision, 2026-10-26)
 
 | ID | Phase | Task |
 | --- | --- | --- |
-| TOR-001 Magnet, file, hand-off | M4 | M4.1 |
-| TOR-002 File selection | M4 | M4.1 |
-| TOR-003 DHT, PEX, LPD, uTP, encryption | M4 | M4.1 |
-| TOR-004 Seeding limits | M4 | M4.1 |
-| TOR-005 Shared bandwidth cap | M4 | M4.2 |
-| TOR-006 `magnet:` and `.torrent` handler | M4 | M4.3 |
+| TOR-001 Magnet, file, hand-off | v1.1 | M4.1 (deferred) |
+| TOR-002 File selection | v1.1 | M4.1 (deferred) |
+| TOR-003 DHT, PEX, LPD, uTP, encryption | v1.1 | M4.1 (deferred) |
+| TOR-004 Seeding limits | v1.1 | M4.1 (deferred) |
+| TOR-005 Shared bandwidth cap | v1.1 | M4.2 (deferred) |
+| TOR-006 `magnet:` and `.torrent` handler | v1.1 | M4.3 (deferred) |
 
 ### 12.6 Queues and scheduler (QUE)
 
