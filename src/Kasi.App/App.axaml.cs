@@ -308,7 +308,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
             new NativeMenuItemSeparator(),
             new NativeMenuItem(model.QuitLabel) { Command = model.QuitCommand },
         };
-        using var icon = AssetLoader.Open(new Uri("avares://Kasi.App/Assets/kasi.png"));
+        using var icon = AssetLoader.Open(new Uri("avares://Kasi.App/Assets/kasi.ico"));
         var trayIcon = new TrayIcon { Icon = new WindowIcon(icon), ToolTipText = model.ToolTip, Menu = menu };
         // a click opens the panel (the native menu stays on the right button, and is what a machine without the panel shows)
         trayIcon.Clicked += (_, _) => ToggleFlyout(model);

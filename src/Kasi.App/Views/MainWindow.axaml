@@ -7,6 +7,7 @@
         x:Class="Kasi.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
+        Icon="/Assets/kasi.ico"
         AutomationProperties.Name="{Binding AutomationName}"
         Width="1360"
         Height="720"

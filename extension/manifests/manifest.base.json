@@ -5,10 +5,10 @@
   "default_locale": "en",
   "version": "0.2.0",
   "icons": {
-    "16": "icons/16.png",
-    "32": "icons/32.png",
-    "48": "icons/48.png",
-    "128": "icons/128.png"
+    "16": "icons/kasi-16.png",
+    "32": "icons/kasi-32.png",
+    "48": "icons/kasi-48.png",
+    "128": "icons/kasi-128.png"
   },
   "permissions": [
     "downloads",
@@ -24,8 +24,8 @@
     "default_title": "__MSG_extensionName__",
     "default_popup": "src/popup/index.html",
     "default_icon": {
-      "16": "icons/16.png",
-      "32": "icons/32.png"
+      "16": "icons/kasi-16.png",
+      "32": "icons/kasi-32.png"
     }
   },
   "options_ui": {
