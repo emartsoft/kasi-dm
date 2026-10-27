@@ -1340,4 +1340,32 @@
   </data>
   <data name="SettingsSpeedProfileEmpty" xml:space="preserve">
     <value>No profiles yet. Add one to use it in a schedule or the tray.</value>
+  </data>  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>Start Kasi with Windows</value>
+  </data>
+  <data name="SettingsStartWithWindowsDescription" xml:space="preserve">
+    <value>Starts hidden in the tray when you sign in. Portable builds write nothing until you turn this on.</value>
+  </data>
+  <data name="SettingsStartWithWindowsFailed" xml:space="preserve">
+    <value>Kasi could not update the Windows startup entry.</value>
+  </data>  <data name="SettingsBackup" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="SettingsBackupExport" xml:space="preserve">
+    <value>Export settings and jobs…</value>
+  </data>
+  <data name="SettingsBackupImport" xml:space="preserve">
+    <value>Import a backup…</value>
+  </data>
+  <data name="SettingsBackupConfirm" xml:space="preserve">
+    <value>Confirm that importing replaces settings, queues and jobs before importing.</value>
+  </data>
+  <data name="SettingsBackupExported" xml:space="preserve">
+    <value>Backup exported.</value>
+  </data>
+  <data name="SettingsBackupImported" xml:space="preserve">
+    <value>Backup imported.</value>
+  </data>
+  <data name="SettingsBackupFailed" xml:space="preserve">
+    <value>The backup could not be read or written.</value>
   </data></root>

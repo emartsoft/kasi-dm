@@ -42,7 +42,7 @@ internal sealed class BrowserServices
 
     /// <summary>The services of the real app: settings in the user's local data folder, named apart for a test instance.</summary>
     public static BrowserServices ForCurrentUser(string? endpointSuffix, ILogger? logger = null) =>
-        new(new BrowserSettingsStore(BrowserSettingsStore.DefaultPath(endpointSuffix)), logger: logger);
+        new(BrowserSettingsStore.ForPath(BrowserSettingsStore.DefaultPath(endpointSuffix)), logger: logger);
 
     /// <summary>Pushes the rules to every connected extension whenever the settings change. Dispose to stop.</summary>
     public IDisposable PublishChanges(KasiPipeServer server)

@@ -711,6 +711,26 @@ internal static class Strings
 
     public static string SchedulerNoProfile => Get(nameof(SchedulerNoProfile));
 
+    public static string SettingsStartWithWindows => Get(nameof(SettingsStartWithWindows));
+
+    public static string SettingsStartWithWindowsDescription => Get(nameof(SettingsStartWithWindowsDescription));
+
+    public static string SettingsStartWithWindowsFailed => Get(nameof(SettingsStartWithWindowsFailed));
+
+    public static string SettingsBackup => Get(nameof(SettingsBackup));
+
+    public static string SettingsBackupExport => Get(nameof(SettingsBackupExport));
+
+    public static string SettingsBackupImport => Get(nameof(SettingsBackupImport));
+
+    public static string SettingsBackupConfirm => Get(nameof(SettingsBackupConfirm));
+
+    public static string SettingsBackupExported => Get(nameof(SettingsBackupExported));
+
+    public static string SettingsBackupImported => Get(nameof(SettingsBackupImported));
+
+    public static string SettingsBackupFailed => Get(nameof(SettingsBackupFailed));
+
     public static string SettingsSpeedProfiles => Get(nameof(SettingsSpeedProfiles));
 
     public static string SettingsSpeedProfileName => Get(nameof(SettingsSpeedProfileName));

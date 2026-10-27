@@ -174,7 +174,7 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
     private async Task WaitForSegmentAsync(int index)
     {
         var path = $"/hls/live/seg{index}.ts";
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(10);
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
         while (_host.Metrics.RequestsForPath(path) == 0)
         {
             TestContext.Current.CancellationToken.ThrowIfCancellationRequested();

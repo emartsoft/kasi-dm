@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Kasi.App.Browser;
@@ -6,6 +7,7 @@ using Kasi.App.Controls;
 using Kasi.App.Engine;
 using Kasi.App.Notifications;
 using Kasi.App.Resources;
+using Kasi.App.Startup;
 using Kasi.Core;
 using Kasi.Ipc.Messages;
 
@@ -38,7 +40,15 @@ internal sealed partial class SettingsViewModel : ObservableObject
     private readonly IUiSettings? _ui;
     private readonly SettingsEnvironment? _environment;
     private readonly IJobService? _jobs;
+    private readonly IStartupRegistration? _startup;
+    private readonly IBackupService? _backup;
     private bool _syncingPage;
+
+    [ObservableProperty]
+    private bool _importConfirmed;
+
+    [ObservableProperty]
+    private string _backupStatus = string.Empty;
 
     [ObservableProperty]
     private ObservableCollection<SpeedProfile> _speedProfiles = [];
@@ -60,6 +70,12 @@ internal sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _scanDownloads;
+
+    [ObservableProperty]
+    private bool _startWithWindows;
+
+    [ObservableProperty]
+    private string _startupStatus = string.Empty;
 
     [ObservableProperty]
     private bool _enabled;
@@ -99,12 +115,15 @@ internal sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = string.Empty;
 
-    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null, SettingsEnvironment? environment = null, IJobService? jobs = null)
+    public SettingsViewModel(IBrowserSettings store, IUiSettings? ui = null, CategoriesViewModel? categories = null, SettingsEnvironment? environment = null, IJobService? jobs = null, IStartupRegistration? startup = null, IBackupService? backup = null)
     {
         _store = store;
         _ui = ui;
         _environment = environment;
         _jobs = jobs;
+        _startup = startup;
+        _startWithWindows = startup?.IsEnabled() ?? false;
+        _backup = backup;
         Categories = categories;
         var pages = new List<SettingsPage>
         {
@@ -215,6 +234,14 @@ internal sealed partial class SettingsViewModel : ObservableObject
 
     public string AboutNoticesLabel => Strings.AboutNotices;
 
+    public string BackupLabel => Strings.SettingsBackup;
+
+    public string BackupExportLabel => Strings.SettingsBackupExport;
+
+    public string BackupImportLabel => Strings.SettingsBackupImport;
+
+    public string BackupConfirmLabel => Strings.SettingsBackupConfirm;
+
     public string SpeedProfilesLabel => Strings.SettingsSpeedProfiles;
 
     public string SpeedProfileNameLabel => Strings.SettingsSpeedProfileName;
@@ -231,14 +258,20 @@ internal sealed partial class SettingsViewModel : ObservableObject
 
     public bool HasSpeedProfiles => SpeedProfiles.Count > 0;
 
-    public IReadOnlyList<string> Notices { get; } =
-    [
-        "Avalonia, FluentAvalonia, CommunityToolkit.Mvvm - MIT",
-        "Microsoft.Data.Sqlite, SQLite - MIT, public domain",
-        "Dapper, Serilog - Apache-2.0",
-        "FluentFTP, MonoTorrent, Velopack - MIT",
-        "FFmpeg (LGPL build, run as a separate program) - LGPL-2.1",
-    ];
+    public string NoticesText { get; } = ReadNotices();
+
+    private static string ReadNotices()
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.txt");
+            return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+        }
+        catch (IOException)
+        {
+            return string.Empty;
+        }
+    }
 
     /// <summary>"...\Kasi" instead of the whole path of a user folder.</summary>
     internal static string ShortFolder(string path)
@@ -260,6 +293,10 @@ internal sealed partial class SettingsViewModel : ObservableObject
     public string ScanDownloadsLabel => Strings.SettingsScanDownloads;
 
     public string ScanDownloadsDescription => Strings.SettingsScanDownloadsDescription;
+
+    public string StartWithWindowsLabel => Strings.SettingsStartWithWindows;
+
+    public string StartWithWindowsDescription => Strings.SettingsStartWithWindowsDescription;
 
     public string Title => Strings.SettingsTitle;
 
@@ -407,6 +444,60 @@ internal sealed partial class SettingsViewModel : ObservableObject
         {
             SpeedProfileNameText = string.Empty;
             SpeedProfileMegabytes = 0;
+        }
+    }
+
+    public async Task ExportBackupAsync(string path, CancellationToken cancellationToken = default)
+    {
+        if (_backup is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _backup.ExportAsync(path, cancellationToken).ConfigureAwait(true);
+            BackupStatus = Strings.SettingsBackupExported;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            BackupStatus = Strings.SettingsBackupFailed;
+        }
+    }
+
+    public async Task ImportBackupAsync(string path, CancellationToken cancellationToken = default)
+    {
+        if (_backup is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await _backup.ImportAsync(path, ImportConfirmed, cancellationToken).ConfigureAwait(true);
+            BackupStatus = result.Imported ? Strings.SettingsBackupImported : Strings.SettingsBackupConfirm;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
+        {
+            BackupStatus = Strings.SettingsBackupFailed;
+        }
+    }
+
+    partial void OnStartWithWindowsChanged(bool value)
+    {
+        if (_startup is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _startup.SetEnabled(value);
+            StartupStatus = string.Empty;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or IOException)
+        {
+            StartupStatus = Strings.SettingsStartWithWindowsFailed;
         }
     }
 

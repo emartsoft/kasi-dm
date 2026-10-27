@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M4 — packaging, portable builds, signed updates and the public beta (TRD section 16; plan.md section 7).** 4a (speed profiles and scheduled bandwidth) is merged; M4.5 to M4.12 follow. M3 media and scheduler work is merged, with the wake-from-sleep hardware evidence and the M1 engine gate still open. The M2 store submissions remain owner steps. Update this line when the phase changes.
+**M4 — packaging, portable builds, signed updates and the public beta (TRD section 16; plan.md section 7).** 4a (speed profiles and scheduled bandwidth) is merged; 4b (start with Windows), 4c (notices) and 4d (export/import) are in progress; M4.5 to M4.12 follow. M3 media and scheduler work is merged, with the wake-from-sleep hardware evidence and the M1 engine gate still open. The M2 store submissions remain owner steps. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 
