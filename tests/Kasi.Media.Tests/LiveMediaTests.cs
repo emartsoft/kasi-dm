@@ -186,7 +186,8 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
-        // The request counter runs before the segment is flushed and the next poll timer is installed.
-        await Task.Delay(50, TestContext.Current.CancellationToken);
+        // The request counter runs before the segment is flushed and the next poll timer is installed; the CI runner needs a
+        // generous yield here, otherwise the test advances the fake clock before the runner is waiting on it again.
+        await Task.Delay(250, TestContext.Current.CancellationToken);
     }
 }
