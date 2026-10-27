@@ -35,6 +35,12 @@ internal sealed class BrowserSettingsStore : IBrowserSettings
     private readonly SemaphoreSlim _saving = new(1, 1);
     private volatile BrowserSettings _current;
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BrowserSettingsStore> _shared =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>One store per settings path, so the browser pipe and the Settings window see the same instance.</summary>
+    public static BrowserSettingsStore ForPath(string path) => _shared.GetOrAdd(path, static value => new BrowserSettingsStore(value));
+
     public BrowserSettingsStore(string path)
     {
         _path = path;

@@ -60,6 +60,7 @@ internal static class CompositionRoot
         services.AddSingleton<ISpeedProfileRepository>(sp => new SpeedProfileRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueUsageRepository>(sp => new QueueUsageRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobSecretRepository>(sp => new JobSecretRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<IBrowserSettings>(_ => BrowserSettingsStore.ForPath(BrowserSettingsStore.DefaultPath(Environment.GetEnvironmentVariable(AppEndpoints.TestSuffixVariable))));
         services.AddSingleton<IBackupService>(sp => new BackupService(
             sp.GetRequiredService<ICategoryRepository>(),
             sp.GetRequiredService<ICategoryRuleRepository>(),
