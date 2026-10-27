@@ -84,6 +84,8 @@
               </Grid>
             </Border>
             <c:ToggleRow Title="{Binding ScanDownloadsLabel}" Description="{Binding ScanDownloadsDescription}" IsChecked="{Binding ScanDownloads}" />
+            <c:ToggleRow Title="{Binding StartWithWindowsLabel}" Description="{Binding StartWithWindowsDescription}" IsChecked="{Binding StartWithWindows}" />
+            <TextBlock Text="{Binding StartupStatus}" Foreground="{DynamicResource KasiDangerBrush}" TextWrapping="Wrap" />
           </StackPanel>
 
           <!-- Browser integration -->
@@ -175,6 +177,17 @@
                 </StackPanel>
               </StackPanel>
             </Border>
+            <Border Classes="kasi-card">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding BackupLabel}" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="ExportBackupButton" Content="{Binding BackupExportLabel}" AutomationProperties.Name="{Binding BackupExportLabel}" />
+                  <Button x:Name="ImportBackupButton" Content="{Binding BackupImportLabel}" AutomationProperties.Name="{Binding BackupImportLabel}" />
+                </StackPanel>
+                <CheckBox Content="{Binding BackupConfirmLabel}" IsChecked="{Binding ImportConfirmed}" AutomationProperties.Name="{Binding BackupConfirmLabel}" />
+                <TextBlock Text="{Binding BackupStatus}" Classes="kasi-secondary" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
           </StackPanel>
 
           <!-- About -->
@@ -190,13 +203,7 @@
             <Border Classes="kasi-card">
               <StackPanel Spacing="6">
                 <TextBlock Text="{Binding AboutNoticesLabel}" FontWeight="SemiBold" />
-                <ItemsControl ItemsSource="{Binding Notices}" AutomationProperties.Name="{Binding AboutNoticesLabel}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="x:String">
-                      <TextBlock Text="{Binding}" Classes="kasi-secondary" TextWrapping="Wrap" />
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <TextBox Text="{Binding NoticesText}" IsReadOnly="True" AcceptsReturn="True" Height="360" TextWrapping="Wrap" AutomationProperties.Name="{Binding AboutNoticesLabel}" />
               </StackPanel>
             </Border>
           </StackPanel>

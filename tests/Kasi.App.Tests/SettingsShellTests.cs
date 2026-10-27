@@ -140,7 +140,7 @@ public class SettingsShellTests
         window.GetVisualDescendants().OfType<ToggleSwitch>().Where(t => t.IsEffectivelyVisible).Should().HaveCount(3);
         model.SelectedTab = 0;
         window.UpdateLayout();
-        window.GetVisualDescendants().OfType<ToggleSwitch>().Where(t => t.IsEffectivelyVisible).Should().HaveCount(1, "General has only the scan switch: the Browser page is not shown there");
+        window.GetVisualDescendants().OfType<ToggleSwitch>().Where(t => t.IsEffectivelyVisible).Should().HaveCount(2, "General has the scan and Start with Windows switches: the Browser page is not shown there");
         window.Close();
     }
 

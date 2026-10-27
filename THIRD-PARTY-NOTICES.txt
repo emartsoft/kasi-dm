@@ -1,6 +1,38 @@
 Kasi Download Manager — third-party notices
 =========================================
 
+Generated from Directory.Packages.props by build/Generate-ThirdPartyNotices.ps1. Do not edit by hand.
+
+Packages
+--------
+Avalonia — MIT
+Avalonia.Controls.DataGrid — MIT
+Avalonia.Desktop — MIT
+Avalonia.Headless.XUnit — MIT
+AwesomeAssertions — Apache-2.0
+BenchmarkDotNet — MIT
+CommunityToolkit.Mvvm — MIT
+CommunityToolkit.WinUI.Notifications — MIT
+coverlet.collector — MIT
+Dapper — Apache-2.0
+FlaUI.Core — MIT
+FlaUI.UIA3 — MIT
+FluentAvaloniaUI — MIT
+FluentFTP — MIT
+FsCheck.Xunit.v3 — BSD-3-Clause
+Microsoft.Data.Sqlite — MIT
+Microsoft.Extensions.Hosting — MIT
+Microsoft.Extensions.TimeProvider.Testing — MIT
+Microsoft.NET.Test.Sdk — MIT
+Microsoft.VisualStudio.Threading.Analyzers — MIT
+MinVer — MIT
+SharpFuzz — MIT
+System.Drawing.Common — MIT
+System.Security.Cryptography.ProtectedData — MIT
+Testcontainers — MIT
+xunit.runner.visualstudio — Apache-2.0
+xunit.v3 — Apache-2.0
+
 FFmpeg / ffprobe
 ----------------
 Kasi invokes an external FFmpeg build for stream-copy muxing and duration probing. FFmpeg is not linked into any Kasi
@@ -14,5 +46,5 @@ assembly and is not distributed in this repository.
   binary are offered with the release; see `docs/legal/ffmpeg-lgpl.md`.
 - The binary is replaceable: Kasi locates it by path and never embeds it in an assembly.
 
-Other dependencies are listed in the repository's package manifests and their licences are recorded in the release
-checklist. No GPL, AGPL or non-free component is part of a Kasi build.
+No GPL, AGPL or non-free component is part of a Kasi build. MonoTorrent, Velopack and Sentry are not included in this
+build; they will be added to this file when the corresponding M4 work lands.

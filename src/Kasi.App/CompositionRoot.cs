@@ -60,6 +60,15 @@ internal static class CompositionRoot
         services.AddSingleton<ISpeedProfileRepository>(sp => new SpeedProfileRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IQueueUsageRepository>(sp => new QueueUsageRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<IJobSecretRepository>(sp => new JobSecretRepository(sp.GetRequiredService<SqliteConnectionFactory>()));
+        services.AddSingleton<IBackupService>(sp => new BackupService(
+            sp.GetRequiredService<ICategoryRepository>(),
+            sp.GetRequiredService<ICategoryRuleRepository>(),
+            sp.GetRequiredService<IQueueRepository>(),
+            sp.GetRequiredService<IQueueScheduleRepository>(),
+            sp.GetRequiredService<ISpeedProfileRepository>(),
+            sp.GetRequiredService<IJobRepository>(),
+            sp.GetRequiredService<IBrowserSettings>(),
+            TimeProvider.System));
         services.AddSingleton(sp => new CheckpointWriter(sp.GetRequiredService<SqliteConnectionFactory>()));
         services.AddSingleton<ICheckpointWriter>(sp => sp.GetRequiredService<CheckpointWriter>());
         services.AddSingleton(_ => new BandwidthLimiter());

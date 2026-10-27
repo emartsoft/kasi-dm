@@ -224,7 +224,7 @@ internal sealed class App(IServiceProvider services, bool startHidden = false, L
                 browser?.ConnectedHosts ?? (() => 0),
                 () => ShowScheduler(services.GetRequiredService<IJobService>(), null),
                 new WindowsShell());
-            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>(), categories, environment, services.GetRequiredService<IJobService>());
+            var model = new SettingsViewModel(settings, services.GetRequiredService<IUiSettings>(), categories, environment, services.GetRequiredService<IJobService>(), new WindowsStartupRegistration(), services.GetRequiredService<IBackupService>());
             _settings = new SettingsWindow { DataContext = model };
             _ = categories.LoadAsync();
             _ = model.LoadSpeedProfilesAsync();
