@@ -102,6 +102,14 @@ internal interface IJobService
 
     Task SaveQueueAsync(Core.Queue queue, CancellationToken cancellationToken = default);
 
+    /// <summary>The named speed profiles the Scheduler and tray can apply; none by default (a fake without them).</summary>
+    Task<IReadOnlyList<SpeedProfile>> SpeedProfilesAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SpeedProfile>>([]);
+
+    Task SaveSpeedProfileAsync(SpeedProfile profile, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    Task DeleteSpeedProfileAsync(int id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     /// <summary>Whether Windows allows wake timers on the active power plan, for the Scheduler warning (KASI-QUE-005).</summary>
     WakeTimerPolicy WakeTimers => WakeTimerPolicy.Allowed;
 }

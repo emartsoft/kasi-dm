@@ -188,6 +188,94 @@ public sealed class QueueSchedulerTests
         public void Dispose() => ArmedFor = null;
     }
 
+    [Fact]
+    [Trait("Requirement", "KASI-BWL-003")]
+    [Trait("TC", "TC-BWL-002")]
+    public async Task A_schedule_profile_applies_at_the_boundary_and_inside_the_window_after_a_restart()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 22, 59, 0, TimeSpan.Zero));
+        var schedule = new QueueSchedule
+        {
+            QueueId = 1,
+            IsEnabled = true,
+            StartTime = new TimeOnly(23, 0),
+            StopTime = new TimeOnly(6, 0),
+            DaysOfWeek = DaysOfWeek.All,
+            ProfileId = 7,
+        };
+        var profiles = new FakeSpeedProfileRepository();
+        var profileId = await profiles.AddAsync(new SpeedProfile { Id = 0, Name = "Night", LimitBps = 5_000_000, SortOrder = 0 }, Ct);
+        schedule = schedule with { ProfileId = profileId };
+        var limit = new TestSpeedLimit();
+        using var runner = new TestQueueRunner();
+        using (var scheduler = new QueueScheduler(runner, new InMemoryScheduleRepository([schedule]), clock, profiles: profiles, limit: limit))
+        {
+            await scheduler.StartAsync(Ct);
+            limit.Value.Should().BeNull();
+            clock.Advance(TimeSpan.FromMinutes(1));
+            await scheduler.EvaluateAllSchedulesAsync(Ct);
+            limit.Value.Should().Be(5_000_000);
+            (await profiles.GetActiveProfileIdAsync(Ct)).Should().Be(profileId);
+            clock.Advance(TimeSpan.FromHours(7));
+            await scheduler.EvaluateAllSchedulesAsync(Ct);
+            limit.Value.Should().BeNull();
+            (await profiles.GetActiveProfileIdAsync(Ct)).Should().BeNull();
+        }
+
+        clock.Advance(TimeSpan.FromHours(20));
+        using var restartRunner = new TestQueueRunner();
+        using var restarted = new QueueScheduler(restartRunner, new InMemoryScheduleRepository([schedule]), clock, profiles: profiles, limit: limit);
+        await restarted.StartAsync(Ct);
+        limit.Value.Should().Be(5_000_000);
+    }
+
+    private sealed class TestSpeedLimit : ISpeedLimitTarget
+    {
+        public long? Value { get; set; }
+
+        public long? SpeedLimit
+        {
+            get => Value;
+            set => Value = value;
+        }
+    }
+
+    private sealed class FakeSpeedProfileRepository : ISpeedProfileRepository
+    {
+        private readonly Dictionary<int, SpeedProfile> _profiles = [];
+        private int _next = 1;
+        private int? _active;
+
+        public Task<IReadOnlyList<SpeedProfile>> ListAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SpeedProfile>>([.. _profiles.Values.OrderBy(p => p.SortOrder)]);
+
+        public Task<SpeedProfile?> GetAsync(int id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_profiles.GetValueOrDefault(id));
+
+        public Task<int> AddAsync(SpeedProfile profile, CancellationToken cancellationToken = default)
+        {
+            var id = profile.Id > 0 ? profile.Id : _next++;
+            _profiles[id] = profile with { Id = id };
+            return Task.FromResult(id);
+        }
+
+        public Task<bool> UpdateAsync(SpeedProfile profile, CancellationToken cancellationToken = default)
+        {
+            _profiles[profile.Id] = profile;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult(_profiles.Remove(id));
+
+        public Task<int?> GetActiveProfileIdAsync(CancellationToken cancellationToken = default) => Task.FromResult(_active);
+
+        public Task SetActiveProfileIdAsync(int? profileId, CancellationToken cancellationToken = default)
+        {
+            _active = profileId;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class InMemoryScheduleRepository(IEnumerable<QueueSchedule> initial) : IQueueScheduleRepository
     {
         private readonly List<QueueSchedule> _items = [.. initial];

@@ -92,7 +92,13 @@ internal sealed partial class MainWindowViewModel : ObservableObject, IAddDownlo
     /// <summary>The grid's column layout and sort, restored when the window opens and saved as the user changes them.</summary>
     public ColumnLayoutViewModel Layout { get; }
 
-    public IReadOnlyList<SpeedPreset> SpeedPresets { get; }
+    public IReadOnlyList<SpeedPreset> SpeedPresets { get; private set; }
+
+    public void SetSpeedProfiles(IReadOnlyList<SpeedProfile> profiles)
+    {
+        SpeedPresets = TrayIconViewModel.BuildPresets(profiles);
+        OnPropertyChanged(nameof(SpeedPresets));
+    }
 
     /// <summary>Set by the app once the dialogs exist: asks for a fresh link for a job.</summary>
     public Action<JobId>? RefreshLinkHandler { get; set; }

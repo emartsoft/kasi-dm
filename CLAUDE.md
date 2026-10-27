@@ -17,7 +17,7 @@ Always cite requirement IDs (KASI-…) and test case IDs (TC-…) in plans, comm
 
 ## Current phase
 
-**M3 — media capture, scheduler wake and quotas (TRD section 16; plan.md section 5).** M3.1 to M3.9 are implemented and merged: extension media detection (#134), data quota/wake timers (#135), WebVTT/live capture (#137), periodic sync (#138) and plan v0.4 (#139). The M1 engine gate still awaits owner benchmark and fault-injection evidence; the M2 store submissions remain owner steps. Update this line when the phase changes.
+**M4 — packaging, portable builds, signed updates and the public beta (TRD section 16; plan.md section 7).** 4a (speed profiles and scheduled bandwidth) is merged; M4.5 to M4.12 follow. M3 media and scheduler work is merged, with the wake-from-sleep hardware evidence and the M1 engine gate still open. The M2 store submissions remain owner steps. Update this line when the phase changes.
 
 ## Stack (do not substitute without asking)
 

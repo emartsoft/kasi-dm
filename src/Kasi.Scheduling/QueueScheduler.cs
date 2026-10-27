@@ -14,6 +14,8 @@ public sealed class QueueScheduler : IDisposable
     private readonly IQueueQuota? _quota;
     private readonly IWakeTimer? _wakeTimer;
     private readonly IWakeTimerPolicy? _wakePolicy;
+    private readonly ISpeedProfileRepository? _profiles;
+    private readonly ISpeedLimitTarget? _limit;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<int, bool> _wasActive = [];
     private ITimer? _timer;
@@ -24,7 +26,9 @@ public sealed class QueueScheduler : IDisposable
         TimeProvider? timeProvider = null,
         IQueueQuota? quota = null,
         IWakeTimer? wakeTimer = null,
-        IWakeTimerPolicy? wakePolicy = null)
+        IWakeTimerPolicy? wakePolicy = null,
+        ISpeedProfileRepository? profiles = null,
+        ISpeedLimitTarget? limit = null)
     {
         _runner = runner;
         _scheduleRepository = scheduleRepository;
@@ -32,6 +36,8 @@ public sealed class QueueScheduler : IDisposable
         _quota = quota;
         _wakeTimer = wakeTimer;
         _wakePolicy = wakePolicy;
+        _profiles = profiles;
+        _limit = limit;
 #pragma warning disable IDE0031 // an event add cannot use the null-conditional operator
         if (_wakeTimer is not null)
         {
@@ -76,7 +82,17 @@ public sealed class QueueScheduler : IDisposable
 
                 // Start only when the window opens (or on the first look), so a queue the user stopped by hand inside its window stays stopped.
                 bool opened = active && (!_wasActive.TryGetValue(schedule.QueueId, out var was) || !was);
+                bool wasActiveBefore = _wasActive.TryGetValue(schedule.QueueId, out var previous) && previous;
                 _wasActive[schedule.QueueId] = active;
+
+                if (opened)
+                {
+                    await ApplyProfileAsync(schedule, cancellationToken).ConfigureAwait(false);
+                }
+                else if (!active && wasActiveBefore)
+                {
+                    await ClearProfileAsync(schedule, cancellationToken).ConfigureAwait(false);
+                }
 
                 if (opened && !isRunning)
                 {
@@ -100,6 +116,40 @@ public sealed class QueueScheduler : IDisposable
         {
             _gate.Release();
         }
+    }
+
+    private async Task ApplyProfileAsync(QueueSchedule schedule, CancellationToken cancellationToken)
+    {
+        if (_profiles is null || _limit is null || schedule.ProfileId is not { } profileId)
+        {
+            return;
+        }
+
+        var profile = await _profiles.GetAsync(profileId, cancellationToken).ConfigureAwait(false);
+        if (profile is null)
+        {
+            return;
+        }
+
+        _limit.SpeedLimit = profile.LimitBps;
+        await _profiles.SetActiveProfileIdAsync(profile.Id, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ClearProfileAsync(QueueSchedule schedule, CancellationToken cancellationToken)
+    {
+        if (_profiles is null || _limit is null || schedule.ProfileId is not { } profileId)
+        {
+            return;
+        }
+
+        var active = await _profiles.GetActiveProfileIdAsync(cancellationToken).ConfigureAwait(false);
+        if (active != profileId)
+        {
+            return;
+        }
+
+        _limit.SpeedLimit = null;
+        await _profiles.SetActiveProfileIdAsync(null, cancellationToken).ConfigureAwait(false);
     }
 
     private void RearmWake(IReadOnlyList<QueueSchedule> schedules, DateTimeOffset now)

@@ -53,14 +53,14 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
     [ObservableProperty]
     private IReadOnlyList<double> _speedSamples = [];
 
-    public TrayIconViewModel(IJobService jobs, IAppLifetime app, Action<Action>? post = null, TimeProvider? timeProvider = null, SpeedLimitState? limit = null)
+    public TrayIconViewModel(IJobService jobs, IAppLifetime app, Action<Action>? post = null, TimeProvider? timeProvider = null, SpeedLimitState? limit = null, IReadOnlyList<SpeedProfile>? profiles = null)
     {
         ArgumentNullException.ThrowIfNull(jobs);
         ArgumentNullException.ThrowIfNull(app);
         _jobs = jobs;
         _app = app;
         _post = post ?? (action => Dispatcher.UIThread.Post(action));
-        SpeedPresets = BuildPresets();
+        SpeedPresets = BuildPresets(profiles);
         _limit = limit ?? new SpeedLimitState(jobs);
         _limit.Changed += OnLimitChanged;
         _selectedPreset = SpeedPresets.FirstOrDefault(p => p.BytesPerSecond == jobs.SpeedLimit) ?? SpeedPresets[0];
@@ -69,12 +69,27 @@ internal sealed partial class TrayIconViewModel : ObservableObject, IAsyncDispos
 
     public IReadOnlyList<SpeedPreset> SpeedPresets { get; }
 
-    /// <summary>Unlimited, 1, 5, 10 and 50 MB/s: the same choices in the tray and on the toolbar.</summary>
-    public static IReadOnlyList<SpeedPreset> BuildPresets() =>
-    [
-        new(Strings.TrayUnlimited, null),
-        .. new long[] { 1, 5, 10, 50 }.Select(mb => new SpeedPreset(string.Format(CultureInfo.CurrentCulture, _presetFormat, mb), mb * 1024 * 1024)),
-    ];
+    /// <summary>Unlimited, 1, 5, 10 and 50 MB/s plus the user's named profiles.</summary>
+    public static IReadOnlyList<SpeedPreset> BuildPresets(IReadOnlyList<SpeedProfile>? profiles = null)
+    {
+        var presets = new List<SpeedPreset>
+        {
+            new(Strings.TrayUnlimited, null),
+        };
+        presets.AddRange(new long[] { 1, 5, 10, 50 }.Select(mb => new SpeedPreset(string.Format(CultureInfo.CurrentCulture, _presetFormat, mb), mb * 1024 * 1024)));
+        if (profiles is not null)
+        {
+            foreach (var profile in profiles)
+            {
+                if (presets.All(preset => preset.BytesPerSecond != profile.LimitBps))
+                {
+                    presets.Add(new SpeedPreset(profile.Name, profile.LimitBps));
+                }
+            }
+        }
+
+        return presets;
+    }
 
     /// <summary>Follows the engine's progress for the tooltip. Call once, on the UI thread.</summary>
     public void Start()

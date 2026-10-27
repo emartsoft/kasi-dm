@@ -76,6 +76,15 @@
 
             <CheckBox Content="{x:Static res:Strings.SchedulerUntilEmpty}" IsChecked="{Binding RunUntilEmpty}" AutomationProperties.Name="{x:Static res:Strings.SchedulerUntilEmptyName}" />
 
+            <TextBlock Text="{x:Static res:Strings.SchedulerSpeedProfile}" Margin="0,8,0,0" Classes="kasi-secondary" />
+            <ComboBox ItemsSource="{Binding SpeedProfiles}" SelectedItem="{Binding SelectedScheduleProfile}" Width="220" HorizontalAlignment="Left" AutomationProperties.Name="{x:Static res:Strings.SchedulerSpeedProfileName}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:SpeedProfileChoice">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
             <TextBlock Text="{x:Static res:Strings.SchedulerActiveDays}" Margin="0,8,0,0" FontWeight="SemiBold" />
             <WrapPanel>
               <CheckBox Content="{x:Static res:Strings.SchedulerDaySun}" IsChecked="{Binding Sunday}" Margin="0,0,12,0" AutomationProperties.Name="{x:Static res:Strings.SchedulerDaySunday}" />
