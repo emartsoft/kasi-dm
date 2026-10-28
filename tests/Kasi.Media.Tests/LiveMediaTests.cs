@@ -1,3 +1,4 @@
+using System.Reflection;
 using Kasi.Core;
 using Kasi.Data;
 using Kasi.Engine;
@@ -11,6 +12,9 @@ namespace Kasi.Media.Tests;
 [Trait("TC", "TC-MED-007")]
 public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
 {
+    private static readonly FieldInfo _waitersField =
+        typeof(FakeTimeProvider).GetField("Waiters", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "kasi-live-media", Guid.NewGuid().ToString("N"));
     private readonly JobId _jobId = JobId.New(TimeProvider.System);
     private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
@@ -65,6 +69,7 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
         await WaitForSegmentAsync(0);
         for (var index = 1; index <= 3; index++)
         {
+            await WaitForTimerAsync(TestContext.Current.CancellationToken);
             _clock.Advance(TimeSpan.FromSeconds(4));
             await WaitForSegmentAsync(index);
         }
@@ -90,6 +95,7 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
         await WaitForSegmentAsync(0);
         for (var index = 1; index < 150; index++)
         {
+            await WaitForTimerAsync(TestContext.Current.CancellationToken);
             _clock.Advance(TimeSpan.FromSeconds(4));
             await WaitForSegmentAsync(index);
         }
@@ -127,6 +133,7 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
         await WaitForSegmentAsync(0);
         for (var index = 1; index <= 2; index++)
         {
+            await WaitForTimerAsync(TestContext.Current.CancellationToken);
             _clock.Advance(TimeSpan.FromSeconds(4));
             await WaitForSegmentAsync(index);
         }
@@ -149,6 +156,7 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
         var resumed = (MediaSourceLoader.Playable)await loader.LoadAsync(MediaKind.Hls, uri,
             cancellationToken: TestContext.Current.CancellationToken);
         var second = runner.RunAsync(resumed, Options(loader, stop.Token), TestContext.Current.CancellationToken);
+        await WaitForTimerAsync(TestContext.Current.CancellationToken);
         _clock.Advance(TimeSpan.FromSeconds(4));
         await WaitForSegmentAsync(3);
         await stop.CancelAsync();
@@ -171,6 +179,49 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
         LiveStopToken = stop,
     };
 
+    private static readonly Type? _waiterType =
+        typeof(FakeTimeProvider).Assembly.GetType("Microsoft.Extensions.Time.Testing.Waiter");
+    private static readonly PropertyInfo? _scheduledOnProp =
+        _waiterType?.GetProperty("ScheduledOn", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly PropertyInfo? _wakeupTimeProp =
+        _waiterType?.GetProperty("WakeupTime", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+    private bool HasLivePollTimer()
+    {
+        if (_waitersField.GetValue(_clock) is System.Collections.IEnumerable waiters)
+        {
+            lock (waiters)
+            {
+                foreach (var waiter in waiters)
+                {
+                    if (_scheduledOnProp?.GetValue(waiter) is long scheduled &&
+                        _wakeupTimeProp?.GetValue(waiter) is long wakeup &&
+                        (wakeup - scheduled) >= TimeSpan.FromSeconds(1).Ticks)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private async Task WaitForTimerAsync(CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (!HasLivePollTimer())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException("The live runner did not arm its poll timer.");
+            }
+
+            await Task.Delay(5, cancellationToken);
+        }
+    }
+
     private async Task WaitForSegmentAsync(int index)
     {
         var path = $"/hls/live/seg{index}.ts";
@@ -183,11 +234,7 @@ public sealed class LiveMediaTests : IAsyncLifetime, IDisposable
                 throw new TimeoutException($"The live runner did not request segment {index}.");
             }
 
-            await Task.Delay(10, TestContext.Current.CancellationToken);
+            await Task.Delay(5, TestContext.Current.CancellationToken);
         }
-
-        // The request counter runs before the segment is flushed and the next poll timer is installed; the CI runner needs a
-        // generous yield here, otherwise the test advances the fake clock before the runner is waiting on it again.
-        await Task.Delay(250, TestContext.Current.CancellationToken);
     }
 }
