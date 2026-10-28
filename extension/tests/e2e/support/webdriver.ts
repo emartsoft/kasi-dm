@@ -111,30 +111,31 @@ export class WebDriverSession {
   async click(css: string, keys: string[] = []): Promise<void> {
     const element = await this.find(css);
     const codes: Record<string, string> = { Alt: '', Control: '', Shift: '' };
-    const held = keys.map((k) => codes[k] ?? '');
-    await this.call('POST', '/actions', {
-      actions: [
-        {
-          type: 'key',
-          id: 'keyboard',
-          actions: [
-            ...held.map((value) => ({ type: 'keyDown', value })),
-            { type: 'pause', duration: 400 },
-            ...held.map((value) => ({ type: 'keyUp', value })),
-          ],
-        },
-        {
-          type: 'pointer',
-          id: 'mouse',
-          parameters: { pointerType: 'mouse' },
-          actions: [
-            { type: 'pointerMove', origin: { [ELEMENT]: element }, x: 0, y: 0 },
-            { type: 'pointerDown', button: 0 },
-            { type: 'pointerUp', button: 0 },
-          ],
-        },
-      ],
-    });
+    const held = keys.map((k) => codes[k] ?? '').filter((v) => v !== '');
+    const actions: unknown[] = [
+      {
+        type: 'pointer',
+        id: 'mouse',
+        parameters: { pointerType: 'mouse' },
+        actions: [
+          { type: 'pointerMove', origin: { [ELEMENT]: element }, x: 0, y: 0 },
+          { type: 'pointerDown', button: 0 },
+          { type: 'pointerUp', button: 0 },
+        ],
+      },
+    ];
+    if (held.length > 0) {
+      actions.unshift({
+        type: 'key',
+        id: 'keyboard',
+        actions: [
+          ...held.map((value) => ({ type: 'keyDown', value })),
+          { type: 'pause', duration: 400 },
+          ...held.map((value) => ({ type: 'keyUp', value })),
+        ],
+      });
+    }
+    await this.call('POST', '/actions', { actions });
     await this.call('DELETE', '/actions');
   }
 
@@ -180,7 +181,20 @@ export class WebDriverSession {
       return await body();
     } finally {
       await this.call('DELETE', '/window');
-      if (first) await this.call('POST', '/window', { handle: first });
+      if (first) {
+        await this.call('POST', '/window', { handle: first });
+        await this.call('POST', '/moz/context', { context: 'chrome' });
+        try {
+          await this.call('POST', '/execute/sync', {
+            script: 'if (typeof gBrowser !== "undefined") { gBrowser.selectedTab = gBrowser.tabs[0]; window.focus(); }',
+            args: [],
+          });
+        } catch {
+          // best-effort tab reactivation
+        } finally {
+          await this.call('POST', '/moz/context', { context: 'content' });
+        }
+      }
     }
   }
 

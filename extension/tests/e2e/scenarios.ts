@@ -58,9 +58,11 @@ async function browserFinishedFile(
     );
   } catch (error) {
     const handed = (await harness.received()).length;
-    const folder = (await driver.folder()).length;
+    const folder = await driver.folder();
+    const folderSummary =
+      folder.length === 0 ? '0 entries' : `${String(folder.length)} entries (${folder.join(', ')})`;
     throw new Error(
-      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s) and the download folder holds ${String(folder)} entries`,
+      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s) and the download folder holds ${folderSummary}`,
       { cause: error },
     );
   }
@@ -425,6 +427,7 @@ export function defineScenarios(kit: BrowserKit): void {
         async () => (await driver.popupText()) === NOT_CONNECTED,
       );
 
+      await pause(300);
       await driver.resetFiles();
       await driver.open(home(page));
       await driver.click('#attr');
