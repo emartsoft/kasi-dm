@@ -61,11 +61,14 @@ async function browserFinishedFile(
     );
   } catch (error) {
     const handed = (await harness.received()).length;
+    const files = await driver.files();
     const folder = await driver.folder();
     const folderSummary =
       folder.length === 0 ? '0 entries' : `${String(folder.length)} entries (${folder.join(', ')})`;
+    const filesSummary =
+      files.length === 0 ? 'none' : files.map((f) => `${f.name}:${f.sha256}`).join(', ');
     throw new Error(
-      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s) and the download folder holds ${folderSummary}`,
+      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s), download folder holds ${folderSummary}, files=[${filesSummary}], expected=${expected}`,
       { cause: error },
     );
   }

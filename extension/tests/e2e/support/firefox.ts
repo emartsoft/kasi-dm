@@ -50,9 +50,6 @@ export async function launchFirefox(
       'browser.download.dir': downloads,
       'browser.download.useDownloadDir': true,
       'browser.download.always_ask_before_handling_new_types': false,
-      'browser.download.manager.showWhenStarting': false,
-      'browser.download.panel.shown': true,
-      'browser.download.alwaysOpenPanel': false,
       'browser.helperApps.neverAsk.saveToDisk': 'application/octet-stream',
       // a second host name for the exclusion case; it resolves to loopback and never leaves the machine
       'network.dns.localDomains': 'excluded.test',
