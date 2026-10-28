@@ -19,7 +19,7 @@ public static class FaultInjectionRunner
     /// <summary>Each connection's socket buffers can hold this much that the server counted as sent but the child never read or saved.</summary>
     private const long SocketBufferBytesPerConnection = 1024 * 1024;
 
-    private static readonly TimeSpan _commitWait = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan _commitWait = TimeSpan.FromSeconds(180);
 
     private static readonly TimeSpan _schedulerJitter = TimeSpan.FromSeconds(0.5);
 

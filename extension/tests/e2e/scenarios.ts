@@ -51,16 +51,24 @@ async function browserFinishedFile(
   driver: BrowserDriver,
   harness: { received(): Promise<readonly unknown[]> },
   expected: string,
+  timeoutMs = 60_000,
 ): Promise<void> {
   try {
-    await waitFor('the browser to finish the file', async () =>
-      (await driver.files()).some((f) => f.sha256 === expected),
+    await waitFor(
+      'the browser to finish the file',
+      async () => (await driver.files()).some((f) => f.sha256 === expected),
+      timeoutMs,
     );
   } catch (error) {
     const handed = (await harness.received()).length;
-    const folder = (await driver.folder()).length;
+    const files = await driver.files();
+    const folder = await driver.folder();
+    const folderSummary =
+      folder.length === 0 ? '0 entries' : `${String(folder.length)} entries (${folder.join(', ')})`;
+    const filesSummary =
+      files.length === 0 ? 'none' : files.map((f) => `${f.name}:${f.sha256}`).join(', ');
     throw new Error(
-      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s) and the download folder holds ${String(folder)} entries`,
+      `${error instanceof Error ? error.message : 'timed out'}: Kasi was handed ${String(handed)} download(s), download folder holds ${folderSummary}, files=[${filesSummary}], expected=${expected}`,
       { cause: error },
     );
   }
@@ -425,6 +433,7 @@ export function defineScenarios(kit: BrowserKit): void {
         async () => (await driver.popupText()) === NOT_CONNECTED,
       );
 
+      await pause(300);
       await driver.resetFiles();
       await driver.open(home(page));
       await driver.click('#attr');

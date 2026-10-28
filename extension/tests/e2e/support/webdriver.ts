@@ -180,7 +180,21 @@ export class WebDriverSession {
       return await body();
     } finally {
       await this.call('DELETE', '/window');
-      if (first) await this.call('POST', '/window', { handle: first });
+      if (first) {
+        await this.call('POST', '/window', { handle: first });
+        await this.call('POST', '/moz/context', { context: 'chrome' });
+        try {
+          await this.call('POST', '/execute/sync', {
+            script:
+              'if (typeof gBrowser !== "undefined") { gBrowser.selectedTab = gBrowser.tabs[0]; window.focus(); }',
+            args: [],
+          });
+        } catch {
+          // best-effort tab reactivation
+        } finally {
+          await this.call('POST', '/moz/context', { context: 'content' });
+        }
+      }
     }
   }
 
