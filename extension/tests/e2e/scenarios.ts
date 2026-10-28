@@ -51,10 +51,13 @@ async function browserFinishedFile(
   driver: BrowserDriver,
   harness: { received(): Promise<readonly unknown[]> },
   expected: string,
+  timeoutMs = 60_000,
 ): Promise<void> {
   try {
-    await waitFor('the browser to finish the file', async () =>
-      (await driver.files()).some((f) => f.sha256 === expected),
+    await waitFor(
+      'the browser to finish the file',
+      async () => (await driver.files()).some((f) => f.sha256 === expected),
+      timeoutMs,
     );
   } catch (error) {
     const handed = (await harness.received()).length;

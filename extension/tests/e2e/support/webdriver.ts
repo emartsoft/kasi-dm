@@ -186,7 +186,8 @@ export class WebDriverSession {
         await this.call('POST', '/moz/context', { context: 'chrome' });
         try {
           await this.call('POST', '/execute/sync', {
-            script: 'if (typeof gBrowser !== "undefined") { gBrowser.selectedTab = gBrowser.tabs[0]; window.focus(); }',
+            script:
+              'if (typeof gBrowser !== "undefined") { gBrowser.selectedTab = gBrowser.tabs[0]; window.focus(); }',
             args: [],
           });
         } catch {
