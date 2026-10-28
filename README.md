@@ -1,6 +1,11 @@
 # Kasi Download Manager
 
 [![CI](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-2%2C100%2B%20passing-brightgreen)](tests/)
+[![Engine Coverage](https://img.shields.io/badge/engine%20coverage-86.6%25-brightgreen)](tests/Kasi.Engine.Tests/)
+[![Architecture](https://img.shields.io/badge/architecture-41%20rules-blue)](tests/Kasi.ArchitectureTests/)
+[![Extension E2E](https://github.com/emartsoft/kasi-dm/actions/workflows/extension-e2e.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/extension-e2e.yml)
+[![Nightly Faults](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-faults.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-faults.yml)
 ![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 ![Avalonia 12](https://img.shields.io/badge/Avalonia-12.1-8B44AC)
 ![TypeScript 5.9](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
@@ -18,6 +23,20 @@ Kasi is a Windows download manager built on .NET 10 and Avalonia. It accelerates
 | UI wireframes | `KASI-UIW-2026-001` |
 | Platforms | Windows 10 22H2+, Windows 11 (x64, ARM64) |
 | Browsers | Chrome, Edge, Firefox (latest 3) and Firefox ESR |
+
+## Test suites & quality insights
+
+| Suite | Scope | Target / Count | Cadence | Status |
+| :--- | :--- | :---: | :---: | :---: |
+| **Core CI** | .NET unit, property, and integration tests across all libraries | 1,745+ tests | PR & Push | [![CI](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/ci.yml) |
+| **Engine Line Coverage** | Line coverage on `Kasi.Engine` (KASI-NFR-018 gate) | **86.6%** (≥80% required) | PR & Push | ![86.6%](https://img.shields.io/badge/coverage-86.6%25-brightgreen) |
+| **Architecture Rules** | Layering, dependency inversion, and circular reference checks | 41 rules | PR & Push | ![41 rules](https://img.shields.io/badge/architecture-41%20rules-brightgreen) |
+| **Browser Extension** | Vitest unit and JSON Schema protocol fixture tests | 373 tests | PR & Push | ![373 tests](https://img.shields.io/badge/tests-373%20passed-brightgreen) |
+| **Extension E2E** | Real browser hand-off, media sniffing, and download capture (Chromium & Firefox) | 23 scenarios | Nightly & Manual | [![Extension E2E](https://github.com/emartsoft/kasi-dm/actions/workflows/extension-e2e.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/extension-e2e.yml) |
+| **Fault Injection** | Kill loops, commit seam cuts, storage stalls, network soaks, and mutations | 6 fault suites | Nightly | [![Nightly Faults](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-faults.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-faults.yml) |
+| **UI Automation** | FlaUI accessibility, Narrator screen-reader sweep, WCAG AAA contrast | Windows 10/11 | Nightly | [![Nightly UI](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-ui.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-ui.yml) |
+| **Linux Conformance** | Containerized build, runtime, and integration conformance (vsftpd, Squid, Dante) | Container integration | PR & Push | [![CI conformance (Linux containers)](https://github.com/emartsoft/kasi-dm/actions/workflows/ci-conformance-linux.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/ci-conformance-linux.yml) |
+| **Fuzzing** | IPC protocol frames, HLS/DASH manifests, SharpFuzz | 100k+ inputs | Nightly | [![Nightly Fuzzing](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-fuzz.yml/badge.svg?branch=main)](https://github.com/emartsoft/kasi-dm/actions/workflows/nightly-fuzz.yml) |
 
 ## Status
 
